@@ -36,18 +36,18 @@ jobs:
 
       - name: Check ZIP
         run: |
-          test -f elxvro-blocks-v0.3.0.zip
-          unzip -t elxvro-blocks-v0.3.0.zip
+          test -f elxvro-blocks-v0.3.1.zip
+          unzip -t elxvro-blocks-v0.3.1.zip
 
       - name: Extract project
         run: |
           rm -rf extracted
           mkdir extracted
-          unzip -q elxvro-blocks-v0.3.0.zip -d extracted
-          ls -la extracted/elxvro-blocks-v0.3.0
+          unzip -q elxvro-blocks-v0.3.1.zip -d extracted
+          ls -la extracted/elxvro-blocks-v0.3.1
 
       - name: Generate Android platform
-        working-directory: extracted/elxvro-blocks-v0.3.0
+        working-directory: extracted/elxvro-blocks-v0.3.1
         run: |
           flutter create \
             --platforms=android \
@@ -56,22 +56,34 @@ jobs:
             .
 
       - name: Install dependencies
-        working-directory: extracted/elxvro-blocks-v0.3.0
+        working-directory: extracted/elxvro-blocks-v0.3.1
         run: flutter pub get
 
       - name: Analyze
-        working-directory: extracted/elxvro-blocks-v0.3.0
+        working-directory: extracted/elxvro-blocks-v0.3.1
         run: flutter analyze
 
       - name: Test
-        working-directory: extracted/elxvro-blocks-v0.3.0
+        working-directory: extracted/elxvro-blocks-v0.3.1
         run: flutter test
 
       - name: Build release APK
-        working-directory: extracted/elxvro-blocks-v0.3.0
+        working-directory: extracted/elxvro-blocks-v0.3.1
         run: flutter build apk --release
 
       - name: Verify APK
         run: |
-          test -f "${{ github.workspace }}/extracted/elxvro-blocks-v0.3.0/build/app/outputs/flutter-apk/app-release.apk"
-          ls -lh "${{ github.workspace }}/extracted/elx
+          APK_PATH="${{ github.workspace }}/extracted/elxvro-blocks-v0.3.1/build/app/outputs/flutter-apk/app-release.apk"
+          test -f "$APK_PATH"
+          ls -lh "$APK_PATH"
+
+      - name: Rename APK
+        run: |
+          cp \
+            "${{ github.workspace }}/extracted/elxvro-blocks-v0.3.1/build/app/outputs/flutter-apk/app-release.apk" \
+            "${{ github.workspace }}/ELXVRO-Blocks-v0.3.1.apk"
+
+          ls -lh "${{ github.workspace }}/ELXVRO-Blocks-v0.3.1.apk"
+
+      - name: Upload APK artifact
+       
