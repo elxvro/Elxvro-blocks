@@ -91,3 +91,89 @@ jobs:
 
       - name: Install dependencies
         working-directory: extracted/elxvro-blocks-v0.9.1
+        run: flutter pub get
+
+      - name: Generate launcher icon
+        working-directory: extracted/elxvro-blocks-v0.9.1
+        run: dart run flutter_launcher_icons
+
+      - name: Generate native splash
+        working-directory: extracted/elxvro-blocks-v0.9.1
+        run: dart run flutter_native_splash:create
+
+      - name: Analyze
+        working-directory: extracted/elxvro-blocks-v0.9.1
+        run: flutter analyze
+
+      - name: Test
+        working-directory: extracted/elxvro-blocks-v0.9.1
+        run: flutter test
+
+      - name: Build release APK
+        working-directory: extracted/elxvro-blocks-v0.9.1
+        run: |
+          flutter build apk \
+            --release \
+            --obfuscate \
+            --split-debug-info=build/symbols/apk
+
+      - name: Build release AAB
+        working-directory: extracted/elxvro-blocks-v0.9.1
+        run: |
+          flutter build appbundle \
+            --release \
+            --obfuscate \
+            --split-debug-info=build/symbols/aab
+
+      - name: Verify outputs
+        run: |
+          APK_PATH="${{ github.workspace }}/extracted/elxvro-blocks-v0.9.1/build/app/outputs/flutter-apk/app-release.apk"
+          AAB_PATH="${{ github.workspace }}/extracted/elxvro-blocks-v0.9.1/build/app/outputs/bundle/release/app-release.aab"
+
+          test -f "$APK_PATH"
+          test -f "$AAB_PATH"
+
+          ls -lh "$APK_PATH"
+          ls -lh "$AAB_PATH"
+
+      - name: Prepare artifacts
+        run: |
+          cp \
+            "${{ github.workspace }}/extracted/elxvro-blocks-v0.9.1/build/app/outputs/flutter-apk/app-release.apk" \
+            "${{ github.workspace }}/ELXVRO-Blocks-v0.9.1.apk"
+
+          cp \
+            "${{ github.workspace }}/extracted/elxvro-blocks-v0.9.1/build/app/outputs/bundle/release/app-release.aab" \
+            "${{ github.workspace }}/ELXVRO-Blocks-v0.9.1.aab"
+
+          cp \
+            "${{ github.workspace }}/extracted/elxvro-blocks-v0.9.1/release-signing-status.txt" \
+            "${{ github.workspace }}/release-signing-status.txt"
+
+          cd "${{ github.workspace }}/extracted/elxvro-blocks-v0.9.1"
+
+          if [ -d build/symbols ]; then
+            zip -qr \
+              "${{ github.workspace }}/ELXVRO-Blocks-v0.9.1-symbols.zip" \
+              build/symbols
+          fi
+
+          cd "${{ github.workspace }}"
+
+          sha256sum \
+            ELXVRO-Blocks-v0.9.1.apk \
+            ELXVRO-Blocks-v0.9.1.aab \
+            > ELXVRO-Blocks-v0.9.1-SHA256.txt
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ELXVRO-Blocks-v0.9.1
+          path: |
+            ${{ github.workspace }}/ELXVRO-Blocks-v0.9.1.apk
+            ${{ github.workspace }}/ELXVRO-Blocks-v0.9.1.aab
+            ${{ github.workspace }}/ELXVRO-Blocks-v0.9.1-SHA256.txt
+            ${{ github.workspace }}/ELXVRO-Blocks-v0.9.1-symbols.zip
+            ${{ github.workspace }}/release-signing-status.txt
+          if-no-files-found: error
+          retention-days: 14
