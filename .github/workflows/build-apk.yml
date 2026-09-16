@@ -54,7 +54,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ELXVRO-Blocks-v0.1.0
-          path: ELXVRO-Blocks-v0.1.0.apk
+          name: ELXVRO-Blocks-v0.1.1
+          path: ELXVRO-Blocks-v0.1.1.apk
           if-no-files-found: error
           retention-days: 14
