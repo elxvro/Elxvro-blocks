@@ -1,4 +1,4 @@
-name: ELXVRO Blocks v0.9.4 Build
+name: ELXVRO Blocks v0.9.5 Build
 
 on:
   push:
@@ -36,18 +36,18 @@ jobs:
 
       - name: Check ZIP
         run: |
-          test -f elxvro-blocks-v0.9.4.zip
-          unzip -t elxvro-blocks-v0.9.4.zip
+          test -f elxvro-blocks-v0.9.5.zip
+          unzip -t elxvro-blocks-v0.9.5.zip
 
       - name: Extract project
         run: |
           rm -rf extracted
           mkdir extracted
-          unzip -q elxvro-blocks-v0.9.4.zip -d extracted
-          ls -la extracted/elxvro-blocks-v0.9.4
+          unzip -q elxvro-blocks-v0.9.5.zip -d extracted
+          ls -la extracted/elxvro-blocks-v0.9.5
 
       - name: Generate Android platform
-        working-directory: extracted/elxvro-blocks-v0.9.4
+        working-directory: extracted/elxvro-blocks-v0.9.5
         run: |
           flutter create \
             --platforms=android \
@@ -56,11 +56,11 @@ jobs:
             .
 
       - name: Apply Android branding
-        working-directory: extracted/elxvro-blocks-v0.9.4
+        working-directory: extracted/elxvro-blocks-v0.9.5
         run: python tool/apply_android_branding.py
 
       - name: Configure release signing when secrets exist
-        working-directory: extracted/elxvro-blocks-v0.9.4
+        working-directory: extracted/elxvro-blocks-v0.9.5
         env:
           KEYSTORE_BASE64: ${{ secrets.ELXVRO_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.ELXVRO_KEYSTORE_PASSWORD }}
@@ -71,6 +71,7 @@ jobs:
              [ -n "$KEYSTORE_PASSWORD" ] && \
              [ -n "$KEY_ALIAS" ] && \
              [ -n "$KEY_PASSWORD" ]; then
+
             printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/app/elxvro-release.jks
 
             {
@@ -83,39 +84,35 @@ jobs:
             python tool/configure_release_signing.py
 
             echo 'RELEASE_SIGNING_CONFIGURED=true' >> "$GITHUB_ENV"
-            printf 'Release keystore configured from GitHub Secrets.\n' \
-              > release-signing-status.txt
+            echo "Release signing configured." > release-signing-status.txt
           else
             echo 'RELEASE_SIGNING_CONFIGURED=false' >> "$GITHUB_ENV"
-
-            printf 'Release keystore secrets are not configured. Test build only.\n' \
-              > release-signing-status.txt
-
+            echo "Release signing secrets not configured. Test build only." > release-signing-status.txt
             echo "::warning::Release signing secrets are missing."
           fi
 
       - name: Install dependencies
-        working-directory: extracted/elxvro-blocks-v0.9.4
+        working-directory: extracted/elxvro-blocks-v0.9.5
         run: flutter pub get
 
       - name: Generate launcher icon
-        working-directory: extracted/elxvro-blocks-v0.9.4
+        working-directory: extracted/elxvro-blocks-v0.9.5
         run: dart run flutter_launcher_icons
 
       - name: Generate native splash
-        working-directory: extracted/elxvro-blocks-v0.9.4
+        working-directory: extracted/elxvro-blocks-v0.9.5
         run: dart run flutter_native_splash:create
 
       - name: Analyze
-        working-directory: extracted/elxvro-blocks-v0.9.4
+        working-directory: extracted/elxvro-blocks-v0.9.5
         run: flutter analyze
 
       - name: Test
-        working-directory: extracted/elxvro-blocks-v0.9.4
+        working-directory: extracted/elxvro-blocks-v0.9.5
         run: flutter test
 
       - name: Build release APK
-        working-directory: extracted/elxvro-blocks-v0.9.4
+        working-directory: extracted/elxvro-blocks-v0.9.5
         run: |
           flutter build apk \
             --release \
@@ -123,7 +120,7 @@ jobs:
             --split-debug-info=build/symbols/apk
 
       - name: Build release AAB
-        working-directory: extracted/elxvro-blocks-v0.9.4
+        working-directory: extracted/elxvro-blocks-v0.9.5
         run: |
           flutter build appbundle \
             --release \
@@ -132,52 +129,53 @@ jobs:
 
       - name: Verify release outputs
         run: |
-          APK_PATH="${{ github.workspace }}/extracted/elxvro-blocks-v0.9.4/build/app/outputs/flutter-apk/app-release.apk"
-          AAB_PATH="${{ github.workspace }}/extracted/elxvro-blocks-v0.9.4/build/app/outputs/bundle/release/app-release.aab"
+          APK_PATH="${{ github.workspace }}/extracted/elxvro-blocks-v0.9.5/build/app/outputs/flutter-apk/app-release.apk"
+          AAB_PATH="${{ github.workspace }}/extracted/elxvro-blocks-v0.9.5/build/app/outputs/bundle/release/app-release.aab"
 
           test -f "$APK_PATH"
           test -f "$AAB_PATH"
 
-          ls -lh "$APK_PATH" "$AAB_PATH"
+          ls -lh "$APK_PATH"
+          ls -lh "$AAB_PATH"
 
       - name: Prepare release artifacts
         run: |
           cp \
-            "${{ github.workspace }}/extracted/elxvro-blocks-v0.9.4/build/app/outputs/flutter-apk/app-release.apk" \
-            "${{ github.workspace }}/ELXVRO-Blocks-v0.9.4.apk"
+            "${{ github.workspace }}/extracted/elxvro-blocks-v0.9.5/build/app/outputs/flutter-apk/app-release.apk" \
+            "${{ github.workspace }}/ELXVRO-Blocks-v0.9.5.apk"
 
           cp \
-            "${{ github.workspace }}/extracted/elxvro-blocks-v0.9.4/build/app/outputs/bundle/release/app-release.aab" \
-            "${{ github.workspace }}/ELXVRO-Blocks-v0.9.4.aab"
+            "${{ github.workspace }}/extracted/elxvro-blocks-v0.9.5/build/app/outputs/bundle/release/app-release.aab" \
+            "${{ github.workspace }}/ELXVRO-Blocks-v0.9.5.aab"
 
           cp \
-            "${{ github.workspace }}/extracted/elxvro-blocks-v0.9.4/release-signing-status.txt" \
+            "${{ github.workspace }}/extracted/elxvro-blocks-v0.9.5/release-signing-status.txt" \
             "${{ github.workspace }}/release-signing-status.txt"
 
-          cd "${{ github.workspace }}/extracted/elxvro-blocks-v0.9.4"
+          cd "${{ github.workspace }}/extracted/elxvro-blocks-v0.9.5"
 
           if [ -d build/symbols ]; then
             zip -qr \
-              "${{ github.workspace }}/ELXVRO-Blocks-v0.9.4-symbols.zip" \
+              "${{ github.workspace }}/ELXVRO-Blocks-v0.9.5-symbols.zip" \
               build/symbols
           fi
 
           cd "${{ github.workspace }}"
 
           sha256sum \
-            ELXVRO-Blocks-v0.9.4.apk \
-            ELXVRO-Blocks-v0.9.4.aab \
-            > ELXVRO-Blocks-v0.9.4-SHA256.txt
+            ELXVRO-Blocks-v0.9.5.apk \
+            ELXVRO-Blocks-v0.9.5.aab \
+            > ELXVRO-Blocks-v0.9.5-SHA256.txt
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ELXVRO-Blocks-v0.9.4
+          name: ELXVRO-Blocks-v0.9.5
           path: |
-            ${{ github.workspace }}/ELXVRO-Blocks-v0.9.4.apk
-            ${{ github.workspace }}/ELXVRO-Blocks-v0.9.4.aab
-            ${{ github.workspace }}/ELXVRO-Blocks-v0.9.4-SHA256.txt
-            ${{ github.workspace }}/ELXVRO-Blocks-v0.9.4-symbols.zip
+            ${{ github.workspace }}/ELXVRO-Blocks-v0.9.5.apk
+            ${{ github.workspace }}/ELXVRO-Blocks-v0.9.5.aab
+            ${{ github.workspace }}/ELXVRO-Blocks-v0.9.5-SHA256.txt
+            ${{ github.workspace }}/ELXVRO-Blocks-v0.9.5-symbols.zip
             ${{ github.workspace }}/release-signing-status.txt
           if-no-files-found: error
           retention-days: 14
