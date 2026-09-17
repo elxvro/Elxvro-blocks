@@ -104,11 +104,11 @@ jobs:
         working-directory: extracted/elxvro-blocks-v0.9.9
         run: bash tool/fetch_real_material_audio.sh
 
-      - name: Fetch puzzle background music
+      - name: Fetch real composed puzzle music
         working-directory: extracted/elxvro-blocks-v0.9.9
-        run: bash tool/fetch_background_music.sh
+        run: bash tool/fetch_real_puzzle_music.sh
 
-      - name: Verify real audio and music
+      - name: Verify real material audio
         working-directory: extracted/elxvro-blocks-v0.9.9
         run: |
           test -s assets/audio/REAL_AUDIO_BUILD.txt
@@ -118,10 +118,20 @@ jobs:
           test -s assets/audio/leaf_clear_v1.wav
           test -s assets/audio/marble_place_v1.wav
 
-          test -s assets/audio/music/background_music.ogg
-
           echo "Real material audio verified."
-          echo "Background music verified."
+
+      - name: Verify real music
+        working-directory: extracted/elxvro-blocks-v0.9.9
+        run: |
+          test -s assets/audio/cozy_puzzle_music.ogg
+          test -s assets/audio/REAL_MUSIC_BUILD.txt
+
+          ffprobe -v error \
+            -show_entries format=duration \
+            -of default=noprint_wrappers=1:nokey=1 \
+            assets/audio/cozy_puzzle_music.ogg
+
+          echo "Real composed puzzle music verified."
 
       - name: Generate launcher icon
         working-directory: extracted/elxvro-blocks-v0.9.9
