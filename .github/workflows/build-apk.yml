@@ -75,8 +75,8 @@ jobs:
             exit 1
           fi
 
-          if ! printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/app/elxvro-release.jks; then
-            echo "::error::ELXVRO_KEYSTORE_BASE64 is not valid Base64. Recreate it from the .jks file and replace that GitHub secret."
+          if ! printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > android/app/elxvro-release.jks; then
+            echo "::error::ELXVRO_KEYSTORE_BASE64 is not valid Base64 after whitespace cleanup. Recreate it from the .jks file and replace that GitHub secret."
             exit 1
           fi
 
