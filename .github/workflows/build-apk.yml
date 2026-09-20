@@ -1,4 +1,4 @@
-name: ELXVRO Blocks v0.10.1 Build
+name: ELXVRO Blocks v0.10.1 Play Release
 
 on:
   push:
@@ -59,7 +59,7 @@ jobs:
         working-directory: extracted/elxvro-blocks-v0.10.1
         run: python tool/apply_android_branding.py
 
-      - name: Configure release signing when secrets exist
+      - name: Configure mandatory Play release signing
         working-directory: extracted/elxvro-blocks-v0.10.1
         env:
           KEYSTORE_BASE64: ${{ secrets.ELXVRO_KEYSTORE_BASE64 }}
@@ -67,29 +67,38 @@ jobs:
           KEY_ALIAS: ${{ secrets.ELXVRO_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ELXVRO_KEY_PASSWORD }}
         run: |
-          if [ -n "$KEYSTORE_BASE64" ] && \
-             [ -n "$KEYSTORE_PASSWORD" ] && \
-             [ -n "$KEY_ALIAS" ] && \
-             [ -n "$KEY_PASSWORD" ]; then
-
-            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/app/elxvro-release.jks
-
-            {
-              printf 'storePassword=%s\n' "$KEYSTORE_PASSWORD"
-              printf 'keyPassword=%s\n' "$KEY_PASSWORD"
-              printf 'keyAlias=%s\n' "$KEY_ALIAS"
-              printf 'storeFile=elxvro-release.jks\n'
-            } > android/key.properties
-
-            python tool/configure_release_signing.py
-
-            echo 'RELEASE_SIGNING_CONFIGURED=true' >> "$GITHUB_ENV"
-            echo "Release signing configured." > release-signing-status.txt
-          else
-            echo 'RELEASE_SIGNING_CONFIGURED=false' >> "$GITHUB_ENV"
-            echo "Release signing secrets not configured. Test build only." > release-signing-status.txt
-            echo "::warning::Release signing secrets are missing."
+          if [ -z "$KEYSTORE_BASE64" ] || \
+             [ -z "$KEYSTORE_PASSWORD" ] || \
+             [ -z "$KEY_ALIAS" ] || \
+             [ -z "$KEY_PASSWORD" ]; then
+            echo "::error::Play release signing secrets are missing. Build stopped to prevent a debug-signed release."
+            exit 1
           fi
+
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/app/elxvro-release.jks
+
+          if [ ! -s android/app/elxvro-release.jks ]; then
+            echo "::error::Decoded keystore is empty or invalid."
+            exit 1
+          fi
+
+          {
+            printf 'storePassword=%s\n' "$KEYSTORE_PASSWORD"
+            printf 'keyPassword=%s\n' "$KEY_PASSWORD"
+            printf 'keyAlias=%s\n' "$KEY_ALIAS"
+            printf 'storeFile=elxvro-release.jks\n'
+          } > android/key.properties
+
+          keytool -list \
+            -keystore android/app/elxvro-release.jks \
+            -alias "$KEY_ALIAS" \
+            -storepass "$KEYSTORE_PASSWORD" \
+            >/dev/null
+
+          python tool/configure_release_signing.py
+
+          echo 'RELEASE_SIGNING_CONFIGURED=true' >> "$GITHUB_ENV"
+          echo "Google Play release signing configured and keystore alias verified." > release-signing-status.txt
 
       - name: Install dependencies
         working-directory: extracted/elxvro-blocks-v0.10.1
@@ -117,7 +126,6 @@ jobs:
           test -s assets/audio/wood_clear_v1.wav
           test -s assets/audio/leaf_clear_v1.wav
           test -s assets/audio/marble_place_v1.wav
-
           echo "Real material audio verified."
 
       - name: Verify real music
@@ -152,6 +160,8 @@ jobs:
       - name: Build release APK
         working-directory: extracted/elxvro-blocks-v0.10.1
         run: |
+          test "$RELEASE_SIGNING_CONFIGURED" = "true"
+
           flutter build apk \
             --release \
             --obfuscate \
@@ -160,10 +170,24 @@ jobs:
       - name: Build release AAB
         working-directory: extracted/elxvro-blocks-v0.10.1
         run: |
+          test "$RELEASE_SIGNING_CONFIGURED" = "true"
+
           flutter build appbundle \
             --release \
             --obfuscate \
             --split-debug-info=build/symbols/aab
+
+      - name: Verify Play AAB signature
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: |
+          AAB="build/app/outputs/bundle/release/app-release.aab"
+
+          test -f "$AAB"
+
+          jarsigner -verify -verbose -certs "$AAB"
+
+          echo "AAB cryptographic signature verified."
+          keytool -printcert -jarfile "$AAB" | grep -E 'Owner:|Issuer:|SHA256:' || true
 
       - name: Verify release outputs
         run: |
@@ -208,7 +232,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ELXVRO-Blocks-v0.10.1
+          name: ELXVRO-Blocks-v0.10.1-PLAY-SIGNED
           path: |
             ${{ github.workspace }}/ELXVRO-Blocks-v0.10.1.apk
             ${{ github.workspace }}/ELXVRO-Blocks-v0.10.1.aab
