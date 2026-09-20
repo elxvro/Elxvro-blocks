@@ -85,6 +85,11 @@ jobs:
             exit 1
           fi
 
+          echo "Decoded keystore SHA256:"
+          sha256sum android/app/elxvro-release.jks
+          echo "Decoded keystore file type:"
+          file android/app/elxvro-release.jks || true
+
           if ! keytool -list \
             -keystore android/app/elxvro-release.jks \
             -storepass "$KEYSTORE_PASSWORD" \
