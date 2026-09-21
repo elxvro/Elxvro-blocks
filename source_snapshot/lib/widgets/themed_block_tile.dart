@@ -87,6 +87,7 @@ class _Premium3DBlockPainter extends CustomPainter {
     }
     canvas.restore();
 
+    _paintSurfaceResponse(canvas, topSize);
     _paintBevel(canvas, topSize);
 
     if (flash > 0) {
@@ -175,6 +176,169 @@ class _Premium3DBlockPainter extends CustomPainter {
       ..color = Colors.black.withValues(alpha: 0.46);
     canvas.drawPath(right, seam);
     canvas.drawPath(front, seam);
+  }
+
+  void _paintSurfaceResponse(Canvas canvas, Size size) {
+    final rect = Rect.fromLTWH(1, 1, size.width - 2, size.height - 2);
+    final radius = Radius.circular(size.shortestSide * 0.16);
+    final rr = RRect.fromRectAndRadius(rect, radius);
+
+    // Directional light from the upper-left gives every material a physical
+    // face instead of a flat UI gradient.
+    canvas.save();
+    canvas.clipRRect(rr);
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          stops: const <double>[0.0, 0.34, 0.72, 1.0],
+          colors: <Color>[
+            Colors.white.withValues(alpha: 0.19),
+            Colors.white.withValues(alpha: 0.035),
+            Colors.transparent,
+            Colors.black.withValues(alpha: 0.23),
+          ],
+        ).createShader(rect),
+    );
+
+    switch (material) {
+      case ThemeMaterial.glass:
+        final glassLine = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeWidth = math.max(0.5, size.shortestSide * 0.017)
+          ..color = Colors.white.withValues(alpha: 0.20);
+        canvas.drawArc(
+          Rect.fromLTWH(
+            size.width * 0.12,
+            size.height * 0.08,
+            size.width * 0.70,
+            size.height * 0.58,
+          ),
+          -2.72,
+          1.05,
+          false,
+          glassLine,
+        );
+        break;
+      case ThemeMaterial.wood:
+        final sheen = Paint()
+          ..strokeCap = StrokeCap.round
+          ..strokeWidth = math.max(0.5, size.shortestSide * 0.014)
+          ..color = const Color(0xFFFFD6A0).withValues(alpha: 0.13);
+        for (var i = 0; i < 3; i++) {
+          final y = size.height * (0.22 + i * 0.21);
+          canvas.drawLine(
+            Offset(size.width * 0.14, y),
+            Offset(size.width * (0.56 + i * 0.08), y - size.height * 0.035),
+            sheen,
+          );
+        }
+        break;
+      case ThemeMaterial.stone:
+        final pore = Paint()
+          ..color = Colors.black.withValues(alpha: 0.18);
+        final highlight = Paint()
+          ..color = Colors.white.withValues(alpha: 0.09);
+        final points = <Offset>[
+          Offset(size.width * 0.20, size.height * 0.22),
+          Offset(size.width * 0.70, size.height * 0.18),
+          Offset(size.width * 0.34, size.height * 0.60),
+          Offset(size.width * 0.76, size.height * 0.66),
+          Offset(size.width * 0.52, size.height * 0.37),
+        ];
+        for (var i = 0; i < points.length; i++) {
+          final r = size.shortestSide * (0.012 + (i % 2) * 0.006);
+          canvas.drawCircle(points[i], r, pore);
+          canvas.drawCircle(
+            points[i] - Offset(r * 0.35, r * 0.35),
+            r * 0.38,
+            highlight,
+          );
+        }
+        break;
+      case ThemeMaterial.leaf:
+        canvas.drawOval(
+          Rect.fromLTWH(
+            size.width * 0.16,
+            size.height * 0.10,
+            size.width * 0.48,
+            size.height * 0.22,
+          ),
+          Paint()
+            ..shader = RadialGradient(
+              colors: <Color>[
+                Colors.white.withValues(alpha: 0.18),
+                Colors.transparent,
+              ],
+            ).createShader(
+              Rect.fromLTWH(
+                size.width * 0.16,
+                size.height * 0.10,
+                size.width * 0.48,
+                size.height * 0.22,
+              ),
+            ),
+        );
+        break;
+      case ThemeMaterial.crystal:
+        final glint = Paint()
+          ..strokeCap = StrokeCap.round
+          ..color = Colors.white.withValues(alpha: 0.36);
+        glint.strokeWidth = math.max(0.55, size.shortestSide * 0.018);
+        final g = Offset(size.width * 0.70, size.height * 0.24);
+        canvas.drawLine(
+          g - Offset(size.width * 0.11, 0),
+          g + Offset(size.width * 0.11, 0),
+          glint,
+        );
+        canvas.drawLine(
+          g - Offset(0, size.height * 0.11),
+          g + Offset(0, size.height * 0.11),
+          glint,
+        );
+        break;
+      case ThemeMaterial.marble:
+        canvas.drawArc(
+          Rect.fromLTWH(
+            size.width * 0.07,
+            size.height * 0.03,
+            size.width * 0.78,
+            size.height * 0.64,
+          ),
+          -2.75,
+          1.08,
+          false,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = math.max(0.55, size.shortestSide * 0.017)
+            ..color = Colors.white.withValues(alpha: 0.20),
+        );
+        break;
+    }
+
+    canvas.restore();
+
+    // Contact occlusion at the lower/right bevel makes the face sit on its
+    // extruded sides instead of appearing pasted on top.
+    canvas.drawLine(
+      Offset(size.width * 0.13, size.height - 1.2),
+      Offset(size.width * 0.82, size.height - 1.2),
+      Paint()
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = math.max(0.7, size.shortestSide * 0.028)
+        ..color = Colors.black.withValues(alpha: 0.25),
+    );
+    canvas.drawLine(
+      Offset(size.width - 1.2, size.height * 0.16),
+      Offset(size.width - 1.2, size.height * 0.78),
+      Paint()
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = math.max(0.7, size.shortestSide * 0.028)
+        ..color = Colors.black.withValues(alpha: 0.22),
+    );
   }
 
   void _paintBevel(Canvas canvas, Size topSize) {
