@@ -9,6 +9,10 @@ on:
       - ".github/workflows/build-3d-prototype.yml"
   workflow_dispatch:
 
+env:
+  GODOT_VERSION: "4.3"
+  ANDROID_HOME: /usr/lib/android-sdk
+
 permissions:
   contents: read
 
@@ -17,6 +21,7 @@ jobs:
     name: Build 3D prototype APK
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+
     container:
       image: barichello/godot-ci:4.3
 
@@ -39,22 +44,24 @@ jobs:
         run: |
           set -euo pipefail
 
+          chmod -R u+rwX prototype-3d
+
           mkdir -p "$HOME/.local/share/godot/export_templates"
           mkdir -p "$HOME/.config"
 
           rm -rf "$HOME/.config/godot"
           cp -a /root/.config/godot "$HOME/.config/godot"
 
-          rm -rf "$HOME/.local/share/godot/export_templates/4.3.stable"
-          cp -a /root/.local/share/godot/export_templates/4.3.stable             "$HOME/.local/share/godot/export_templates/4.3.stable"
+          rm -rf "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          cp -a "/root/.local/share/godot/export_templates/${GODOT_VERSION}.stable"             "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
 
-          test -f "$HOME/.local/share/godot/export_templates/4.3.stable/android_debug.apk"
-          echo "Godot editor settings, Java path, debug keystore and export templates ready."
+          test -f "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_debug.apk"
 
       - name: Install Android 34 packages
         shell: bash
         run: |
           set -euo pipefail
+
           yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses >/dev/null 2>&1 || true
           sdkmanager --sdk_root="$ANDROID_HOME"             "platform-tools"             "build-tools;34.0.0"             "platforms;android-34"
 
@@ -62,17 +69,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path prototype-3d --editor --quit
+          cd prototype-3d
+          rm -rf .godot
+          godot --headless --verbose --editor --quit --path .
 
       - name: Build Android debug APK
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p prototype-3d/build
-          godot --headless \
-            --path prototype-3d \
-            --export-debug "Android" \
-            build/ELXVRO-Blocks-3D-Prototype.apk
+          cd prototype-3d
+          mkdir -p build
+
+          godot --headless --verbose --path .             --export-debug "Android Debug"             "build/ELXVRO-Blocks-3D-Prototype.apk"
+
+          test -s build/ELXVRO-Blocks-3D-Prototype.apk
 
       - name: Verify APK
         shell: bash
@@ -80,8 +90,7 @@ jobs:
           set -euo pipefail
           test -s prototype-3d/build/ELXVRO-Blocks-3D-Prototype.apk
           ls -lh prototype-3d/build/ELXVRO-Blocks-3D-Prototype.apk
-          sha256sum prototype-3d/build/ELXVRO-Blocks-3D-Prototype.apk \
-            > prototype-3d/build/ELXVRO-Blocks-3D-Prototype-SHA256.txt
+          sha256sum prototype-3d/build/ELXVRO-Blocks-3D-Prototype.apk             > prototype-3d/build/ELXVRO-Blocks-3D-Prototype-SHA256.txt
 
       - name: Upload prototype APK
         uses: actions/upload-artifact@v4
