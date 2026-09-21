@@ -1,0 +1,70 @@
+name: ELXVRO Blocks 3D Prototype APK
+
+on:
+  push:
+    branches:
+      - 3d-prototype-v0.11.0
+    paths:
+      - "prototype-3d/**"
+      - ".github/workflows/build-3d-prototype.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android-debug:
+    name: Build 3D prototype APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    container:
+      image: barichello/godot-ci:4.3
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Godot project
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --version
+          test -f prototype-3d/project.godot
+          test -f prototype-3d/export_presets.cfg
+          test -f prototype-3d/main.tscn
+          test -f prototype-3d/game.gd
+
+      - name: Import project
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path prototype-3d --editor --quit
+
+      - name: Build Android debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p prototype-3d/build
+          godot --headless \
+            --path prototype-3d \
+            --export-debug "Android" \
+            build/ELXVRO-Blocks-3D-Prototype.apk
+
+      - name: Verify APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s prototype-3d/build/ELXVRO-Blocks-3D-Prototype.apk
+          ls -lh prototype-3d/build/ELXVRO-Blocks-3D-Prototype.apk
+          sha256sum prototype-3d/build/ELXVRO-Blocks-3D-Prototype.apk \
+            > prototype-3d/build/ELXVRO-Blocks-3D-Prototype-SHA256.txt
+
+      - name: Upload prototype APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ELXVRO-Blocks-v0.11.0-3D-PROTOTYPE
+          path: |
+            prototype-3d/build/ELXVRO-Blocks-3D-Prototype.apk
+            prototype-3d/build/ELXVRO-Blocks-3D-Prototype-SHA256.txt
+          if-no-files-found: error
+          retention-days: 14
