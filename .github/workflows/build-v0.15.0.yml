@@ -187,23 +187,49 @@ jobs:
         working-directory: extracted/elxvro-blocks-v0.10.1
         run: |
           test "$RELEASE_SIGNING_CONFIGURED" = "true"
-          flutter build apk             --release             --obfuscate             --split-debug-info=build/symbols/apk
+          flutter build apk \
+            --release \
+            --obfuscate \
+            --split-debug-info=build/symbols/apk
 
-      - name: Prepare test artifact
+      - name: Build signed Google Play AAB
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: |
+          test "$RELEASE_SIGNING_CONFIGURED" = "true"
+          flutter build appbundle \
+            --release \
+            --obfuscate \
+            --split-debug-info=build/symbols/aab
+
+      - name: Prepare APK and AAB package
         run: |
           set -euo pipefail
           APK="extracted/elxvro-blocks-v0.10.1/build/app/outputs/flutter-apk/app-release.apk"
-          test -s "$APK"
-          cp "$APK" ELXVRO-Blocks-v0.15.0-BRIGHT-FRACTURE-PLAYLIST.apk
-          sha256sum ELXVRO-Blocks-v0.15.0-BRIGHT-FRACTURE-PLAYLIST.apk > ELXVRO-Blocks-v0.15.0-BRIGHT-FRACTURE-PLAYLIST-SHA256.txt
-          ls -lh ELXVRO-Blocks-v0.15.0-BRIGHT-FRACTURE-PLAYLIST.apk
+          AAB="extracted/elxvro-blocks-v0.10.1/build/app/outputs/bundle/release/app-release.aab"
 
-      - name: Upload APK
+          test -s "$APK"
+          test -s "$AAB"
+
+          cp "$APK" ELXVRO-Blocks-v0.15.0-SIGNED.apk
+          cp "$AAB" ELXVRO-Blocks-v0.15.0-GOOGLE-PLAY.aab
+
+          sha256sum ELXVRO-Blocks-v0.15.0-SIGNED.apk > ELXVRO-Blocks-v0.15.0-SIGNED.apk.sha256
+          sha256sum ELXVRO-Blocks-v0.15.0-GOOGLE-PLAY.aab > ELXVRO-Blocks-v0.15.0-GOOGLE-PLAY.aab.sha256
+
+          mkdir -p ELXVRO-Blocks-v0.15.0-APK-AAB
+          cp ELXVRO-Blocks-v0.15.0-SIGNED.apk ELXVRO-Blocks-v0.15.0-APK-AAB/
+          cp ELXVRO-Blocks-v0.15.0-GOOGLE-PLAY.aab ELXVRO-Blocks-v0.15.0-APK-AAB/
+          cp ELXVRO-Blocks-v0.15.0-SIGNED.apk.sha256 ELXVRO-Blocks-v0.15.0-APK-AAB/
+          cp ELXVRO-Blocks-v0.15.0-GOOGLE-PLAY.aab.sha256 ELXVRO-Blocks-v0.15.0-APK-AAB/
+
+          ls -lh ELXVRO-Blocks-v0.15.0-SIGNED.apk
+          ls -lh ELXVRO-Blocks-v0.15.0-GOOGLE-PLAY.aab
+
+      - name: Upload APK and AAB
         uses: actions/upload-artifact@v4
         with:
-          name: ELXVRO-Blocks-v0.15.0-BRIGHT-FRACTURE-PLAYLIST
+          name: ELXVRO-Blocks-v0.15.0-APK-AAB
           path: |
-            ELXVRO-Blocks-v0.15.0-BRIGHT-FRACTURE-PLAYLIST.apk
-            ELXVRO-Blocks-v0.15.0-BRIGHT-FRACTURE-PLAYLIST-SHA256.txt
+            ELXVRO-Blocks-v0.15.0-APK-AAB/
           if-no-files-found: error
           retention-days: 14
