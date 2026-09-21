@@ -1350,14 +1350,70 @@ class _GameScreenState extends State<GameScreen>
   }
 
   void _mediumHaptic() {
-    if (widget.appState.hapticsEnabled) {
-      HapticFeedback.mediumImpact();
+    if (!widget.appState.hapticsEnabled) return;
+    switch (_theme.material) {
+      case ThemeMaterial.stone:
+      case ThemeMaterial.marble:
+        HapticFeedback.heavyImpact();
+        break;
+      case ThemeMaterial.wood:
+        HapticFeedback.mediumImpact();
+        Timer(
+          const Duration(milliseconds: 42),
+          HapticFeedback.selectionClick,
+        );
+        break;
+      case ThemeMaterial.glass:
+        HapticFeedback.mediumImpact();
+        Timer(
+          const Duration(milliseconds: 24),
+          HapticFeedback.lightImpact,
+        );
+        break;
+      case ThemeMaterial.crystal:
+        HapticFeedback.mediumImpact();
+        Timer(
+          const Duration(milliseconds: 18),
+          HapticFeedback.selectionClick,
+        );
+        break;
+      case ThemeMaterial.leaf:
+        HapticFeedback.lightImpact();
+        break;
     }
   }
 
   void _clearHaptic() {
-    if (widget.appState.hapticsEnabled) {
-      HapticFeedback.lightImpact();
+    if (!widget.appState.hapticsEnabled) return;
+    switch (_theme.material) {
+      case ThemeMaterial.glass:
+        HapticFeedback.lightImpact();
+        Timer(
+          const Duration(milliseconds: 22),
+          HapticFeedback.selectionClick,
+        );
+        break;
+      case ThemeMaterial.crystal:
+        HapticFeedback.lightImpact();
+        Timer(
+          const Duration(milliseconds: 18),
+          HapticFeedback.selectionClick,
+        );
+        break;
+      case ThemeMaterial.stone:
+      case ThemeMaterial.marble:
+        HapticFeedback.mediumImpact();
+        break;
+      case ThemeMaterial.wood:
+        HapticFeedback.lightImpact();
+        Timer(
+          const Duration(milliseconds: 38),
+          HapticFeedback.selectionClick,
+        );
+        break;
+      case ThemeMaterial.leaf:
+        HapticFeedback.selectionClick();
+        break;
     }
   }
 
