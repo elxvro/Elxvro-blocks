@@ -1807,19 +1807,55 @@ class _GameScreenState extends State<GameScreen>
                             final decay = impactActive
                                 ? (1 - progress / 0.54).clamp(0.0, 1.0)
                                 : 0.0;
-                            final shake = impactActive
-                                ? sin(progress * pi * 13) *
-                                    min(7.5, 1.25 * _impactLevel) *
-                                    decay
+                            final materialWeight = switch (_theme.material) {
+                              ThemeMaterial.stone => 1.28,
+                              ThemeMaterial.marble => 1.18,
+                              ThemeMaterial.crystal => 1.08,
+                              ThemeMaterial.wood => 0.92,
+                              ThemeMaterial.glass => 0.86,
+                              ThemeMaterial.leaf => 0.62,
+                            };
+                            final frequency = switch (_theme.material) {
+                              ThemeMaterial.stone => 9.0,
+                              ThemeMaterial.marble => 10.5,
+                              ThemeMaterial.wood => 11.5,
+                              ThemeMaterial.glass => 15.0,
+                              ThemeMaterial.crystal => 16.5,
+                              ThemeMaterial.leaf => 7.5,
+                            };
+                            final shakeX = impactActive
+                                ? sin(progress * pi * frequency) *
+                                    min(8.5, 1.28 * _impactLevel) *
+                                    decay *
+                                    materialWeight
+                                : 0.0;
+                            final shakeY = impactActive
+                                ? cos(progress * pi * (frequency * 0.72)) *
+                                    min(3.4, 0.46 * _impactLevel) *
+                                    decay *
+                                    materialWeight
+                                : 0.0;
+                            final tilt = impactActive
+                                ? sin(progress * pi * (frequency * 0.54)) *
+                                    0.0018 *
+                                    _impactLevel *
+                                    decay *
+                                    materialWeight
                                 : 0.0;
                             final punch = impactActive
-                                ? 1 + sin(progress * pi) * 0.006 * _impactLevel
+                                ? 1 +
+                                    sin(progress * pi) *
+                                        0.0065 *
+                                        _impactLevel *
+                                        materialWeight
                                 : 1.0;
                             return Transform.translate(
-                              offset: Offset(shake, 0),
-                              child: Transform.scale(
-                                scale: punch,
-                                child: AnimatedContainer(
+                              offset: Offset(shakeX, shakeY),
+                              child: Transform.rotate(
+                                angle: tilt,
+                                child: Transform.scale(
+                                  scale: punch,
+                                  child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 220),
                                   padding: const EdgeInsets.all(5),
                                   decoration: BoxDecoration(
@@ -1991,7 +2027,8 @@ class _GameScreenState extends State<GameScreen>
                                   ),
                                 ),
                               ),
-                            );
+                            ),
+                          );
                           },
                         );
                       },
