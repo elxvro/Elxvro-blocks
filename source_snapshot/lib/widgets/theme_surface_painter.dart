@@ -41,6 +41,47 @@ class ThemeSurfacePainter extends CustomPainter {
         _paintMarble(canvas, size);
         break;
     }
+
+    _paintAmbientLight(canvas, size);
+  }
+
+  void _paintAmbientLight(Canvas canvas, Size size) {
+    final strength = switch (material) {
+      ThemeMaterial.glass => 0.16,
+      ThemeMaterial.crystal => 0.18,
+      ThemeMaterial.marble => 0.12,
+      ThemeMaterial.wood => 0.07,
+      ThemeMaterial.stone => 0.045,
+      ThemeMaterial.leaf => 0.09,
+    };
+
+    final rect = Offset.zero & size;
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            Colors.white.withValues(alpha: strength),
+            Colors.transparent,
+            Colors.black.withValues(alpha: strength * 0.58),
+          ],
+          stops: const <double>[0.0, 0.54, 1.0],
+        ).createShader(rect),
+    );
+
+    if (material == ThemeMaterial.glass ||
+        material == ThemeMaterial.crystal) {
+      canvas.drawLine(
+        Offset(size.width * 0.16, size.height * 0.78),
+        Offset(size.width * 0.82, size.height * 0.22),
+        Paint()
+          ..strokeCap = StrokeCap.round
+          ..strokeWidth = math.max(0.45, size.shortestSide * 0.018)
+          ..color = Colors.white.withValues(alpha: 0.12 * intensity),
+      );
+    }
   }
 
   void _paintGlass(Canvas canvas, Size size) {
