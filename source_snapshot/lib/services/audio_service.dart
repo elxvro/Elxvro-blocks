@@ -288,21 +288,51 @@ class AudioService {
     String profile, {
     required int lineCount,
     required int combo,
-  }) {
+  }) async {
     final safe = _safeProfile(profile);
+
+    Duration fractureDelay() {
+      switch (safe) {
+        case 'glass':
+          return const Duration(milliseconds: 22);
+        case 'crystal':
+          return const Duration(milliseconds: 18);
+        case 'wood':
+          return const Duration(milliseconds: 38);
+        case 'stone':
+          return const Duration(milliseconds: 54);
+        case 'marble':
+          return const Duration(milliseconds: 50);
+        case 'leaf':
+          return const Duration(milliseconds: 30);
+        default:
+          return const Duration(milliseconds: 34);
+      }
+    }
+
     if (lineCount >= 3 || combo >= 4) {
       unawaited(
         _duckMusic(
-          factor: 0.42,
-          duration: const Duration(milliseconds: 780),
+          factor: 0.38,
+          duration: const Duration(milliseconds: 860),
         ),
       );
-      return _play('audio/${safe}_combo.wav', 0.70);
+      // A real fracture has a sharp material transient followed by body/impact.
+      // Layer the existing real-material sample under the combo hit.
+      unawaited(_playVariant(safe, 'clear', 3, 0.48));
+      await Future<void>.delayed(fractureDelay());
+      await _play('audio/${safe}_combo.wav', 0.69);
+      return;
     }
+
     if (lineCount >= 2 || combo >= 2) {
-      return _playVariant(safe, 'clear', 3, 0.61);
+      unawaited(_playVariant(safe, 'clear', 3, 0.57));
+      await Future<void>.delayed(fractureDelay());
+      await _playVariant(safe, 'clear', 3, 0.42);
+      return;
     }
-    return _playVariant(safe, 'clear', 3, 0.56);
+
+    await _playVariant(safe, 'clear', 3, 0.56);
   }
 
   Future<void> playCombo(String profile) =>
