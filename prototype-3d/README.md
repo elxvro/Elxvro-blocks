@@ -15,3 +15,5 @@ Prototype features:
 - Basic game-over detection and restart UI
 
 The APK is intentionally a debug-signed prototype for device testing. Production Play signing remains on the existing release workflow.
+
+Build trigger: GitHub Actions prototype APK.
