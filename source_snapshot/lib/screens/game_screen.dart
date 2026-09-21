@@ -1059,7 +1059,7 @@ class _GameScreenState extends State<GameScreen>
       _placementPulseCells = cells;
       _placementPulseRevision += 1;
     });
-    _placementPulseTimer = Timer(const Duration(milliseconds: 260), () {
+    _placementPulseTimer = Timer(const Duration(milliseconds: 300), () {
       if (!mounted) return;
       setState(() => _placementPulseCells = <int>{});
     });
@@ -3299,19 +3299,19 @@ class _Material2DOverlayPainter extends CustomPainter {
         _paintGlass(canvas, size, center, radius, p, fade);
         break;
       case ThemeMaterial.wood:
-        _paintWood(canvas, center, radius, p, fade);
+        _paintWood(canvas, size, center, radius, p, fade);
         break;
       case ThemeMaterial.stone:
-        _paintStone(canvas, center, radius, p, fade);
+        _paintStone(canvas, size, center, radius, p, fade);
         break;
       case ThemeMaterial.leaf:
-        _paintLeaf(canvas, center, radius, p, fade);
+        _paintLeaf(canvas, size, center, radius, p, fade);
         break;
       case ThemeMaterial.crystal:
-        _paintCrystal(canvas, center, radius, p, fade);
+        _paintCrystal(canvas, size, center, radius, p, fade);
         break;
       case ThemeMaterial.marble:
-        _paintMarble(canvas, center, radius, p, fade);
+        _paintMarble(canvas, size, center, radius, p, fade);
         break;
     }
   }
@@ -3483,6 +3483,7 @@ class _Material2DOverlayPainter extends CustomPainter {
 
   void _paintWood(
     Canvas canvas,
+    Size size,
     Offset center,
     double radius,
     double p,
@@ -3649,6 +3650,7 @@ class _Material2DOverlayPainter extends CustomPainter {
 
   void _paintStone(
     Canvas canvas,
+    Size size,
     Offset center,
     double radius,
     double p,
@@ -3768,6 +3770,7 @@ class _Material2DOverlayPainter extends CustomPainter {
 
   void _paintLeaf(
     Canvas canvas,
+    Size size,
     Offset center,
     double radius,
     double p,
@@ -3928,6 +3931,7 @@ class _Material2DOverlayPainter extends CustomPainter {
 
   void _paintCrystal(
     Canvas canvas,
+    Size size,
     Offset center,
     double radius,
     double p,
@@ -4062,6 +4066,7 @@ class _Material2DOverlayPainter extends CustomPainter {
 
   void _paintMarble(
     Canvas canvas,
+    Size size,
     Offset center,
     double radius,
     double p,
