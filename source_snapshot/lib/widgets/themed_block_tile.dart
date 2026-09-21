@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 
 import '../models/game_theme.dart';
 
-/// Draws the complete material surface for a single occupied block cell.
-/// Each theme deliberately uses a different silhouette and texture so themes
-/// read as different materials, not as recolors of the same square.
+/// Premium pseudo-3D material block used by the original Flutter game shell.
+/// The game logic, menus and navigation stay untouched; only the block surface
+/// is rendered with depth, side faces, contact shadow and material texture.
 class ThemedBlockTile extends StatelessWidget {
   const ThemedBlockTile({
     super.key,
@@ -25,7 +25,7 @@ class ThemedBlockTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return RepaintBoundary(
       child: CustomPaint(
-        painter: _MaterialBlockPainter(
+        painter: _Premium3DBlockPainter(
           material: material,
           base: base,
           accent: accent,
@@ -37,8 +37,8 @@ class ThemedBlockTile extends StatelessWidget {
   }
 }
 
-class _MaterialBlockPainter extends CustomPainter {
-  const _MaterialBlockPainter({
+class _Premium3DBlockPainter extends CustomPainter {
+  const _Premium3DBlockPainter({
     required this.material,
     required this.base,
     required this.accent,
@@ -52,37 +52,154 @@ class _MaterialBlockPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (size.shortestSide <= 2) return;
+    if (size.shortestSide <= 4) return;
+
+    final depth = (size.shortestSide * 0.13).clamp(2.0, 5.5).toDouble();
+    final topSize = Size(
+      math.max(2, size.width - depth),
+      math.max(2, size.height - depth),
+    );
+
+    _paintContactShadow(canvas, size, depth);
+    _paintDepthFaces(canvas, size, depth);
+
+    canvas.save();
+    canvas.translate(0, 0);
     switch (material) {
       case ThemeMaterial.glass:
-        _glass(canvas, size);
+        _glass(canvas, topSize);
         break;
       case ThemeMaterial.wood:
-        _wood(canvas, size);
+        _wood(canvas, topSize);
         break;
       case ThemeMaterial.stone:
-        _stone(canvas, size);
+        _stone(canvas, topSize);
         break;
       case ThemeMaterial.leaf:
-        _leaf(canvas, size);
+        _leaf(canvas, topSize);
         break;
       case ThemeMaterial.crystal:
-        _crystal(canvas, size);
+        _crystal(canvas, topSize);
         break;
       case ThemeMaterial.marble:
-        _marble(canvas, size);
+        _marble(canvas, topSize);
         break;
     }
+    canvas.restore();
+
+    _paintBevel(canvas, topSize);
+
     if (flash > 0) {
-      final r = RRect.fromRectAndRadius(
-        Offset.zero & size,
-        Radius.circular(size.shortestSide * 0.16),
+      final rr = RRect.fromRectAndRadius(
+        Rect.fromLTWH(0.6, 0.6, topSize.width - 1.2, topSize.height - 1.2),
+        Radius.circular(topSize.shortestSide * 0.16),
       );
       canvas.drawRRect(
-        r,
-        Paint()..color = Colors.white.withValues(alpha: 0.42 * flash),
+        rr,
+        Paint()..color = Colors.white.withValues(alpha: 0.48 * flash),
+      );
+      canvas.drawRRect(
+        rr,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.max(1.0, topSize.shortestSide * 0.055)
+          ..color = accent.withValues(alpha: 0.72 * flash),
       );
     }
+  }
+
+  void _paintContactShadow(Canvas canvas, Size size, double depth) {
+    final rect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+        depth * 0.60,
+        depth * 0.95,
+        size.width - depth * 0.45,
+        size.height - depth * 0.35,
+      ),
+      Radius.circular(size.shortestSide * 0.18),
+    );
+    canvas.drawRRect(
+      rect,
+      Paint()
+        ..color = Colors.black.withValues(alpha: 0.38)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, depth * 1.10),
+    );
+  }
+
+  void _paintDepthFaces(Canvas canvas, Size size, double depth) {
+    final w = size.width;
+    final h = size.height;
+    final topW = w - depth;
+    final topH = h - depth;
+
+    final right = Path()
+      ..moveTo(topW, 1)
+      ..lineTo(w - 1, depth)
+      ..lineTo(w - 1, h - 1)
+      ..lineTo(topW, topH)
+      ..close();
+
+    final front = Path()
+      ..moveTo(1, topH)
+      ..lineTo(topW, topH)
+      ..lineTo(w - 1, h - 1)
+      ..lineTo(depth, h - 1)
+      ..close();
+
+    final rightPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: <Color>[
+          Color.lerp(base, accent, 0.16)!.withValues(alpha: 0.98),
+          Color.lerp(base, Colors.black, 0.48)!.withValues(alpha: 0.98),
+        ],
+      ).createShader(Rect.fromLTWH(topW, 0, depth, h));
+
+    final frontPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+        colors: <Color>[
+          Color.lerp(base, Colors.black, 0.34)!.withValues(alpha: 0.98),
+          Color.lerp(base, Colors.black, 0.58)!.withValues(alpha: 0.98),
+        ],
+      ).createShader(Rect.fromLTWH(0, topH, w, depth));
+
+    canvas.drawPath(right, rightPaint);
+    canvas.drawPath(front, frontPaint);
+
+    final seam = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(0.7, size.shortestSide * 0.026)
+      ..color = Colors.black.withValues(alpha: 0.46);
+    canvas.drawPath(right, seam);
+    canvas.drawPath(front, seam);
+  }
+
+  void _paintBevel(Canvas canvas, Size topSize) {
+    final radius = topSize.shortestSide * 0.16;
+    final rr = RRect.fromRectAndRadius(
+      Rect.fromLTWH(0.7, 0.7, topSize.width - 1.4, topSize.height - 1.4),
+      Radius.circular(radius),
+    );
+
+    canvas.drawRRect(
+      rr,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(0.8, topSize.shortestSide * 0.032)
+        ..color = Colors.white.withValues(alpha: 0.24),
+    );
+
+    canvas.drawLine(
+      Offset(topSize.width * 0.16, topSize.height * 0.10),
+      Offset(topSize.width * 0.70, topSize.height * 0.10),
+      Paint()
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = math.max(0.8, topSize.shortestSide * 0.035)
+        ..color = Colors.white.withValues(alpha: 0.34),
+    );
   }
 
   Paint _gradient(Size size, List<Color> colors) => Paint()
@@ -92,212 +209,203 @@ class _MaterialBlockPainter extends CustomPainter {
       colors: colors,
     ).createShader(Offset.zero & size);
 
-  void _glass(Canvas canvas, Size size) {
-    final r = size.shortestSide * 0.20;
-    final rr = RRect.fromRectAndRadius(
+  RRect _topRRect(Size size, {double radiusFactor = 0.18}) {
+    return RRect.fromRectAndRadius(
       Rect.fromLTWH(1, 1, size.width - 2, size.height - 2),
-      Radius.circular(r),
+      Radius.circular(size.shortestSide * radiusFactor),
     );
+  }
+
+  void _glass(Canvas canvas, Size size) {
+    final rr = _topRRect(size, radiusFactor: 0.20);
     canvas.drawRRect(
       rr,
       _gradient(size, <Color>[
-        accent.withValues(alpha: 0.92),
-        base.withValues(alpha: 0.60),
-        const Color(0xFF1B6E8C).withValues(alpha: 0.72),
+        Colors.white.withValues(alpha: 0.38),
+        accent.withValues(alpha: 0.82),
+        base.withValues(alpha: 0.58),
+        const Color(0xFF0B425E).withValues(alpha: 0.88),
       ]),
     );
     canvas.drawRRect(
       rr,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = math.max(1.0, size.shortestSide * 0.055)
-        ..color = Colors.white.withValues(alpha: 0.72),
+        ..strokeWidth = math.max(1, size.shortestSide * 0.055)
+        ..color = Colors.white.withValues(alpha: 0.68),
     );
+
     final inner = RRect.fromRectAndRadius(
       Rect.fromLTWH(
         size.width * 0.10,
-        size.height * 0.10,
-        size.width * 0.80,
-        size.height * 0.80,
+        size.height * 0.11,
+        size.width * 0.73,
+        size.height * 0.69,
       ),
-      Radius.circular(r * 0.72),
+      Radius.circular(size.shortestSide * 0.11),
     );
     canvas.drawRRect(
       inner,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.8
-        ..color = Colors.white.withValues(alpha: 0.22),
+        ..strokeWidth = math.max(0.7, size.shortestSide * 0.022)
+        ..color = Colors.white.withValues(alpha: 0.24),
     );
-    final shine = Paint()
-      ..color = Colors.white.withValues(alpha: 0.62)
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = math.max(1, size.shortestSide * 0.06);
-    canvas.drawLine(
-      Offset(size.width * 0.20, size.height * 0.19),
-      Offset(size.width * 0.62, size.height * 0.19),
-      shine,
-    );
+
     canvas.drawCircle(
-      Offset(size.width * 0.75, size.height * 0.68),
-      size.shortestSide * 0.065,
-      Paint()..color = Colors.white.withValues(alpha: 0.18),
+      Offset(size.width * 0.74, size.height * 0.67),
+      size.shortestSide * 0.075,
+      Paint()
+        ..shader = RadialGradient(
+          colors: <Color>[
+            Colors.white.withValues(alpha: 0.48),
+            accent.withValues(alpha: 0.04),
+          ],
+        ).createShader(
+          Rect.fromCircle(
+            center: Offset(size.width * 0.74, size.height * 0.67),
+            radius: size.shortestSide * 0.11,
+          ),
+        ),
     );
   }
 
   void _wood(Canvas canvas, Size size) {
-    final rr = RRect.fromRectAndRadius(
-      Rect.fromLTWH(1, 1, size.width - 2, size.height - 2),
-      Radius.circular(size.shortestSide * 0.13),
-    );
+    final rr = _topRRect(size, radiusFactor: 0.13);
     canvas.drawRRect(
       rr,
       _gradient(size, <Color>[
-        accent.withValues(alpha: 0.92),
+        Color.lerp(accent, Colors.white, 0.18)!,
         base,
-        const Color(0xFF70401E),
+        const Color(0xFF7C421B),
+        const Color(0xFF48220E),
       ]),
     );
-    canvas.drawRRect(
-      rr,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = math.max(1.0, size.shortestSide * 0.06)
-        ..color = const Color(0xFF5A3015).withValues(alpha: 0.92),
-    );
+
     final grain = Paint()
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = math.max(0.65, size.shortestSide * 0.025)
-      ..color = const Color(0xFF633516).withValues(alpha: 0.65);
-    for (var i = 0; i < 4; i++) {
-      final y = size.height * (0.22 + i * 0.19);
-      final p = Path()
-        ..moveTo(size.width * 0.08, y)
+      ..strokeWidth = math.max(0.55, size.shortestSide * 0.023)
+      ..color = const Color(0xFF3F1E0D).withValues(alpha: 0.58);
+
+    for (var i = 0; i < 5; i++) {
+      final y = size.height * (0.17 + i * 0.15);
+      final path = Path()
+        ..moveTo(size.width * 0.07, y)
         ..cubicTo(
-          size.width * 0.30,
-          y - size.height * 0.10,
-          size.width * 0.62,
-          y + size.height * 0.09,
-          size.width * 0.93,
-          y - size.height * 0.02,
+          size.width * 0.25,
+          y - size.height * 0.07,
+          size.width * 0.52,
+          y + size.height * 0.08,
+          size.width * 0.91,
+          y - size.height * 0.015,
         );
-      canvas.drawPath(p, grain);
+      canvas.drawPath(path, grain);
     }
-    final knotCenter = Offset(size.width * 0.67, size.height * 0.48);
+
+    final knot = Offset(size.width * 0.67, size.height * 0.50);
     canvas.drawOval(
       Rect.fromCenter(
-        center: knotCenter,
-        width: size.width * 0.22,
+        center: knot,
+        width: size.width * 0.23,
         height: size.height * 0.16,
       ),
-      grain..strokeWidth = math.max(0.75, size.shortestSide * 0.03),
-    );
-    canvas.drawCircle(
-      knotCenter,
-      size.shortestSide * 0.035,
-      Paint()..color = const Color(0xFF4C2813).withValues(alpha: 0.70),
+      grain..strokeWidth = math.max(0.8, size.shortestSide * 0.028),
     );
   }
 
   void _stone(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final c = size.shortestSide * 0.11;
+    final c = size.shortestSide * 0.10;
     final path = Path()
       ..moveTo(c, 1)
-      ..lineTo(w - c * 0.55, 1)
-      ..lineTo(w - 1, c * 1.05)
-      ..lineTo(w - c * 0.25, h - c * 0.72)
-      ..lineTo(w - c * 1.05, h - 1)
-      ..lineTo(c * 0.75, h - 1)
-      ..lineTo(1, h - c * 1.10)
-      ..lineTo(1, c * 0.75)
+      ..lineTo(size.width - c * 0.50, 1)
+      ..lineTo(size.width - 1, c)
+      ..lineTo(size.width - c * 0.20, size.height - c * 0.75)
+      ..lineTo(size.width - c, size.height - 1)
+      ..lineTo(c * 0.75, size.height - 1)
+      ..lineTo(1, size.height - c)
+      ..lineTo(1, c * 0.72)
       ..close();
+
     canvas.drawPath(
       path,
       _gradient(size, <Color>[
-        accent.withValues(alpha: 0.82),
+        Color.lerp(accent, Colors.white, 0.10)!,
         base,
-        const Color(0xFF48515A),
+        const Color(0xFF353C42),
       ]),
     );
-    canvas.drawPath(
-      path,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = math.max(1, size.shortestSide * 0.05)
-        ..color = const Color(0xFFCBD5DF).withValues(alpha: 0.34),
-    );
+
     final crack = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = math.max(0.7, size.shortestSide * 0.026)
       ..strokeCap = StrokeCap.round
-      ..color = const Color(0xFF263039).withValues(alpha: 0.72);
-    final mid = Offset(w * 0.54, h * 0.47);
-    canvas.drawLine(mid, Offset(w * 0.78, h * 0.21), crack);
-    canvas.drawLine(mid, Offset(w * 0.86, h * 0.63), crack);
-    canvas.drawLine(mid, Offset(w * 0.36, h * 0.78), crack);
-    final speck = Paint()..color = Colors.white.withValues(alpha: 0.16);
+      ..strokeWidth = math.max(0.65, size.shortestSide * 0.024)
+      ..color = const Color(0xFF151A1D).withValues(alpha: 0.70);
+
+    final mid = Offset(size.width * 0.53, size.height * 0.46);
+    canvas.drawLine(mid, Offset(size.width * 0.79, size.height * 0.20), crack);
+    canvas.drawLine(mid, Offset(size.width * 0.86, size.height * 0.62), crack);
+    canvas.drawLine(mid, Offset(size.width * 0.34, size.height * 0.80), crack);
+
+    final speck = Paint()..color = Colors.white.withValues(alpha: 0.17);
     for (final p in <Offset>[
-      Offset(w * 0.23, h * 0.28),
-      Offset(w * 0.73, h * 0.34),
-      Offset(w * 0.31, h * 0.59),
+      Offset(size.width * 0.23, size.height * 0.28),
+      Offset(size.width * 0.73, size.height * 0.34),
+      Offset(size.width * 0.31, size.height * 0.59),
     ]) {
       canvas.drawCircle(p, size.shortestSide * 0.022, speck);
     }
   }
 
   void _leaf(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final path = Path()
-      ..moveTo(w * 0.12, h * 0.68)
-      ..cubicTo(w * 0.18, h * 0.20, w * 0.63, h * 0.05, w * 0.88, h * 0.18)
-      ..cubicTo(w * 0.98, h * 0.52, w * 0.70, h * 0.88, w * 0.25, h * 0.90)
-      ..cubicTo(w * 0.20, h * 0.82, w * 0.16, h * 0.75, w * 0.12, h * 0.68)
-      ..close();
-    canvas.drawPath(
-      path,
+    final rr = _topRRect(size, radiusFactor: 0.22);
+    canvas.drawRRect(
+      rr,
       _gradient(size, <Color>[
-        accent.withValues(alpha: 0.95),
+        const Color(0xFFB8FF8F),
+        accent,
         base,
-        const Color(0xFF16733A),
+        const Color(0xFF0F5E2E),
       ]),
     );
-    canvas.drawPath(
-      path,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = math.max(1.0, size.shortestSide * 0.045)
-        ..color = const Color(0xFFC8FFAE).withValues(alpha: 0.42),
-    );
+
     final vein = Paint()
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = math.max(0.75, size.shortestSide * 0.03)
-      ..color = const Color(0xFFE3FFBD).withValues(alpha: 0.50);
-    final a = Offset(w * 0.22, h * 0.77);
-    final b = Offset(w * 0.78, h * 0.24);
+      ..strokeWidth = math.max(0.7, size.shortestSide * 0.026)
+      ..color = const Color(0xFFE4FFC8).withValues(alpha: 0.46);
+
+    final a = Offset(size.width * 0.18, size.height * 0.80);
+    final b = Offset(size.width * 0.78, size.height * 0.20);
     canvas.drawLine(a, b, vein);
     for (var i = 1; i <= 3; i++) {
       final t = i / 4;
       final x = a.dx + (b.dx - a.dx) * t;
       final y = a.dy + (b.dy - a.dy) * t;
-      canvas.drawLine(Offset(x, y), Offset(x - w * 0.15, y - h * 0.02), vein);
-      canvas.drawLine(Offset(x, y), Offset(x + w * 0.12, y + h * 0.10), vein);
+      canvas.drawLine(
+        Offset(x, y),
+        Offset(x - size.width * 0.14, y - size.height * 0.02),
+        vein,
+      );
+      canvas.drawLine(
+        Offset(x, y),
+        Offset(x + size.width * 0.11, y + size.height * 0.10),
+        vein,
+      );
     }
   }
 
   void _crystal(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
-    final p1 = Offset(w * 0.50, h * 0.04);
-    final p2 = Offset(w * 0.92, h * 0.27);
+    final p1 = Offset(w * 0.50, h * 0.03);
+    final p2 = Offset(w * 0.92, h * 0.25);
     final p3 = Offset(w * 0.82, h * 0.82);
     final p4 = Offset(w * 0.50, h * 0.96);
-    final p5 = Offset(w * 0.13, h * 0.78);
-    final p6 = Offset(w * 0.07, h * 0.28);
+    final p5 = Offset(w * 0.12, h * 0.79);
+    final p6 = Offset(w * 0.06, h * 0.27);
+    final center = Offset(w * 0.52, h * 0.50);
+
     final outline = Path()
       ..moveTo(p1.dx, p1.dy)
       ..lineTo(p2.dx, p2.dy)
@@ -306,83 +414,99 @@ class _MaterialBlockPainter extends CustomPainter {
       ..lineTo(p5.dx, p5.dy)
       ..lineTo(p6.dx, p6.dy)
       ..close();
+
     canvas.drawPath(
       outline,
       _gradient(size, <Color>[
-        accent.withValues(alpha: 0.94),
+        Colors.white.withValues(alpha: 0.72),
+        accent,
         base,
-        const Color(0xFF4430A8),
+        const Color(0xFF352077),
       ]),
     );
-    final center = Offset(w * 0.52, h * 0.51);
-    final facet1 = Paint()..color = Colors.white.withValues(alpha: 0.20);
-    canvas.drawPath(Path()..moveTo(p1.dx,p1.dy)..lineTo(p2.dx,p2.dy)..lineTo(center.dx,center.dy)..close(), facet1);
-    canvas.drawPath(Path()..moveTo(p5.dx,p5.dy)..lineTo(p6.dx,p6.dy)..lineTo(center.dx,center.dy)..close(), Paint()..color=accent.withValues(alpha:0.16));
+
+    canvas.drawPath(
+      Path()
+        ..moveTo(p1.dx, p1.dy)
+        ..lineTo(p2.dx, p2.dy)
+        ..lineTo(center.dx, center.dy)
+        ..close(),
+      Paint()..color = Colors.white.withValues(alpha: 0.24),
+    );
+    canvas.drawPath(
+      Path()
+        ..moveTo(p5.dx, p5.dy)
+        ..lineTo(p6.dx, p6.dy)
+        ..lineTo(center.dx, center.dy)
+        ..close(),
+      Paint()..color = const Color(0xFF24105A).withValues(alpha: 0.26),
+    );
+
     final edge = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = math.max(0.8, size.shortestSide * 0.035)
+      ..strokeWidth = math.max(0.8, size.shortestSide * 0.032)
       ..color = Colors.white.withValues(alpha: 0.48);
     canvas.drawPath(outline, edge);
-    for (final point in <Offset>[p1, p2, p3, p4, p5, p6]) {
-      canvas.drawLine(center, point, edge..color = Colors.white.withValues(alpha: 0.15));
+    for (final p in <Offset>[p1, p2, p3, p4, p5, p6]) {
+      canvas.drawLine(
+        center,
+        p,
+        Paint()
+          ..strokeWidth = math.max(0.5, size.shortestSide * 0.018)
+          ..color = Colors.white.withValues(alpha: 0.14),
+      );
     }
   }
 
   void _marble(Canvas canvas, Size size) {
-    final rr = RRect.fromRectAndRadius(
-      Rect.fromLTWH(1, 1, size.width - 2, size.height - 2),
-      Radius.circular(size.shortestSide * 0.14),
-    );
+    final rr = _topRRect(size, radiusFactor: 0.14);
     canvas.drawRRect(
       rr,
       _gradient(size, <Color>[
-        const Color(0xFFEEE4CD),
-        base.withValues(alpha: 0.95),
-        const Color(0xFF8D7347),
+        Colors.white,
+        const Color(0xFFF1E7D1),
+        base.withValues(alpha: 0.97),
+        const Color(0xFFA08658),
       ]),
     );
-    canvas.drawRRect(
-      rr,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = math.max(1.1, size.shortestSide * 0.055)
-        ..color = accent.withValues(alpha: 0.85),
-    );
+
     final vein = Paint()
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = math.max(0.65, size.shortestSide * 0.025)
-      ..color = const Color(0xFF5C5043).withValues(alpha: 0.45);
-    final p = Path()
-      ..moveTo(size.width * 0.04, size.height * 0.75)
+      ..strokeWidth = math.max(0.60, size.shortestSide * 0.023)
+      ..color = const Color(0xFF51483F).withValues(alpha: 0.42);
+
+    final path = Path()
+      ..moveTo(size.width * 0.04, size.height * 0.76)
       ..cubicTo(
-        size.width * 0.28,
-        size.height * 0.56,
-        size.width * 0.33,
+        size.width * 0.27,
+        size.height * 0.57,
+        size.width * 0.34,
         size.height * 0.22,
         size.width * 0.60,
         size.height * 0.44,
       )
       ..cubicTo(
-        size.width * 0.73,
+        size.width * 0.72,
         size.height * 0.55,
         size.width * 0.84,
         size.height * 0.28,
         size.width * 0.98,
         size.height * 0.18,
       );
-    canvas.drawPath(p, vein);
+    canvas.drawPath(path, vein);
+
     canvas.drawLine(
-      Offset(size.width * 0.16, size.height * 0.18),
-      Offset(size.width * 0.70, size.height * 0.72),
+      Offset(size.width * 0.15, size.height * 0.18),
+      Offset(size.width * 0.72, size.height * 0.74),
       Paint()
-        ..strokeWidth = math.max(0.7, size.shortestSide * 0.028)
-        ..color = accent.withValues(alpha: 0.46),
+        ..strokeWidth = math.max(0.7, size.shortestSide * 0.026)
+        ..color = accent.withValues(alpha: 0.52),
     );
   }
 
   @override
-  bool shouldRepaint(covariant _MaterialBlockPainter oldDelegate) {
+  bool shouldRepaint(covariant _Premium3DBlockPainter oldDelegate) {
     return oldDelegate.material != material ||
         oldDelegate.base != base ||
         oldDelegate.accent != accent ||
