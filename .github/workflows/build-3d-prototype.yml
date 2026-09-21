@@ -34,6 +34,33 @@ jobs:
           test -f prototype-3d/main.tscn
           test -f prototype-3d/game.gd
 
+      - name: Prepare Godot export templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGET="$HOME/.local/share/godot/export_templates/4.3.stable"
+          mkdir -p "$(dirname "$TARGET")"
+
+          if [ -d /root/.local/share/godot/export_templates/4.3.stable ]; then
+            rm -rf "$TARGET"
+            cp -a /root/.local/share/godot/export_templates/4.3.stable "$TARGET"
+          elif [ -d /opt/godot/export_templates/4.3.stable ]; then
+            rm -rf "$TARGET"
+            cp -a /opt/godot/export_templates/4.3.stable "$TARGET"
+          else
+            FOUND="$(find / -type d -path '*/export_templates/4.3.stable' 2>/dev/null | head -n 1 || true)"
+            if [ -z "$FOUND" ]; then
+              echo "::error::Godot 4.3 export templates were not found in the container."
+              exit 1
+            fi
+            rm -rf "$TARGET"
+            cp -a "$FOUND" "$TARGET"
+          fi
+
+          test -f "$TARGET/android_debug.apk"
+          test -f "$TARGET/android_release.apk"
+          echo "Godot Android export templates ready at $TARGET"
+
       - name: Import project
         shell: bash
         run: |
