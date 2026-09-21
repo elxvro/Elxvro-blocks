@@ -1716,7 +1716,24 @@ class _GameScreenState extends State<GameScreen>
                                   duration: const Duration(milliseconds: 220),
                                   padding: const EdgeInsets.all(5),
                                   decoration: BoxDecoration(
-                                    color: _theme.board,
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: <Color>[
+                                        Color.lerp(
+                                          _theme.board,
+                                          _theme.blockAccent,
+                                          0.09,
+                                        )!,
+                                        _theme.board,
+                                        Color.lerp(
+                                          _theme.board,
+                                          Colors.black,
+                                          0.30,
+                                        )!,
+                                      ],
+                                      stops: const <double>[0.0, 0.56, 1.0],
+                                    ),
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
                                       color: danger
@@ -1732,16 +1749,24 @@ class _GameScreenState extends State<GameScreen>
                                         ? null
                                         : <BoxShadow>[
                                             BoxShadow(
-                                              color: danger
-                                                  ? const Color(0xFFFF4D4D)
-                                                      .withValues(alpha: 0.14 + dangerAmount * 0.16)
-                                                  : Colors.black.withValues(alpha: 0.42),
-                                              blurRadius: danger ? 24 : 30,
+                                              color: Colors.black.withValues(alpha: 0.62),
+                                              blurRadius: 18,
+                                              spreadRadius: 1,
+                                              offset: const Offset(0, 12),
                                             ),
                                             BoxShadow(
-                                              color: _theme.blockAccent.withValues(alpha: 0.08),
-                                              blurRadius: 20,
-                                              spreadRadius: -3,
+                                              color: danger
+                                                  ? const Color(0xFFFF4D4D)
+                                                      .withValues(alpha: 0.16 + dangerAmount * 0.17)
+                                                  : _theme.blockAccent.withValues(alpha: 0.14),
+                                              blurRadius: danger ? 28 : 24,
+                                              spreadRadius: -2,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                            BoxShadow(
+                                              color: Colors.white.withValues(alpha: 0.035),
+                                              blurRadius: 2,
+                                              offset: const Offset(0, -1),
                                             ),
                                           ],
                                   ),
@@ -1873,10 +1898,26 @@ class _GameScreenState extends State<GameScreen>
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(24),
-                        color: Colors.black.withValues(alpha: 0.14),
-                        border: Border.all(
-                          color: _theme.blockAccent.withValues(alpha: 0.12),
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: <Color>[
+                            _theme.blockAccent.withValues(alpha: 0.065),
+                            Colors.black.withValues(alpha: 0.24),
+                          ],
                         ),
+                        border: Border.all(
+                          color: _theme.blockAccent.withValues(alpha: 0.18),
+                        ),
+                        boxShadow: widget.appState.performanceMode
+                            ? null
+                            : <BoxShadow>[
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.42),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 7),
+                                ),
+                              ],
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
