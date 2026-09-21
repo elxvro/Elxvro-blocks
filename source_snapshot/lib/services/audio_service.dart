@@ -18,6 +18,12 @@ class AudioService {
     'marble',
   };
 
+  static const List<String> _musicTracks = <String>[
+    'audio/bgm_magic_puzzle.ogg',
+    'audio/bgm_cozy_puzzle_3.ogg',
+    'audio/bgm_out_in_space.ogg',
+  ];
+
   static const Map<String, Duration> _sfxDurations = <String, Duration>{
     'audio/ui_tap_v1.wav': Duration(milliseconds: 120),
     'audio/ui_tap_v2.wav': Duration(milliseconds: 120),
@@ -59,7 +65,9 @@ class AudioService {
   Future<void>? _initializationFuture;
   bool _musicStarted = false;
   Future<void>? _musicStartFuture;
+  StreamSubscription<void>? _musicCompletionSubscription;
   bool _musicPaused = false;
+  int _currentMusicIndex = -1;
   bool _musicEnabled = true;
   bool _sfxEnabled = true;
   bool _uiEnabled = true;
@@ -174,8 +182,15 @@ class AudioService {
       await AudioPlayer.global.ensureInitialized();
       await AudioPlayer.global.setAudioContext(_gameContext);
       await _musicPlayer.setAudioContext(_gameContext);
-      await _musicPlayer.setReleaseMode(ReleaseMode.loop);
+      await _musicPlayer.setReleaseMode(ReleaseMode.stop);
       await _musicPlayer.setVolume(_effectiveMusicVolume);
+      _musicCompletionSubscription ??=
+          _musicPlayer.onPlayerComplete.listen((_) {
+        if (_disposed || _suspended || !_musicEnabled) return;
+        _musicStarted = false;
+        _musicPaused = false;
+        unawaited(_startMusic());
+      });
       _initialized = true;
 
       if (_sfxEnabled || _uiEnabled) {
@@ -199,13 +214,24 @@ class AudioService {
 
   Future<void> _doStartMusic() async {
     try {
+      if (_musicTracks.isEmpty) return;
+
+      var nextIndex = _random.nextInt(_musicTracks.length);
+      if (_musicTracks.length > 1 && nextIndex == _currentMusicIndex) {
+        nextIndex = (nextIndex + 1 + _random.nextInt(_musicTracks.length - 1)) %
+            _musicTracks.length;
+      }
+
+      final nextTrack = _musicTracks[nextIndex];
       await _musicPlayer.play(
-        AssetSource('audio/cozy_puzzle_music.ogg'),
+        AssetSource(nextTrack),
         volume: _effectiveMusicVolume,
         ctx: _gameContext,
       );
+      _currentMusicIndex = nextIndex;
       _musicStarted = true;
       _musicPaused = false;
+      debugPrint('ELXVRO BGM: $nextTrack');
     } catch (error) {
       _musicStarted = false;
       _musicPaused = false;
@@ -550,6 +576,8 @@ class AudioService {
     }
 
     try {
+      await _musicCompletionSubscription?.cancel();
+      _musicCompletionSubscription = null;
       await _musicPlayer.dispose();
     } catch (error) {
       debugPrint('ELXVRO audio dispose failed: $error');
