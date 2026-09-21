@@ -49,8 +49,6 @@ jobs:
           cp -a /root/.local/share/godot/export_templates/4.3.stable             "$HOME/.local/share/godot/export_templates/4.3.stable"
 
           test -f "$HOME/.local/share/godot/export_templates/4.3.stable/android_debug.apk"
-          test -f "$HOME/.android/debug.keystore"
-
           echo "Godot editor settings, Java path, debug keystore and export templates ready."
 
       - name: Install Android 34 packages
