@@ -173,7 +173,7 @@ class _GameScreenState extends State<GameScreen>
     _clearController = AnimationController(
       vsync: this,
       duration: Duration(
-        milliseconds: widget.appState.performanceMode ? 360 : 620,
+        milliseconds: widget.appState.performanceMode ? 430 : 780,
       ),
     )..addStatusListener((status) {
         if (status == AnimationStatus.completed && mounted) {
@@ -906,21 +906,122 @@ class _GameScreenState extends State<GameScreen>
     final flash = <int>{};
     final particles = <_Particle>[];
     final lowFx = widget.appState.performanceMode;
-    final perCell = lowFx ? 1 : (cells.length > 18 ? 2 : 4);
-    final maxParticles = lowFx ? 28 : 84;
+
+    final centerRow =
+        cells.map((cell) => cell.row + 0.5).reduce((a, b) => a + b) /
+            cells.length;
+    final centerCol =
+        cells.map((cell) => cell.col + 0.5).reduce((a, b) => a + b) /
+            cells.length;
+
+    int materialBurstCount() {
+      if (lowFx) return 1;
+      switch (_theme.material) {
+        case ThemeMaterial.glass:
+          return cells.length > 18 ? 3 : 5;
+        case ThemeMaterial.crystal:
+          return cells.length > 18 ? 3 : 5;
+        case ThemeMaterial.wood:
+          return cells.length > 18 ? 2 : 4;
+        case ThemeMaterial.stone:
+        case ThemeMaterial.marble:
+          return cells.length > 18 ? 2 : 4;
+        case ThemeMaterial.leaf:
+          return cells.length > 18 ? 2 : 4;
+      }
+    }
+
+    double baseGravityKick() {
+      switch (_theme.material) {
+        case ThemeMaterial.glass:
+          return 0.22;
+        case ThemeMaterial.crystal:
+          return 0.25;
+        case ThemeMaterial.wood:
+          return 0.18;
+        case ThemeMaterial.stone:
+          return 0.14;
+        case ThemeMaterial.marble:
+          return 0.16;
+        case ThemeMaterial.leaf:
+          return 0.12;
+      }
+    }
+
+    final perCell = materialBurstCount();
+    final maxParticles = lowFx ? 30 : (perfect ? 132 : 104);
+    final impactBoost = 1.0 + (impact.clamp(1, 6) - 1) * 0.075;
 
     for (final cell in cells) {
       flash.add(cell.row * _boardSize + cell.col);
+
+      final cellX = cell.col + 0.5;
+      final cellY = cell.row + 0.5;
+      var dx = cellX - centerCol;
+      var dy = cellY - centerRow;
+      final len = sqrt(dx * dx + dy * dy);
+      if (len > 0.001) {
+        dx /= len;
+        dy /= len;
+      } else {
+        final angle = _random.nextDouble() * pi * 2;
+        dx = cos(angle);
+        dy = sin(angle);
+      }
+
       for (var i = 0; i < perCell; i++) {
+        final jitter = (_random.nextDouble() - 0.5) * 0.18;
+        final tangentX = -dy;
+        final tangentY = dx;
+        final outward = (0.085 + _random.nextDouble() * 0.12) *
+            impactBoost *
+            (perfect ? 1.18 : 1.0);
+
+        var vx = dx * outward + tangentX * jitter;
+        var vy = dy * outward * 0.42 +
+            tangentY * jitter * 0.25 -
+            baseGravityKick() * (0.55 + _random.nextDouble() * 0.65);
+
+        switch (_theme.material) {
+          case ThemeMaterial.glass:
+            vx *= 1.20;
+            vy *= 1.14;
+            break;
+          case ThemeMaterial.crystal:
+            vx *= 1.26;
+            vy *= 1.18;
+            break;
+          case ThemeMaterial.wood:
+            vx *= 0.92;
+            vy *= 0.96;
+            break;
+          case ThemeMaterial.stone:
+            vx *= 0.72;
+            vy *= 0.72;
+            break;
+          case ThemeMaterial.marble:
+            vx *= 0.78;
+            vy *= 0.76;
+            break;
+          case ThemeMaterial.leaf:
+            vx *= 0.84;
+            vy *= 0.52;
+            break;
+        }
+
         particles.add(
           _Particle(
             x: (cell.col + 0.5) / _boardSize,
             y: (cell.row + 0.5) / _boardSize,
-            vx: (_random.nextDouble() - 0.5) * (perfect ? 0.34 : 0.24),
-            vy: -0.05 - _random.nextDouble() * (perfect ? 0.27 : 0.19),
-            radius: 1.6 + _random.nextDouble() * (perfect ? 4.0 : 3.0),
+            vx: vx,
+            vy: vy,
+            radius: 1.5 +
+                _random.nextDouble() *
+                    (perfect ? 4.4 : 3.2) *
+                    (1 + impact * 0.035),
             angle: _random.nextDouble() * pi * 2,
-            spin: (_random.nextDouble() - 0.5) * 5.5,
+            spin: (_random.nextDouble() - 0.5) *
+                (_theme.material == ThemeMaterial.stone ? 3.6 : 6.4),
           ),
         );
       }
@@ -4168,6 +4269,65 @@ class _ParticleBurstPainter extends CustomPainter {
       final x = (particle.x + particle.vx * t + wave) * size.width;
       final y = (particle.y + particle.vy * t + gravity * t * t) * size.height;
       final radius = particle.radius * max(0.34, 1 - shrink * t);
+
+      final previousT = max(0.0, t - 0.055);
+      final previousWave = sway == 0
+          ? 0.0
+          : sin(particle.angle * 2.2 + previousT * 9 + i * 0.7) *
+              sway *
+              previousT;
+      final px =
+          (particle.x + particle.vx * previousT + previousWave) * size.width;
+      final py = (particle.y +
+              particle.vy * previousT +
+              gravity * previousT * previousT) *
+          size.height;
+
+      if (material == ThemeMaterial.glass ||
+          material == ThemeMaterial.crystal) {
+        canvas.drawLine(
+          Offset(px, py),
+          Offset(x, y),
+          Paint()
+            ..strokeCap = StrokeCap.round
+            ..strokeWidth = max(0.55, radius * 0.22)
+            ..color = Colors.white.withValues(alpha: 0.28 * alpha),
+        );
+      } else if (material == ThemeMaterial.stone ||
+          material == ThemeMaterial.marble) {
+        canvas.drawCircle(
+          Offset(px, py + radius * 0.25),
+          radius * 0.55,
+          Paint()
+            ..color = Color.lerp(baseColor, Colors.white, 0.24)!
+                .withValues(alpha: 0.08 * alpha)
+            ..maskFilter = MaskFilter.blur(
+              BlurStyle.normal,
+              max(0.8, radius * 0.55),
+            ),
+        );
+      } else if (material == ThemeMaterial.wood) {
+        canvas.drawLine(
+          Offset(px, py),
+          Offset(x, y),
+          Paint()
+            ..strokeCap = StrokeCap.round
+            ..strokeWidth = max(0.55, radius * 0.16)
+            ..color = color.withValues(alpha: 0.12 * alpha),
+        );
+      } else if (material == ThemeMaterial.leaf) {
+        canvas.drawCircle(
+          Offset(px, py),
+          radius * 0.34,
+          Paint()
+            ..color = color.withValues(alpha: 0.08 * alpha)
+            ..maskFilter = MaskFilter.blur(
+              BlurStyle.normal,
+              max(0.8, radius * 0.45),
+            ),
+        );
+      }
+
       canvas.save();
       canvas.translate(x, y);
       canvas.rotate(particle.angle + particle.spin * t);
