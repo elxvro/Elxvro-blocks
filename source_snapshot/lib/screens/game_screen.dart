@@ -1031,7 +1031,13 @@ class _GameScreenState extends State<GameScreen>
       _flashCells = flash;
       _particles = particles.take(maxParticles).toList(growable: false);
       _perfectClearFx = perfect;
-      _impactLevel = impact.clamp(1, 6).toInt();
+      final materialImpact = switch (_theme.material) {
+        ThemeMaterial.stone => 1,
+        ThemeMaterial.marble => 1,
+        ThemeMaterial.crystal => impact >= 3 ? 1 : 0,
+        _ => 0,
+      };
+      _impactLevel = (impact + materialImpact).clamp(1, 6).toInt();
     });
     _clearController.forward(from: 0);
   }
@@ -3109,48 +3115,132 @@ class _ClearShockwavePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (cells.isEmpty) return;
+
+    final cellW = size.width / boardSize;
+    final cellH = size.height / boardSize;
+    final sorted = cells.toList()..sort();
+    final sweep = Curves.easeOutCubic.transform(
+      (progress / 0.42).clamp(0.0, 1.0).toDouble(),
+    );
+    final fade = (1 - progress).clamp(0.0, 1.0).toDouble();
+
+    bool cleared(int row, int col) {
+      if (row < 0 || row >= boardSize || col < 0 || col >= boardSize) {
+        return false;
+      }
+      return cells.contains(row * boardSize + col);
+    }
+
+    // A bright fracture front walks through the actually-cleared cells.
+    // Only exposed edges are drawn, so the effect reads as a breaking contour
+    // rather than a generic glow laid on top of the board.
+    for (var order = 0; order < sorted.length; order++) {
+      final index = sorted[order];
+      final row = index ~/ boardSize;
+      final col = index % boardSize;
+      final rect = Rect.fromLTWH(col * cellW, row * cellH, cellW, cellH);
+      final normalizedOrder =
+          sorted.length <= 1 ? 0.0 : order / (sorted.length - 1);
+      final front = ((sweep - normalizedOrder * 0.72) / 0.28)
+          .clamp(0.0, 1.0)
+          .toDouble();
+      if (front <= 0) continue;
+
+      final pulse = sin(front * pi).abs();
+      final alpha = fade * (0.18 + 0.72 * pulse);
+      final glow = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = 2.0 + impact * 0.18
+        ..color = color.withValues(alpha: 0.24 * alpha);
+      final core = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = 0.82 + impact * 0.04
+        ..color = Colors.white.withValues(alpha: 0.72 * alpha);
+
+      void drawEdge(Offset a, Offset b) {
+        canvas.drawLine(a, b, glow);
+        canvas.drawLine(a, b, core);
+      }
+
+      final inset = min(cellW, cellH) * 0.08;
+      if (!cleared(row - 1, col)) {
+        drawEdge(
+          Offset(rect.left + inset, rect.top + inset * 0.25),
+          Offset(rect.right - inset, rect.top + inset * 0.25),
+        );
+      }
+      if (!cleared(row + 1, col)) {
+        drawEdge(
+          Offset(rect.left + inset, rect.bottom - inset * 0.25),
+          Offset(rect.right - inset, rect.bottom - inset * 0.25),
+        );
+      }
+      if (!cleared(row, col - 1)) {
+        drawEdge(
+          Offset(rect.left + inset * 0.25, rect.top + inset),
+          Offset(rect.left + inset * 0.25, rect.bottom - inset),
+        );
+      }
+      if (!cleared(row, col + 1)) {
+        drawEdge(
+          Offset(rect.right - inset * 0.25, rect.top + inset),
+          Offset(rect.right - inset * 0.25, rect.bottom - inset),
+        );
+      }
+    }
+
+    // Keep a compact physical impulse around the fracture center.
     var x = 0.0;
     var y = 0.0;
     for (final index in cells) {
       x += (index % boardSize) + 0.5;
       y += (index ~/ boardSize) + 0.5;
     }
-    x = x / cells.length / boardSize * size.width;
-    y = y / cells.length / boardSize * size.height;
-    final center = Offset(x, y);
-    final p = Curves.easeOutCubic.transform(progress.clamp(0.0, 1.0).toDouble());
-    final alpha = (1 - progress).clamp(0.0, 1.0).toDouble();
-    final baseRadius = size.shortestSide * (0.05 + 0.19 * p);
-
-    final glow = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.8 + impact * 0.22
-      ..color = color.withValues(alpha: 0.48 * alpha);
-    canvas.drawCircle(center, baseRadius, glow);
-    canvas.drawCircle(
-      center,
-      baseRadius * 0.62,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.0
-        ..color = Colors.white.withValues(alpha: 0.36 * alpha),
+    final center = Offset(
+      x / cells.length / boardSize * size.width,
+      y / cells.length / boardSize * size.height,
     );
 
-    if (impact < 2) return;
-    final rays = min(16, 6 + impact * 2);
-    final rayPaint = Paint()
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = 1.0
-      ..color = color.withValues(alpha: 0.27 * alpha);
-    for (var i = 0; i < rays; i++) {
-      final angle = i / rays * pi * 2 + 0.18;
-      final inner = baseRadius * 0.46;
-      final outer = baseRadius * (0.78 + (i.isEven ? 0.34 : 0.18));
-      canvas.drawLine(
-        center + Offset(cos(angle), sin(angle)) * inner,
-        center + Offset(cos(angle), sin(angle)) * outer,
-        rayPaint,
-      );
+    final ringPhase = ((progress - 0.08) / 0.62).clamp(0.0, 1.0).toDouble();
+    final ringFade = (1 - ringPhase).clamp(0.0, 1.0).toDouble() * fade;
+    final baseRadius =
+        size.shortestSide * (0.035 + 0.15 * Curves.easeOutCubic.transform(ringPhase));
+
+    canvas.drawCircle(
+      center,
+      baseRadius,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.35 + impact * 0.18
+        ..color = color.withValues(alpha: 0.34 * ringFade),
+    );
+    canvas.drawCircle(
+      center,
+      baseRadius * 0.58,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.85
+        ..color = Colors.white.withValues(alpha: 0.22 * ringFade),
+    );
+
+    if (impact >= 3 && ringFade > 0.02) {
+      final rays = min(18, 8 + impact * 2);
+      final rayPaint = Paint()
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = 0.9
+        ..color = color.withValues(alpha: 0.18 * ringFade);
+      for (var i = 0; i < rays; i++) {
+        final angle = i / rays * pi * 2 + progress * 0.20;
+        final inner = baseRadius * 0.72;
+        final outer = baseRadius * (1.05 + (i % 3) * 0.16);
+        canvas.drawLine(
+          center + Offset(cos(angle), sin(angle)) * inner,
+          center + Offset(cos(angle), sin(angle)) * outer,
+          rayPaint,
+        );
+      }
     }
   }
 
