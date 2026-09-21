@@ -88,6 +88,7 @@ class _Premium3DBlockPainter extends CustomPainter {
     canvas.restore();
 
     _paintSurfaceResponse(canvas, topSize);
+    _paintMicroSpecular(canvas, topSize);
     _paintBevel(canvas, topSize);
 
     if (flash > 0) {
@@ -95,36 +96,91 @@ class _Premium3DBlockPainter extends CustomPainter {
         Rect.fromLTWH(0.6, 0.6, topSize.width - 1.2, topSize.height - 1.2),
         Radius.circular(topSize.shortestSide * 0.16),
       );
+      final flashColor = switch (material) {
+        ThemeMaterial.glass => Colors.white,
+        ThemeMaterial.crystal => Color.lerp(Colors.white, accent, 0.24)!,
+        ThemeMaterial.marble => const Color(0xFFFFF8E8),
+        ThemeMaterial.stone => Color.lerp(base, Colors.white, 0.38)!,
+        ThemeMaterial.wood => const Color(0xFFFFD7A2),
+        ThemeMaterial.leaf => const Color(0xFFD9FFC5),
+      };
+      final flashStrength = switch (material) {
+        ThemeMaterial.glass => 0.58,
+        ThemeMaterial.crystal => 0.62,
+        ThemeMaterial.marble => 0.42,
+        ThemeMaterial.stone => 0.30,
+        ThemeMaterial.wood => 0.34,
+        ThemeMaterial.leaf => 0.28,
+      };
       canvas.drawRRect(
         rr,
-        Paint()..color = Colors.white.withValues(alpha: 0.48 * flash),
+        Paint()..color = flashColor.withValues(alpha: flashStrength * flash),
       );
       canvas.drawRRect(
         rr,
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = math.max(1.0, topSize.shortestSide * 0.055)
-          ..color = accent.withValues(alpha: 0.72 * flash),
+          ..color = accent.withValues(alpha: 0.78 * flash),
       );
     }
   }
 
   void _paintContactShadow(Canvas canvas, Size size, double depth) {
+    final weight = switch (material) {
+      ThemeMaterial.stone => 1.26,
+      ThemeMaterial.marble => 1.20,
+      ThemeMaterial.wood => 1.02,
+      ThemeMaterial.crystal => 0.94,
+      ThemeMaterial.glass => 0.88,
+      ThemeMaterial.leaf => 0.72,
+    };
+    final softness = switch (material) {
+      ThemeMaterial.leaf => 1.55,
+      ThemeMaterial.glass => 1.24,
+      ThemeMaterial.crystal => 1.18,
+      ThemeMaterial.wood => 1.08,
+      ThemeMaterial.marble => 0.94,
+      ThemeMaterial.stone => 0.88,
+    };
     final rect = RRect.fromRectAndRadius(
       Rect.fromLTWH(
-        depth * 0.60,
-        depth * 0.95,
-        size.width - depth * 0.45,
-        size.height - depth * 0.35,
+        depth * (0.54 + 0.10 * weight),
+        depth * (0.82 + 0.16 * weight),
+        size.width - depth * 0.42,
+        size.height - depth * 0.30,
       ),
       Radius.circular(size.shortestSide * 0.18),
     );
     canvas.drawRRect(
       rect,
       Paint()
-        ..color = Colors.black.withValues(alpha: 0.38)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, depth * 1.10),
+        ..color = Colors.black.withValues(
+          alpha: (0.31 + 0.095 * weight).clamp(0.0, 0.55),
+        )
+        ..maskFilter = MaskFilter.blur(
+          BlurStyle.normal,
+          depth * softness,
+        ),
     );
+
+    if (material == ThemeMaterial.glass ||
+        material == ThemeMaterial.crystal) {
+      canvas.drawOval(
+        Rect.fromLTWH(
+          size.width * 0.16,
+          size.height * 0.79,
+          size.width * 0.64,
+          size.height * 0.13,
+        ),
+        Paint()
+          ..color = accent.withValues(alpha: 0.10)
+          ..maskFilter = MaskFilter.blur(
+            BlurStyle.normal,
+            depth * 1.35,
+          ),
+      );
+    }
   }
 
   void _paintDepthFaces(Canvas canvas, Size size, double depth) {
@@ -339,6 +395,123 @@ class _Premium3DBlockPainter extends CustomPainter {
         ..strokeWidth = math.max(0.7, size.shortestSide * 0.028)
         ..color = Colors.black.withValues(alpha: 0.22),
     );
+  }
+
+  void _paintMicroSpecular(Canvas canvas, Size size) {
+    final rect = Rect.fromLTWH(1, 1, size.width - 2, size.height - 2);
+    final rr = RRect.fromRectAndRadius(
+      rect,
+      Radius.circular(size.shortestSide * 0.16),
+    );
+
+    canvas.save();
+    canvas.clipRRect(rr);
+
+    final strength = switch (material) {
+      ThemeMaterial.glass => 0.34,
+      ThemeMaterial.crystal => 0.38,
+      ThemeMaterial.marble => 0.24,
+      ThemeMaterial.wood => 0.12,
+      ThemeMaterial.stone => 0.08,
+      ThemeMaterial.leaf => 0.15,
+    };
+
+    final widthFactor = switch (material) {
+      ThemeMaterial.glass => 0.34,
+      ThemeMaterial.crystal => 0.27,
+      ThemeMaterial.marble => 0.40,
+      ThemeMaterial.wood => 0.52,
+      ThemeMaterial.stone => 0.60,
+      ThemeMaterial.leaf => 0.46,
+    };
+
+    final band = Path()
+      ..moveTo(-size.width * 0.10, size.height * 0.42)
+      ..lineTo(size.width * 0.56, -size.height * 0.08)
+      ..lineTo(
+        size.width * (0.56 + widthFactor),
+        size.height * 0.04,
+      )
+      ..lineTo(
+        size.width * (widthFactor - 0.04),
+        size.height * 0.58,
+      )
+      ..close();
+
+    canvas.drawPath(
+      band,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            Colors.transparent,
+            Colors.white.withValues(alpha: strength * 0.26),
+            Colors.white.withValues(alpha: strength),
+            Colors.white.withValues(alpha: strength * 0.16),
+            Colors.transparent,
+          ],
+          stops: const <double>[0.0, 0.30, 0.50, 0.70, 1.0],
+        ).createShader(rect),
+    );
+
+    if (material == ThemeMaterial.crystal ||
+        material == ThemeMaterial.glass) {
+      final prism = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(0.5, size.shortestSide * 0.014)
+        ..color = accent.withValues(alpha: 0.22);
+      canvas.drawLine(
+        Offset(size.width * 0.18, size.height * 0.72),
+        Offset(size.width * 0.72, size.height * 0.24),
+        prism,
+      );
+      canvas.drawLine(
+        Offset(size.width * 0.26, size.height * 0.76),
+        Offset(size.width * 0.78, size.height * 0.31),
+        prism..color = Colors.white.withValues(alpha: 0.18),
+      );
+    } else if (material == ThemeMaterial.marble) {
+      canvas.drawOval(
+        Rect.fromLTWH(
+          size.width * 0.12,
+          size.height * 0.08,
+          size.width * 0.58,
+          size.height * 0.26,
+        ),
+        Paint()
+          ..shader = RadialGradient(
+            colors: <Color>[
+              Colors.white.withValues(alpha: 0.16),
+              Colors.transparent,
+            ],
+          ).createShader(
+            Rect.fromLTWH(
+              size.width * 0.12,
+              size.height * 0.08,
+              size.width * 0.58,
+              size.height * 0.26,
+            ),
+          ),
+      );
+    } else if (material == ThemeMaterial.leaf) {
+      canvas.drawOval(
+        Rect.fromLTWH(
+          size.width * 0.08,
+          size.height * 0.10,
+          size.width * 0.62,
+          size.height * 0.38,
+        ),
+        Paint()
+          ..color = Colors.white.withValues(alpha: 0.055)
+          ..maskFilter = MaskFilter.blur(
+            BlurStyle.normal,
+            math.max(0.8, size.shortestSide * 0.045),
+          ),
+      );
+    }
+
+    canvas.restore();
   }
 
   void _paintBevel(Canvas canvas, Size topSize) {
