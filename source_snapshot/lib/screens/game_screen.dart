@@ -3133,57 +3133,161 @@ class _Material2DOverlayPainter extends CustomPainter {
     double p,
     double fade,
   ) {
-    final crack = Paint()
+    // v0.11.1: fracture starts on the real outer edge of every cleared cell,
+    // then travels inward before the shards leave the board.
+    final crackPhase = (progress / 0.24).clamp(0.0, 1.0).toDouble();
+    final shardPhase =
+        ((progress - 0.14) / 0.46).clamp(0.0, 1.0).toDouble();
+    final cellW = size.width / boardSize;
+    final cellH = size.height / boardSize;
+    final edgeGlow = theme.blockAccent.withValues(alpha: 0.30 * fade);
+
+    final edgePaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = perfect ? 1.25 : 0.9
-      ..color = Colors.white.withValues(alpha: 0.72 * fade);
-    final glow = Paint()
+      ..strokeJoin = StrokeJoin.round
+      ..strokeWidth = perfect ? 1.45 : 1.05
+      ..color = Colors.white.withValues(alpha: 0.86 * fade * crackPhase);
+    final edgeGlowPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.4
-      ..color = theme.blockAccent.withValues(alpha: 0.16 * fade);
-    final rays = perfect ? 14 : 9 + min(4, impact);
-    for (var i = 0; i < rays; i++) {
-      final angle = i / rays * pi * 2 + 0.17 * sin(i * 1.9);
-      final mid = center + Offset(cos(angle), sin(angle)) * radius * 0.56;
-      final endAngle = angle + sin(i * 2.31) * 0.16;
-      final end = center + Offset(cos(endAngle), sin(endAngle)) * radius * 1.22;
-      final path = Path()
-        ..moveTo(center.dx, center.dy)
-        ..lineTo(mid.dx, mid.dy)
-        ..lineTo(end.dx, end.dy);
-      canvas.drawPath(path, glow);
-      canvas.drawPath(path, crack);
-      if (i.isEven) {
-        final branchAngle = angle + (i.isEven ? 0.42 : -0.42);
-        final branchEnd = mid +
-            Offset(cos(branchAngle), sin(branchAngle)) * radius * 0.30;
-        canvas.drawLine(mid, branchEnd, crack);
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = perfect ? 3.4 : 2.5
+      ..color = edgeGlow;
+
+    bool cleared(int row, int col) {
+      if (row < 0 || row >= boardSize || col < 0 || col >= boardSize) {
+        return false;
+      }
+      return cells.contains(row * boardSize + col);
+    }
+
+    void jaggedEdge(Offset a, Offset b, int seed) {
+      final path = Path()..moveTo(a.dx, a.dy);
+      const segments = 5;
+      for (var s = 1; s <= segments; s++) {
+        final t = s / segments;
+        final base = Offset(
+          a.dx + (b.dx - a.dx) * t,
+          a.dy + (b.dy - a.dy) * t,
+        );
+        final nx = b.dy - a.dy;
+        final ny = -(b.dx - a.dx);
+        final len = max(1.0, sqrt(nx * nx + ny * ny));
+        final wobble =
+            sin((seed + 1) * 1.73 + s * 2.21) * min(cellW, cellH) * 0.035;
+        path.lineTo(base.dx + nx / len * wobble, base.dy + ny / len * wobble);
+      }
+      canvas.drawPath(path, edgeGlowPaint);
+      canvas.drawPath(path, edgePaint);
+    }
+
+    for (final index in cells) {
+      final row = index ~/ boardSize;
+      final col = index % boardSize;
+      final left = col * cellW;
+      final top = row * cellH;
+      final right = left + cellW;
+      final bottom = top + cellH;
+      final inset = min(cellW, cellH) * 0.08;
+
+      if (!cleared(row - 1, col)) {
+        jaggedEdge(
+          Offset(left + inset, top + inset * 0.22),
+          Offset(right - inset, top + inset * 0.22),
+          index * 4,
+        );
+      }
+      if (!cleared(row + 1, col)) {
+        jaggedEdge(
+          Offset(left + inset, bottom - inset * 0.22),
+          Offset(right - inset, bottom - inset * 0.22),
+          index * 4 + 1,
+        );
+      }
+      if (!cleared(row, col - 1)) {
+        jaggedEdge(
+          Offset(left + inset * 0.22, top + inset),
+          Offset(left + inset * 0.22, bottom - inset),
+          index * 4 + 2,
+        );
+      }
+      if (!cleared(row, col + 1)) {
+        jaggedEdge(
+          Offset(right - inset * 0.22, top + inset),
+          Offset(right - inset * 0.22, bottom - inset),
+          index * 4 + 3,
+        );
+      }
+
+      if (crackPhase > 0.10) {
+        final cellCenter = Offset(left + cellW * 0.5, top + cellH * 0.5);
+        final spokePaint = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeWidth = 0.72
+          ..color = Colors.white.withValues(alpha: 0.50 * fade * crackPhase);
+        final spokes = perfect ? 5 : 3;
+        for (var s = 0; s < spokes; s++) {
+          final angle = (index * 0.91 + s * 2.17);
+          final len = min(cellW, cellH) *
+              (0.22 + 0.15 * crackPhase + (s % 2) * 0.05);
+          final elbow = cellCenter +
+              Offset(cos(angle), sin(angle)) * len * 0.56;
+          final endAngle = angle + sin(index + s * 1.7) * 0.34;
+          final end =
+              elbow + Offset(cos(endAngle), sin(endAngle)) * len * 0.50;
+          final path = Path()
+            ..moveTo(cellCenter.dx, cellCenter.dy)
+            ..lineTo(elbow.dx, elbow.dy)
+            ..lineTo(end.dx, end.dy);
+          canvas.drawPath(path, spokePaint);
+        }
+      }
+
+      if (shardPhase > 0) {
+        final shardAlpha = fade * shardPhase;
+        final shardPaint = Paint()
+          ..style = PaintingStyle.fill
+          ..color = theme.block.withValues(alpha: 0.18 * shardAlpha);
+        final shardEdge = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 0.72
+          ..color = Colors.white.withValues(alpha: 0.56 * shardAlpha);
+
+        for (var s = 0; s < 2; s++) {
+          final angle = index * 0.83 + s * pi + 0.4;
+          final travel = min(cellW, cellH) * (0.16 + 0.34 * shardPhase);
+          final origin = Offset(
+            left + cellW * (s == 0 ? 0.24 : 0.72),
+            top + cellH * (s == 0 ? 0.20 : 0.76),
+          );
+          final pos = origin + Offset(cos(angle), sin(angle)) * travel;
+          final r = min(cellW, cellH) * (0.09 + 0.025 * s);
+          canvas.save();
+          canvas.translate(pos.dx, pos.dy);
+          canvas.rotate(angle + shardPhase * (s == 0 ? 1.2 : -1.0));
+          final shard = Path()
+            ..moveTo(-r * 0.35, -r)
+            ..lineTo(r * 0.85, -r * 0.10)
+            ..lineTo(-r * 0.15, r * 0.92)
+            ..close();
+          canvas.drawPath(shard, shardPaint);
+          canvas.drawPath(shard, shardEdge);
+          canvas.restore();
+        }
       }
     }
 
+    // A thin refraction flash keeps the break readable without hiding the grid.
     final flare = Paint()
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = 1.0
-      ..color = Colors.white.withValues(alpha: 0.34 * fade);
+      ..strokeWidth = perfect ? 1.35 : 1.0
+      ..color = Colors.white.withValues(alpha: 0.30 * fade);
     canvas.drawLine(
-      Offset(center.dx - radius * 0.75, center.dy - radius * 0.18),
-      Offset(center.dx + radius * 0.82, center.dy + radius * 0.11),
+      Offset(center.dx - radius * 0.82, center.dy - radius * 0.20),
+      Offset(center.dx + radius * 0.88, center.dy + radius * 0.12),
       flare,
     );
-
-    if (perfect) {
-      final edge = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.8
-        ..color = Colors.white.withValues(alpha: 0.22 * fade);
-      final edgePath = Path()
-        ..moveTo(size.width * 0.92, 0)
-        ..lineTo(size.width * 0.84, size.height * 0.08)
-        ..lineTo(size.width * 0.90, size.height * 0.15)
-        ..lineTo(size.width * 0.81, size.height * 0.22);
-      canvas.drawPath(edgePath, edge);
-    }
   }
 
   void _paintWood(
