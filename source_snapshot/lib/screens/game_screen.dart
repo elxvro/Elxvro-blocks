@@ -3297,37 +3297,162 @@ class _Material2DOverlayPainter extends CustomPainter {
     double p,
     double fade,
   ) {
-    final line = Paint()
+    // v0.11.2: wood tears along exposed cell edges instead of exploding
+    // from one artificial center point.
+    final cellW = size.width / boardSize;
+    final cellH = size.height / boardSize;
+    final splitPhase =
+        ((progress - 0.04) / 0.34).clamp(0.0, 1.0).toDouble();
+    final debrisPhase =
+        ((progress - 0.20) / 0.62).clamp(0.0, 1.0).toDouble();
+
+    bool cleared(int row, int col) {
+      if (row < 0 || row >= boardSize || col < 0 || col >= boardSize) {
+        return false;
+      }
+      return cells.contains(row * boardSize + col);
+    }
+
+    final splitPaint = Paint()
+      ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = 1.1
-      ..color = theme.blockAccent.withValues(alpha: 0.52 * fade);
-    final chipPaint = Paint()
-      ..style = PaintingStyle.fill
-      ..color = theme.block.withValues(alpha: 0.70 * fade);
-    final count = 8 + min(6, impact);
-    for (var i = 0; i < count; i++) {
-      final angle = i / count * pi * 2 + 0.11;
-      final start = center + Offset(cos(angle), sin(angle)) * radius * 0.24;
-      final end = center +
-          Offset(cos(angle + sin(i * 1.7) * 0.08),
-                  sin(angle + sin(i * 1.7) * 0.08)) *
-              radius * (0.72 + (i % 3) * 0.10);
-      canvas.drawLine(start, end, line);
-      canvas.save();
-      canvas.translate(end.dx, end.dy);
-      canvas.rotate(angle + p * (i.isEven ? 1.2 : -1.1));
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(
-            center: Offset.zero,
-            width: 2.2 + (i % 2) * 1.0,
-            height: 8.0 + (i % 3) * 2.0,
-          ),
-          const Radius.circular(1),
-        ),
-        chipPaint,
-      );
-      canvas.restore();
+      ..strokeWidth = 1.0
+      ..color = const Color(0xFFFFE2A8)
+          .withValues(alpha: 0.36 * fade * splitPhase);
+    final darkSplit = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 0.75
+      ..color = const Color(0xFF3B1D0D)
+          .withValues(alpha: 0.64 * fade * splitPhase);
+
+    for (final index in cells) {
+      final row = index ~/ boardSize;
+      final col = index % boardSize;
+      final rect = Rect.fromLTWH(col * cellW, row * cellH, cellW, cellH);
+      final cx = rect.center.dx;
+      final cy = rect.center.dy;
+
+      final splits = <Path>[];
+      for (var s = 0; s < 3; s++) {
+        final y = rect.top + cellH * (0.28 + s * 0.22);
+        final path = Path()
+          ..moveTo(rect.left + cellW * 0.12, y)
+          ..cubicTo(
+            cx - cellW * 0.18,
+            y - cellH * 0.07,
+            cx + cellW * 0.10,
+            y + cellH * 0.06,
+            rect.right - cellW * 0.10,
+            y - cellH * 0.02,
+          );
+        splits.add(path);
+      }
+      for (final path in splits) {
+        canvas.drawPath(path, darkSplit);
+        canvas.drawPath(path, splitPaint);
+      }
+
+      final exposed = <({Offset a, Offset b, double angle})>[];
+      if (!cleared(row - 1, col)) {
+        exposed.add((
+          a: Offset(rect.left + cellW * 0.12, rect.top + cellH * 0.06),
+          b: Offset(rect.right - cellW * 0.12, rect.top + cellH * 0.06),
+          angle: -pi / 2,
+        ));
+      }
+      if (!cleared(row + 1, col)) {
+        exposed.add((
+          a: Offset(rect.left + cellW * 0.12, rect.bottom - cellH * 0.06),
+          b: Offset(rect.right - cellW * 0.12, rect.bottom - cellH * 0.06),
+          angle: pi / 2,
+        ));
+      }
+      if (!cleared(row, col - 1)) {
+        exposed.add((
+          a: Offset(rect.left + cellW * 0.06, rect.top + cellH * 0.12),
+          b: Offset(rect.left + cellW * 0.06, rect.bottom - cellH * 0.12),
+          angle: pi,
+        ));
+      }
+      if (!cleared(row, col + 1)) {
+        exposed.add((
+          a: Offset(rect.right - cellW * 0.06, rect.top + cellH * 0.12),
+          b: Offset(rect.right - cellW * 0.06, rect.bottom - cellH * 0.12),
+          angle: 0,
+        ));
+      }
+
+      for (var e = 0; e < exposed.length; e++) {
+        final edge = exposed[e];
+        final edgePath = Path()..moveTo(edge.a.dx, edge.a.dy);
+        for (var s = 1; s <= 5; s++) {
+          final t = s / 5;
+          final base = Offset(
+            edge.a.dx + (edge.b.dx - edge.a.dx) * t,
+            edge.a.dy + (edge.b.dy - edge.a.dy) * t,
+          );
+          final wobble =
+              sin(index * 1.17 + e * 2.03 + s * 2.6) * min(cellW, cellH) * 0.04;
+          final normal = Offset(cos(edge.angle), sin(edge.angle));
+          edgePath.lineTo(
+            base.dx + normal.dx * wobble,
+            base.dy + normal.dy * wobble,
+          );
+        }
+        canvas.drawPath(edgePath, darkSplit);
+        canvas.drawPath(edgePath, splitPaint);
+
+        if (debrisPhase > 0) {
+          for (var chip = 0; chip < 2; chip++) {
+            final t = (chip + 1) / 3;
+            final anchor = Offset(
+              edge.a.dx + (edge.b.dx - edge.a.dx) * t,
+              edge.a.dy + (edge.b.dy - edge.a.dy) * t,
+            );
+            final travel =
+                min(cellW, cellH) * (0.12 + 0.24 * debrisPhase + chip * 0.03);
+            final pos = anchor +
+                Offset(cos(edge.angle), sin(edge.angle)) * travel;
+            final length = min(cellW, cellH) * (0.17 + chip * 0.04);
+            final width = max(1.5, length * 0.22);
+            canvas.save();
+            canvas.translate(pos.dx, pos.dy);
+            canvas.rotate(edge.angle + debrisPhase * (chip.isEven ? 0.8 : -0.7));
+            canvas.drawRRect(
+              RRect.fromRectAndRadius(
+                Rect.fromCenter(
+                  center: Offset.zero,
+                  width: width,
+                  height: length,
+                ),
+                Radius.circular(width * 0.35),
+              ),
+              Paint()
+                ..color = theme.block.withValues(alpha: 0.82 * fade),
+            );
+            canvas.drawLine(
+              Offset(0, -length * 0.30),
+              Offset(0, length * 0.32),
+              Paint()
+                ..strokeWidth = 0.55
+                ..color = const Color(0xFF5C2D13)
+                    .withValues(alpha: 0.72 * fade),
+            );
+            canvas.restore();
+          }
+        }
+      }
+
+      if (debrisPhase > 0.1) {
+        canvas.drawCircle(
+          Offset(cx, cy),
+          min(cellW, cellH) * 0.07 * (1 - debrisPhase * 0.45),
+          Paint()
+            ..color = theme.blockAccent
+                .withValues(alpha: 0.10 * fade * (1 - debrisPhase)),
+        );
+      }
     }
   }
 
@@ -3338,28 +3463,115 @@ class _Material2DOverlayPainter extends CustomPainter {
     double p,
     double fade,
   ) {
+    final cellW = size.width / boardSize;
+    final cellH = size.height / boardSize;
+    final crackPhase =
+        (progress / 0.30).clamp(0.0, 1.0).toDouble();
+    final crumblePhase =
+        ((progress - 0.16) / 0.60).clamp(0.0, 1.0).toDouble();
+
+    bool cleared(int row, int col) {
+      if (row < 0 || row >= boardSize || col < 0 || col >= boardSize) {
+        return false;
+      }
+      return cells.contains(row * boardSize + col);
+    }
+
     final crack = Paint()
       ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
       ..strokeWidth = 1.05
-      ..color = theme.blockAccent.withValues(alpha: 0.48 * fade);
-    final dust = Paint()..style = PaintingStyle.fill;
-    final crackCount = 6 + min(4, impact);
-    for (var i = 0; i < crackCount; i++) {
-      final angle = i / crackCount * pi * 2 + 0.24;
-      final a = center + Offset(cos(angle), sin(angle)) * radius * 0.16;
-      final b = center +
-          Offset(cos(angle + 0.07 * sin(i * 2.2)),
-                  sin(angle + 0.07 * sin(i * 2.2))) *
-              radius * 0.88;
-      canvas.drawLine(a, b, crack);
-    }
-    for (var i = 0; i < 15; i++) {
-      final angle = i / 15 * pi * 2 + 0.31;
-      final rr = radius * (0.45 + (i % 4) * 0.14) * p;
-      final point = center + Offset(cos(angle), sin(angle)) * rr;
-      dust.color = Color.lerp(theme.block, Colors.white, 0.18)!
-          .withValues(alpha: (0.07 + (i % 3) * 0.025) * fade);
-      canvas.drawCircle(point, 4.5 + (i % 4) * 2.1, dust);
+      ..color = const Color(0xFF11171B)
+          .withValues(alpha: 0.78 * fade * crackPhase);
+    final crackLight = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 0.72
+      ..color = theme.blockAccent.withValues(alpha: 0.30 * fade * crackPhase);
+
+    for (final index in cells) {
+      final row = index ~/ boardSize;
+      final col = index % boardSize;
+      final rect = Rect.fromLTWH(col * cellW, row * cellH, cellW, cellH);
+      final c0 = rect.center;
+
+      for (var s = 0; s < 5; s++) {
+        final angle = index * 0.73 + s * (pi * 2 / 5);
+        final elbow = c0 +
+            Offset(cos(angle), sin(angle)) *
+                min(cellW, cellH) * (0.12 + 0.10 * crackPhase);
+        final endAngle = angle + sin(index * 0.7 + s * 1.9) * 0.36;
+        final end = c0 +
+            Offset(cos(endAngle), sin(endAngle)) *
+                min(cellW, cellH) * (0.27 + 0.16 * crackPhase);
+        final path = Path()
+          ..moveTo(c0.dx, c0.dy)
+          ..lineTo(elbow.dx, elbow.dy)
+          ..lineTo(end.dx, end.dy);
+        canvas.drawPath(path, crackLight);
+        canvas.drawPath(path, crack);
+      }
+
+      final exposedAngles = <double>[];
+      if (!cleared(row - 1, col)) exposedAngles.add(-pi / 2);
+      if (!cleared(row + 1, col)) exposedAngles.add(pi / 2);
+      if (!cleared(row, col - 1)) exposedAngles.add(pi);
+      if (!cleared(row, col + 1)) exposedAngles.add(0);
+
+      for (var e = 0; e < exposedAngles.length; e++) {
+        final angle = exposedAngles[e];
+        final base = c0 +
+            Offset(cos(angle), sin(angle)) *
+                min(cellW, cellH) * 0.42;
+        if (crumblePhase > 0) {
+          for (var rock = 0; rock < 2; rock++) {
+            final spread = (rock == 0 ? -1 : 1) * 0.22;
+            final a = angle + spread;
+            final travel =
+                min(cellW, cellH) * (0.10 + crumblePhase * (0.26 + rock * 0.05));
+            final pos = base + Offset(cos(a), sin(a)) * travel;
+            final r = min(cellW, cellH) * (0.055 + rock * 0.018);
+            final poly = Path()
+              ..moveTo(-r, -r * 0.24)
+              ..lineTo(-r * 0.28, -r)
+              ..lineTo(r * 0.86, -r * 0.48)
+              ..lineTo(r, r * 0.40)
+              ..lineTo(r * 0.08, r)
+              ..lineTo(-r * 0.80, r * 0.42)
+              ..close();
+            canvas.save();
+            canvas.translate(pos.dx, pos.dy);
+            canvas.rotate(a + crumblePhase * (rock == 0 ? 1.1 : -0.9));
+            canvas.drawPath(
+              poly,
+              Paint()..color = theme.block.withValues(alpha: 0.90 * fade),
+            );
+            canvas.drawPath(
+              poly,
+              Paint()
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = 0.60
+                ..color = theme.blockAccent.withValues(alpha: 0.24 * fade),
+            );
+            canvas.restore();
+          }
+
+          final dustPaint = Paint();
+          for (var d = 0; d < 3; d++) {
+            final a = angle + (d - 1) * 0.20;
+            final travel = min(cellW, cellH) *
+                (0.18 + crumblePhase * (0.22 + d * 0.04));
+            final pos = base + Offset(cos(a), sin(a)) * travel;
+            dustPaint.color = Color.lerp(theme.block, Colors.white, 0.22)!
+                .withValues(alpha: 0.12 * fade * (1 - crumblePhase * 0.4));
+            canvas.drawCircle(
+              pos,
+              min(cellW, cellH) * (0.035 + d * 0.012),
+              dustPaint,
+            );
+          }
+        }
+      }
     }
   }
 
