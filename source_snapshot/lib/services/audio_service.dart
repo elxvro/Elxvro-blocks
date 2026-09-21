@@ -24,6 +24,10 @@ class AudioService {
     'audio/bgm_out_in_space.ogg',
   ];
 
+  // Kept only as an emergency runtime fallback. Normal playback uses the
+  // non-repeating playlist above, so the old track no longer loops forever.
+  static const String _legacyMusicFallback = 'audio/cozy_puzzle_music.ogg';
+
   static const Map<String, Duration> _sfxDurations = <String, Duration>{
     'audio/ui_tap_v1.wav': Duration(milliseconds: 120),
     'audio/ui_tap_v2.wav': Duration(milliseconds: 120),
@@ -233,9 +237,20 @@ class AudioService {
       _musicPaused = false;
       debugPrint('ELXVRO BGM: $nextTrack');
     } catch (error) {
-      _musicStarted = false;
-      _musicPaused = false;
-      debugPrint('ELXVRO music start failed: $error');
+      debugPrint('ELXVRO playlist track failed, using fallback: $error');
+      try {
+        await _musicPlayer.play(
+          AssetSource(_legacyMusicFallback),
+          volume: _effectiveMusicVolume,
+          ctx: _gameContext,
+        );
+        _musicStarted = true;
+        _musicPaused = false;
+      } catch (fallbackError) {
+        _musicStarted = false;
+        _musicPaused = false;
+        debugPrint('ELXVRO music fallback failed: $fallbackError');
+      }
     } finally {
       _musicStartFuture = null;
     }
