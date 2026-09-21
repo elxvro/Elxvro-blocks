@@ -918,16 +918,16 @@ class _GameScreenState extends State<GameScreen>
       if (lowFx) return 1;
       switch (_theme.material) {
         case ThemeMaterial.glass:
-          return cells.length > 18 ? 3 : 5;
+          return cells.length > 18 ? 4 : 7;
         case ThemeMaterial.crystal:
-          return cells.length > 18 ? 3 : 5;
+          return cells.length > 18 ? 4 : 7;
         case ThemeMaterial.wood:
-          return cells.length > 18 ? 2 : 4;
+          return cells.length > 18 ? 3 : 6;
         case ThemeMaterial.stone:
         case ThemeMaterial.marble:
-          return cells.length > 18 ? 2 : 4;
+          return cells.length > 18 ? 3 : 6;
         case ThemeMaterial.leaf:
-          return cells.length > 18 ? 2 : 4;
+          return cells.length > 18 ? 3 : 6;
       }
     }
 
@@ -949,8 +949,8 @@ class _GameScreenState extends State<GameScreen>
     }
 
     final perCell = materialBurstCount();
-    final maxParticles = lowFx ? 30 : (perfect ? 132 : 104);
-    final impactBoost = 1.0 + (impact.clamp(1, 6) - 1) * 0.075;
+    final maxParticles = lowFx ? 36 : (perfect ? 168 : 140);
+    final impactBoost = 1.0 + (impact.clamp(1, 6) - 1) * 0.10;
 
     for (final cell in cells) {
       flash.add(cell.row * _boardSize + cell.col);
@@ -973,9 +973,9 @@ class _GameScreenState extends State<GameScreen>
         final jitter = (_random.nextDouble() - 0.5) * 0.18;
         final tangentX = -dy;
         final tangentY = dx;
-        final outward = (0.085 + _random.nextDouble() * 0.12) *
+        final outward = (0.11 + _random.nextDouble() * 0.17) *
             impactBoost *
-            (perfect ? 1.18 : 1.0);
+            (perfect ? 1.30 : 1.0);
 
         var vx = dx * outward + tangentX * jitter;
         var vy = dy * outward * 0.42 +
@@ -984,28 +984,28 @@ class _GameScreenState extends State<GameScreen>
 
         switch (_theme.material) {
           case ThemeMaterial.glass:
-            vx *= 1.20;
-            vy *= 1.14;
+            vx *= 1.34;
+            vy *= 1.24;
             break;
           case ThemeMaterial.crystal:
-            vx *= 1.26;
-            vy *= 1.18;
+            vx *= 1.42;
+            vy *= 1.28;
             break;
           case ThemeMaterial.wood:
-            vx *= 0.92;
-            vy *= 0.96;
+            vx *= 0.98;
+            vy *= 1.00;
             break;
           case ThemeMaterial.stone:
-            vx *= 0.72;
-            vy *= 0.72;
+            vx *= 0.82;
+            vy *= 0.80;
             break;
           case ThemeMaterial.marble:
-            vx *= 0.78;
-            vy *= 0.76;
+            vx *= 0.86;
+            vy *= 0.84;
             break;
           case ThemeMaterial.leaf:
-            vx *= 0.84;
-            vy *= 0.52;
+            vx *= 1.02;
+            vy *= 0.58;
             break;
         }
 
@@ -1015,10 +1015,10 @@ class _GameScreenState extends State<GameScreen>
             y: (cell.row + 0.5) / _boardSize,
             vx: vx,
             vy: vy,
-            radius: 1.5 +
+            radius: 1.7 +
                 _random.nextDouble() *
-                    (perfect ? 4.4 : 3.2) *
-                    (1 + impact * 0.035),
+                    (perfect ? 5.3 : 3.9) *
+                    (1 + impact * 0.045),
             angle: _random.nextDouble() * pi * 2,
             spin: (_random.nextDouble() - 0.5) *
                 (_theme.material == ThemeMaterial.stone ? 3.6 : 6.4),
@@ -3315,38 +3315,76 @@ class _ClearShockwavePainter extends CustomPainter {
       y / cells.length / boardSize * size.height,
     );
 
-    final ringPhase = ((progress - 0.08) / 0.62).clamp(0.0, 1.0).toDouble();
+    final ringPhase = ((progress - 0.06) / 0.66).clamp(0.0, 1.0).toDouble();
     final ringFade = (1 - ringPhase).clamp(0.0, 1.0).toDouble() * fade;
-    final baseRadius =
-        size.shortestSide * (0.035 + 0.15 * Curves.easeOutCubic.transform(ringPhase));
+    final baseRadius = size.shortestSide *
+        (0.05 + 0.23 * Curves.easeOutCubic.transform(ringPhase));
 
     canvas.drawCircle(
       center,
       baseRadius,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.35 + impact * 0.18
-        ..color = color.withValues(alpha: 0.34 * ringFade),
+        ..strokeWidth = 1.55 + impact * 0.20
+        ..color = color.withValues(alpha: 0.42 * ringFade),
     );
     canvas.drawCircle(
       center,
       baseRadius * 0.58,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.85
-        ..color = Colors.white.withValues(alpha: 0.22 * ringFade),
+        ..strokeWidth = 0.95
+        ..color = Colors.white.withValues(alpha: 0.30 * ringFade),
     );
+
+    final widePhase =
+        ((progress - 0.14) / 0.72).clamp(0.0, 1.0).toDouble();
+    final wideFade =
+        (1 - widePhase).clamp(0.0, 1.0).toDouble() * fade;
+    final wideRadius = size.shortestSide *
+        (0.10 + 0.32 * Curves.easeOutQuart.transform(widePhase));
+    if (wideFade > 0.01) {
+      canvas.drawCircle(
+        center,
+        wideRadius,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 0.75 + impact * 0.08
+          ..color = color.withValues(alpha: 0.20 * wideFade),
+      );
+    }
+
+    if (impact >= 2 && ringFade > 0.03) {
+      final sampleStep = max(1, sorted.length ~/ 7);
+      for (var i = 0; i < sorted.length; i += sampleStep) {
+        final index = sorted[i];
+        final localCenter = Offset(
+          ((index % boardSize) + 0.5) / boardSize * size.width,
+          ((index ~/ boardSize) + 0.5) / boardSize * size.height,
+        );
+        final localRadius = min(cellW, cellH) *
+            (0.48 + 1.05 * Curves.easeOutCubic.transform(ringPhase));
+        canvas.drawCircle(
+          localCenter,
+          localRadius,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 0.72
+            ..color = Colors.white.withValues(alpha: 0.16 * ringFade),
+        );
+      }
+    }
 
     if (impact >= 3 && ringFade > 0.02) {
       final rays = min(18, 8 + impact * 2);
       final rayPaint = Paint()
         ..strokeCap = StrokeCap.round
         ..strokeWidth = 0.9
-        ..color = color.withValues(alpha: 0.18 * ringFade);
+        ..color = color.withValues(alpha: 0.26 * ringFade);
       for (var i = 0; i < rays; i++) {
         final angle = i / rays * pi * 2 + progress * 0.20;
         final inner = baseRadius * 0.72;
-        final outer = baseRadius * (1.05 + (i % 3) * 0.16);
+        final outer = baseRadius * (1.18 + (i % 3) * 0.22);
         canvas.drawLine(
           center + Offset(cos(angle), sin(angle)) * inner,
           center + Offset(cos(angle), sin(angle)) * outer,
