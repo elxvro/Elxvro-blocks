@@ -70,7 +70,7 @@ class _AmbientGlow extends StatelessWidget {
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 colors: <Color>[
-                  glow.withValues(alpha: 0.12),
+                  glow.withValues(alpha: 0.20),
                   Colors.transparent,
                 ],
               ),
@@ -87,7 +87,7 @@ class _AmbientGlow extends StatelessWidget {
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 colors: <Color>[
-                  glow.withValues(alpha: 0.09),
+                  glow.withValues(alpha: 0.15),
                   Colors.transparent,
                 ],
               ),
@@ -133,12 +133,12 @@ class _ThemeBackdropPainter extends CustomPainter {
     final p = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2
-      ..color = Colors.white.withValues(alpha: 0.055);
+      ..color = Colors.white.withValues(alpha: 0.085);
     for (var i = -2; i < 8; i++) {
       final x = s.width * (i / 6);
       canvas.drawLine(Offset(x, 0), Offset(x + s.height * 0.22, s.height), p);
     }
-    final bubble = Paint()..color = accent.withValues(alpha: 0.045);
+    final bubble = Paint()..color = accent.withValues(alpha: 0.075);
     for (final q in <Offset>[
       Offset(s.width * .16, s.height * .22),
       Offset(s.width * .80, s.height * .18),
@@ -153,7 +153,7 @@ class _ThemeBackdropPainter extends CustomPainter {
     final p = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.1
-      ..color = const Color(0xFFD49855).withValues(alpha: 0.075);
+      ..color = const Color(0xFFE4A766).withValues(alpha: 0.11);
     for (var i = 0; i < 10; i++) {
       final y = s.height * (0.05 + i * 0.105);
       final path = Path()
@@ -165,7 +165,7 @@ class _ThemeBackdropPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeWidth = 5
-      ..color = const Color(0xFF7B4B26).withValues(alpha: 0.11);
+      ..color = const Color(0xFF9A6232).withValues(alpha: 0.15);
     canvas.drawLine(Offset(-30, s.height * .78), Offset(s.width * .44, s.height * .52), branch);
     canvas.drawLine(Offset(s.width * .26, s.height * .61), Offset(s.width * .48, s.height * .37), branch..strokeWidth=3);
   }
@@ -174,7 +174,7 @@ class _ThemeBackdropPainter extends CustomPainter {
     final line = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0
-      ..color = Colors.white.withValues(alpha: 0.045);
+      ..color = Colors.white.withValues(alpha: 0.07);
     const cols = 4;
     const rows = 8;
     final w = s.width / cols;
@@ -194,7 +194,7 @@ class _ThemeBackdropPainter extends CustomPainter {
     final vein = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.1
-      ..color = const Color(0xFFB9FFB0).withValues(alpha: 0.055);
+      ..color = const Color(0xFFCEFFC7).withValues(alpha: 0.085);
     for (var i = 0; i < 7; i++) {
       final x = s.width * (0.05 + i * .16);
       final path = Path()
@@ -202,7 +202,7 @@ class _ThemeBackdropPainter extends CustomPainter {
         ..quadraticBezierTo(x + 80, s.height * .55, x + 20, -30);
       canvas.drawPath(path, vein);
     }
-    final leaf = Paint()..color = accent.withValues(alpha: 0.035);
+    final leaf = Paint()..color = accent.withValues(alpha: 0.06);
     for (final p in <Offset>[
       Offset(s.width*.16,s.height*.25),
       Offset(s.width*.82,s.height*.34),
@@ -220,7 +220,7 @@ class _ThemeBackdropPainter extends CustomPainter {
     final p = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0
-      ..color = Colors.white.withValues(alpha: 0.05);
+      ..color = Colors.white.withValues(alpha: 0.08);
     final points = <Offset>[
       Offset(s.width*.10,s.height*.20),
       Offset(s.width*.78,s.height*.12),
@@ -239,11 +239,11 @@ class _ThemeBackdropPainter extends CustomPainter {
     final gold = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.25
-      ..color = accent.withValues(alpha: 0.07);
+      ..color = accent.withValues(alpha: 0.11);
     final white = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.9
-      ..color = Colors.white.withValues(alpha: 0.035);
+      ..color = Colors.white.withValues(alpha: 0.055);
     for (var i=0;i<5;i++) {
       final y=s.height*(.08+i*.21);
       final p=Path()..moveTo(-30,y)..cubicTo(s.width*.22,y-90,s.width*.62,y+80,s.width+40,y-25);
