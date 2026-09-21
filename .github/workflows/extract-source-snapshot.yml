@@ -1,0 +1,43 @@
+name: Extract ELXVRO Blocks Source Snapshot
+
+on:
+  push:
+    branches:
+      - 3d-integrated-v0.11.0
+    paths:
+      - ".github/workflows/extract-source-snapshot.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 3d-integrated-v0.11.0
+
+      - name: Extract Flutter source snapshot
+        run: |
+          set -euo pipefail
+          rm -rf _src source_snapshot
+          mkdir _src
+          unzip -q elxvro-blocks-v0.10.1.zip -d _src
+          mkdir -p source_snapshot
+          cp -a _src/elxvro-blocks-v0.10.1/lib source_snapshot/lib
+          cp _src/elxvro-blocks-v0.10.1/pubspec.yaml source_snapshot/pubspec.yaml
+
+      - name: Commit snapshot
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add source_snapshot
+          if git diff --cached --quiet; then
+            echo "Snapshot unchanged."
+            exit 0
+          fi
+          git commit -m "Add Flutter source snapshot for integrated 3D work"
+          git push origin HEAD:3d-integrated-v0.11.0
