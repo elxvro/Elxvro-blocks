@@ -2775,13 +2775,32 @@ class _BoardGrid extends StatelessWidget {
                         key: ValueKey<String>(
                           'place-$index-$placementPulseRevision',
                         ),
-                        tween: Tween<double>(begin: 0.72, end: 1),
-                        duration: const Duration(milliseconds: 240),
-                        curve: Curves.easeOutBack,
-                        builder: (context, scale, child) => Transform.scale(
-                          scale: scale,
-                          child: child,
-                        ),
+                        tween: Tween<double>(begin: 0, end: 1),
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.linear,
+                        builder: (context, t, child) {
+                          final settle = Curves.easeOutBack.transform(t);
+                          final fall = 1 - Curves.easeOutCubic.transform(t);
+                          final scale = 0.86 + settle * 0.14;
+                          final y = -cellSize * 0.16 * fall;
+                          final tilt = sin(t * pi) *
+                              (theme.material == ThemeMaterial.leaf
+                                  ? 0.035
+                                  : theme.material == ThemeMaterial.glass ||
+                                          theme.material == ThemeMaterial.crystal
+                                      ? 0.018
+                                      : 0.010);
+                          return Transform.translate(
+                            offset: Offset(0, y),
+                            child: Transform.rotate(
+                              angle: tilt,
+                              child: Transform.scale(
+                                scale: scale,
+                                child: child,
+                              ),
+                            ),
+                          );
+                        },
                         child: ThemedBlockTile(
                           material: theme.material,
                           base: theme.block,
