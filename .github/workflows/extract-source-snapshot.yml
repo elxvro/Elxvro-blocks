@@ -41,3 +41,5 @@ jobs:
           fi
           git commit -m "Add Flutter source snapshot for integrated 3D work"
           git push origin HEAD:3d-integrated-v0.11.0
+
+# trigger source snapshot
