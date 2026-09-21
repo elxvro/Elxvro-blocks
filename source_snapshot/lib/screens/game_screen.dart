@@ -3582,41 +3582,156 @@ class _Material2DOverlayPainter extends CustomPainter {
     double p,
     double fade,
   ) {
+    // v0.11.3: leaf material separates as fibers and curled fragments.
+    final cellW = size.width / boardSize;
+    final cellH = size.height / boardSize;
+    final tearPhase =
+        (progress / 0.30).clamp(0.0, 1.0).toDouble();
+    final driftPhase =
+        ((progress - 0.16) / 0.72).clamp(0.0, 1.0).toDouble();
+
+    bool cleared(int row, int col) {
+      if (row < 0 || row >= boardSize || col < 0 || col >= boardSize) {
+        return false;
+      }
+      return cells.contains(row * boardSize + col);
+    }
+
+    final vein = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 0.82
+      ..color = const Color(0xFFE3FFBD)
+          .withValues(alpha: 0.48 * fade * tearPhase);
+    final tear = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 1.0
+      ..color = const Color(0xFF143F24)
+          .withValues(alpha: 0.72 * fade * tearPhase);
+
+    for (final index in cells) {
+      final row = index ~/ boardSize;
+      final col = index % boardSize;
+      final rect = Rect.fromLTWH(col * cellW, row * cellH, cellW, cellH);
+      final c0 = rect.center;
+
+      final mainPath = Path()
+        ..moveTo(rect.left + cellW * 0.12, rect.bottom - cellH * 0.16)
+        ..quadraticBezierTo(
+          c0.dx,
+          c0.dy - cellH * 0.05,
+          rect.right - cellW * 0.12,
+          rect.top + cellH * 0.14,
+        );
+      canvas.drawPath(mainPath, vein);
+
+      for (var s = 0; s < 3; s++) {
+        final t = 0.30 + s * 0.18;
+        final x = rect.left + cellW * t;
+        final y = rect.bottom - cellH * (0.18 + t * 0.58);
+        canvas.drawLine(
+          Offset(x, y),
+          Offset(x - cellW * 0.16, y - cellH * 0.07),
+          vein,
+        );
+        canvas.drawLine(
+          Offset(x, y),
+          Offset(x + cellW * 0.14, y + cellH * 0.06),
+          vein,
+        );
+      }
+
+      final exposedAngles = <double>[];
+      if (!cleared(row - 1, col)) exposedAngles.add(-pi / 2);
+      if (!cleared(row + 1, col)) exposedAngles.add(pi / 2);
+      if (!cleared(row, col - 1)) exposedAngles.add(pi);
+      if (!cleared(row, col + 1)) exposedAngles.add(0);
+
+      for (var e = 0; e < exposedAngles.length; e++) {
+        final angle = exposedAngles[e];
+        final tangent = angle + pi / 2;
+        final edgeCenter = c0 +
+            Offset(cos(angle), sin(angle)) *
+                min(cellW, cellH) * 0.42;
+        final path = Path()
+          ..moveTo(
+            edgeCenter.dx - cos(tangent) * min(cellW, cellH) * 0.32,
+            edgeCenter.dy - sin(tangent) * min(cellW, cellH) * 0.32,
+          );
+        for (var s = 1; s <= 6; s++) {
+          final t = s / 6;
+          final along = (t - 0.5) * min(cellW, cellH) * 0.64;
+          final fray =
+              sin(index * 1.31 + e * 2.4 + s * 2.17) * min(cellW, cellH) * 0.035;
+          path.lineTo(
+            edgeCenter.dx + cos(tangent) * along + cos(angle) * fray,
+            edgeCenter.dy + sin(tangent) * along + sin(angle) * fray,
+          );
+        }
+        canvas.drawPath(path, tear);
+
+        if (driftPhase > 0) {
+          for (var flake = 0; flake < 2; flake++) {
+            final along =
+                (flake == 0 ? -0.18 : 0.18) * min(cellW, cellH);
+            final start = edgeCenter +
+                Offset(cos(tangent), sin(tangent)) * along;
+            final sway = sin(index * 0.81 + e + flake * 2.0 + driftPhase * 7) *
+                min(cellW, cellH) *
+                0.10 *
+                driftPhase;
+            final travel = min(cellW, cellH) *
+                (0.12 + driftPhase * (0.28 + flake * 0.05));
+            final pos = start +
+                Offset(cos(angle), sin(angle)) * travel +
+                Offset(cos(tangent), sin(tangent)) * sway;
+            final r = min(cellW, cellH) * (0.07 + flake * 0.015);
+            canvas.save();
+            canvas.translate(pos.dx, pos.dy);
+            canvas.rotate(
+              tangent + driftPhase * (flake == 0 ? 1.6 : -1.35),
+            );
+            final leaf = Path()
+              ..moveTo(-r * 1.20, 0)
+              ..quadraticBezierTo(0, -r * 0.88, r * 1.20, 0)
+              ..quadraticBezierTo(0, r * 0.88, -r * 1.20, 0)
+              ..close();
+            canvas.drawPath(
+              leaf,
+              Paint()
+                ..color = theme.block.withValues(alpha: 0.86 * fade),
+            );
+            canvas.drawLine(
+              Offset(-r * 0.72, 0),
+              Offset(r * 0.72, 0),
+              Paint()
+                ..strokeWidth = 0.55
+                ..color = theme.blockAccent.withValues(alpha: 0.56 * fade),
+            );
+            canvas.restore();
+          }
+        }
+      }
+    }
+
+    // Soft airflow is deliberately subtle; the fragments remain the hero.
     final wind = Paint()
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = 1.15
-      ..color = theme.blockAccent.withValues(alpha: 0.38 * fade);
-    for (var i = 0; i < 3; i++) {
-      final y = center.dy + (i - 1) * radius * 0.22;
+      ..strokeWidth = 0.85
+      ..color = theme.blockAccent.withValues(alpha: 0.16 * fade);
+    for (var i = 0; i < 2; i++) {
+      final y = center.dy + (i == 0 ? -1 : 1) * radius * 0.20;
       final path = Path()
-        ..moveTo(center.dx - radius * 0.84, y)
+        ..moveTo(center.dx - radius * 0.72, y)
         ..quadraticBezierTo(
           center.dx,
-          y - radius * (0.28 + i * 0.06),
-          center.dx + radius * 0.88,
-          y + radius * 0.10,
+          y - radius * (0.20 + i * 0.05),
+          center.dx + radius * 0.78,
+          y + radius * 0.08,
         );
       canvas.drawPath(path, wind);
-    }
-    final leafPaint = Paint()
-      ..style = PaintingStyle.fill
-      ..color = theme.block.withValues(alpha: 0.72 * fade);
-    for (var i = 0; i < 8; i++) {
-      final angle = i / 8 * pi * 2 + p * 0.7;
-      final point = center +
-          Offset(cos(angle), sin(angle)) * radius * (0.35 + (i % 3) * 0.17);
-      canvas.save();
-      canvas.translate(point.dx, point.dy);
-      canvas.rotate(angle + pi / 2 + p * (i.isEven ? 1.2 : -0.9));
-      final r = 4.0 + (i % 3) * 1.2;
-      final leaf = Path()
-        ..moveTo(-r, 0)
-        ..quadraticBezierTo(0, -r * 0.72, r, 0)
-        ..quadraticBezierTo(0, r * 0.72, -r, 0)
-        ..close();
-      canvas.drawPath(leaf, leafPaint);
-      canvas.restore();
     }
   }
 
@@ -3627,31 +3742,130 @@ class _Material2DOverlayPainter extends CustomPainter {
     double p,
     double fade,
   ) {
-    final beam = Paint()
+    final cellW = size.width / boardSize;
+    final cellH = size.height / boardSize;
+    final splitPhase =
+        (progress / 0.24).clamp(0.0, 1.0).toDouble();
+    final burstPhase =
+        ((progress - 0.12) / 0.54).clamp(0.0, 1.0).toDouble();
+
+    bool cleared(int row, int col) {
+      if (row < 0 || row >= boardSize || col < 0 || col >= boardSize) {
+        return false;
+      }
+      return cells.contains(row * boardSize + col);
+    }
+
+    final facet = Paint()
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = 1.0
-      ..color = Colors.white.withValues(alpha: 0.48 * fade);
-    final diamond = Paint()
-      ..style = PaintingStyle.fill
-      ..color = theme.blockAccent.withValues(alpha: 0.42 * fade);
-    final count = 10 + min(6, impact);
-    for (var i = 0; i < count; i++) {
-      final angle = i / count * pi * 2;
-      final end = center + Offset(cos(angle), sin(angle)) * radius;
-      canvas.drawLine(center, end, beam);
-      canvas.save();
-      canvas.translate(end.dx, end.dy);
-      canvas.rotate(angle + p * 1.6);
-      final r = 3.2 + (i % 3) * 0.9;
-      final path = Path()
-        ..moveTo(0, -r)
-        ..lineTo(r * 0.72, 0)
-        ..lineTo(0, r)
-        ..lineTo(-r * 0.72, 0)
-        ..close();
-      canvas.drawPath(path, diamond);
-      canvas.restore();
+      ..strokeWidth = 0.84
+      ..color = Colors.white.withValues(alpha: 0.58 * fade * splitPhase);
+    final neonEdge = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 2.2
+      ..color = theme.blockAccent.withValues(alpha: 0.20 * fade * splitPhase);
+
+    for (final index in cells) {
+      final row = index ~/ boardSize;
+      final col = index % boardSize;
+      final rect = Rect.fromLTWH(col * cellW, row * cellH, cellW, cellH);
+      final c0 = rect.center;
+      final r = min(cellW, cellH);
+
+      for (var s = 0; s < 6; s++) {
+        final angle = s * pi / 3 + index * 0.27;
+        final end = c0 +
+            Offset(cos(angle), sin(angle)) *
+                r *
+                (0.22 + 0.17 * splitPhase);
+        canvas.drawLine(c0, end, neonEdge);
+        canvas.drawLine(c0, end, facet);
+      }
+
+      final exposedAngles = <double>[];
+      if (!cleared(row - 1, col)) exposedAngles.add(-pi / 2);
+      if (!cleared(row + 1, col)) exposedAngles.add(pi / 2);
+      if (!cleared(row, col - 1)) exposedAngles.add(pi);
+      if (!cleared(row, col + 1)) exposedAngles.add(0);
+
+      for (var e = 0; e < exposedAngles.length; e++) {
+        final angle = exposedAngles[e];
+        final edgeCenter =
+            c0 + Offset(cos(angle), sin(angle)) * r * 0.42;
+        final tangent = angle + pi / 2;
+
+        canvas.drawLine(
+          edgeCenter - Offset(cos(tangent), sin(tangent)) * r * 0.31,
+          edgeCenter + Offset(cos(tangent), sin(tangent)) * r * 0.31,
+          neonEdge,
+        );
+        canvas.drawLine(
+          edgeCenter - Offset(cos(tangent), sin(tangent)) * r * 0.31,
+          edgeCenter + Offset(cos(tangent), sin(tangent)) * r * 0.31,
+          facet,
+        );
+
+        if (burstPhase > 0) {
+          for (var shard = 0; shard < 2; shard++) {
+            final spread = (shard == 0 ? -0.17 : 0.17);
+            final a = angle + spread;
+            final travel = r * (0.12 + burstPhase * (0.34 + shard * 0.05));
+            final pos = edgeCenter + Offset(cos(a), sin(a)) * travel;
+            final sr = r * (0.075 + shard * 0.018);
+            canvas.save();
+            canvas.translate(pos.dx, pos.dy);
+            canvas.rotate(a + burstPhase * (shard == 0 ? 1.45 : -1.25));
+            final diamond = Path()
+              ..moveTo(0, -sr * 1.25)
+              ..lineTo(sr * 0.86, -sr * 0.12)
+              ..lineTo(sr * 0.38, sr)
+              ..lineTo(-sr * 0.38, sr)
+              ..lineTo(-sr * 0.86, -sr * 0.12)
+              ..close();
+            canvas.drawPath(
+              diamond,
+              Paint()
+                ..color = theme.block.withValues(alpha: 0.62 * fade),
+            );
+            canvas.drawPath(
+              diamond,
+              Paint()
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = 0.72
+                ..color = Colors.white.withValues(alpha: 0.72 * fade),
+            );
+            canvas.drawLine(
+              Offset.zero,
+              Offset(0, -sr * 0.90),
+              Paint()
+                ..strokeWidth = 0.55
+                ..color = theme.blockAccent.withValues(alpha: 0.86 * fade),
+            );
+            canvas.restore();
+          }
+        }
+      }
+    }
+
+    // Short spectral rays appear only during the actual fracture peak.
+    final spectral = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 0.95
+      ..color = theme.blockAccent.withValues(
+        alpha: 0.24 * fade * (1 - burstPhase * 0.35),
+      );
+    final rays = 8 + min(6, impact);
+    for (var i = 0; i < rays; i++) {
+      final angle = i / rays * pi * 2 + 0.15;
+      final start = center + Offset(cos(angle), sin(angle)) * radius * 0.34;
+      final end = center +
+          Offset(cos(angle), sin(angle)) *
+              radius *
+              (0.66 + burstPhase * 0.30);
+      canvas.drawLine(start, end, spectral);
     }
   }
 
@@ -3662,30 +3876,133 @@ class _Material2DOverlayPainter extends CustomPainter {
     double p,
     double fade,
   ) {
+    final cellW = size.width / boardSize;
+    final cellH = size.height / boardSize;
+    final crackPhase =
+        (progress / 0.32).clamp(0.0, 1.0).toDouble();
+    final chipPhase =
+        ((progress - 0.18) / 0.62).clamp(0.0, 1.0).toDouble();
+
+    bool cleared(int row, int col) {
+      if (row < 0 || row >= boardSize || col < 0 || col >= boardSize) {
+        return false;
+      }
+      return cells.contains(row * boardSize + col);
+    }
+
     final vein = Paint()
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeWidth = 0.95
-      ..color = theme.blockAccent.withValues(alpha: 0.52 * fade);
-    for (var i = 0; i < 5; i++) {
-      final angle = i / 5 * pi * 2 + 0.3;
-      final start = center + Offset(cos(angle), sin(angle)) * radius * 0.18;
-      final control = center +
-          Offset(cos(angle + 0.42), sin(angle + 0.42)) * radius * 0.55;
-      final end = center + Offset(cos(angle), sin(angle)) * radius * 0.92;
-      final path = Path()
-        ..moveTo(start.dx, start.dy)
-        ..quadraticBezierTo(control.dx, control.dy, end.dx, end.dy);
-      canvas.drawPath(path, vein);
+      ..color = const Color(0xFF554B41)
+          .withValues(alpha: 0.66 * fade * crackPhase);
+    final gold = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 0.82
+      ..color = theme.blockAccent
+          .withValues(alpha: 0.62 * fade * crackPhase);
+
+    for (final index in cells) {
+      final row = index ~/ boardSize;
+      final col = index % boardSize;
+      final rect = Rect.fromLTWH(col * cellW, row * cellH, cellW, cellH);
+      final c0 = rect.center;
+      final r = min(cellW, cellH);
+
+      for (var s = 0; s < 4; s++) {
+        final angle = index * 0.61 + s * pi / 2;
+        final start = c0 + Offset(cos(angle), sin(angle)) * r * 0.05;
+        final control = c0 +
+            Offset(cos(angle + 0.42), sin(angle + 0.42)) * r * 0.25;
+        final end = c0 +
+            Offset(cos(angle), sin(angle)) *
+                r *
+                (0.28 + 0.12 * crackPhase);
+        final path = Path()
+          ..moveTo(start.dx, start.dy)
+          ..quadraticBezierTo(control.dx, control.dy, end.dx, end.dy);
+        canvas.drawPath(path, s.isEven ? vein : gold);
+      }
+
+      final exposedAngles = <double>[];
+      if (!cleared(row - 1, col)) exposedAngles.add(-pi / 2);
+      if (!cleared(row + 1, col)) exposedAngles.add(pi / 2);
+      if (!cleared(row, col - 1)) exposedAngles.add(pi);
+      if (!cleared(row, col + 1)) exposedAngles.add(0);
+
+      for (var e = 0; e < exposedAngles.length; e++) {
+        final angle = exposedAngles[e];
+        final tangent = angle + pi / 2;
+        final edgeCenter =
+            c0 + Offset(cos(angle), sin(angle)) * r * 0.42;
+
+        final edgePath = Path()
+          ..moveTo(
+            edgeCenter.dx - cos(tangent) * r * 0.30,
+            edgeCenter.dy - sin(tangent) * r * 0.30,
+          );
+        for (var s = 1; s <= 5; s++) {
+          final t = s / 5;
+          final along = (t - 0.5) * r * 0.60;
+          final wobble =
+              sin(index * 1.13 + e * 1.9 + s * 2.4) * r * 0.035;
+          edgePath.lineTo(
+            edgeCenter.dx + cos(tangent) * along + cos(angle) * wobble,
+            edgeCenter.dy + sin(tangent) * along + sin(angle) * wobble,
+          );
+        }
+        canvas.drawPath(edgePath, vein);
+        if ((index + e).isEven) {
+          canvas.drawPath(edgePath, gold);
+        }
+
+        if (chipPhase > 0) {
+          for (var chip = 0; chip < 2; chip++) {
+            final spread = (chip == 0 ? -0.16 : 0.16);
+            final a = angle + spread;
+            final travel = r * (0.10 + chipPhase * (0.30 + chip * 0.05));
+            final pos = edgeCenter + Offset(cos(a), sin(a)) * travel;
+            final sr = r * (0.060 + chip * 0.016);
+            final shard = Path()
+              ..moveTo(-sr * 0.90, -sr * 0.34)
+              ..lineTo(-sr * 0.20, -sr)
+              ..lineTo(sr * 0.82, -sr * 0.40)
+              ..lineTo(sr * 0.60, sr * 0.78)
+              ..lineTo(-sr * 0.54, sr)
+              ..close();
+            canvas.save();
+            canvas.translate(pos.dx, pos.dy);
+            canvas.rotate(a + chipPhase * (chip == 0 ? 0.82 : -0.74));
+            canvas.drawPath(
+              shard,
+              Paint()
+                ..color = Color.lerp(theme.block, Colors.white, 0.18)!
+                    .withValues(alpha: 0.92 * fade),
+            );
+            canvas.drawPath(
+              shard,
+              Paint()
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = 0.62
+                ..color = theme.blockAccent.withValues(alpha: 0.42 * fade),
+            );
+            canvas.restore();
+          }
+        }
+      }
     }
-    final dust = Paint()..style = PaintingStyle.fill;
-    for (var i = 0; i < 18; i++) {
-      final angle = i / 18 * pi * 2 + 0.16;
-      final rr = radius * (0.30 + (i % 5) * 0.13) * p;
-      final point = center + Offset(cos(angle), sin(angle)) * rr;
-      dust.color = (i % 3 == 0 ? theme.blockAccent : Colors.white)
-          .withValues(alpha: (0.20 + (i % 4) * 0.04) * fade);
-      canvas.drawCircle(point, 1.2 + (i % 3) * 0.7, dust);
+
+    if (chipPhase > 0) {
+      final dust = Paint()..style = PaintingStyle.fill;
+      for (var i = 0; i < 14; i++) {
+        final angle = i / 14 * pi * 2 + 0.16;
+        final rr = radius * (0.30 + (i % 4) * 0.14) * chipPhase;
+        final point = center + Offset(cos(angle), sin(angle)) * rr;
+        dust.color = (i % 3 == 0 ? theme.blockAccent : Colors.white)
+            .withValues(alpha: 0.15 * fade * (1 - chipPhase * 0.35));
+        canvas.drawCircle(point, 1.0 + (i % 3) * 0.65, dust);
+      }
     }
   }
 
