@@ -474,7 +474,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _pointer_down(screen_pos: Vector2, pointer_id: int) -> void:
 	if selected_piece:
 		return
-	var world := _screen_to_plane(screen_pos, 0.85)
+	var world = _screen_to_plane(screen_pos, 0.85)
 	if world == null:
 		return
 
@@ -504,7 +504,7 @@ func _pointer_down(screen_pos: Vector2, pointer_id: int) -> void:
 func _pointer_move(screen_pos: Vector2) -> void:
 	if not selected_piece:
 		return
-	var world := _screen_to_plane(screen_pos, 0.62)
+	var world = _screen_to_plane(screen_pos, 0.62)
 	if world == null:
 		return
 	selected_piece.position.x = world.x
@@ -652,7 +652,9 @@ func _update_ghost(piece_pos: Vector3, cells: Array) -> void:
 	_clear_ghost()
 	var anchor := _world_to_cell(piece_pos)
 	var valid := _can_place(anchor, cells)
-	var color := theme_data[current_theme]["accent"] if valid else Color(1.0, 0.18, 0.18, 1.0)
+	var color: Color = theme_data[current_theme]["accent"]
+	if not valid:
+		color = Color(1.0, 0.18, 0.18, 1.0)
 
 	for cell in cells:
 		var board_cell := Vector2i(anchor.x + cell.x, anchor.y + cell.y)
