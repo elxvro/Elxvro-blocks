@@ -1,0 +1,290 @@
+name: ELXVRO Blocks v0.16.1 Line Clear Fix APK + AAB
+
+on:
+  push:
+    branches:
+      - gameplay-line-clear-fix-v0.16.1
+    paths:
+      - "source_snapshot/**"
+      - ".github/workflows/build-v0.16.1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter 3.47.4
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.4'
+          channel: stable
+          cache: true
+
+      - name: Extract original ELXVRO Blocks
+        run: |
+          set -euo pipefail
+          test -f elxvro-blocks-v0.10.1.zip
+          unzip -t elxvro-blocks-v0.10.1.zip
+          rm -rf extracted
+          mkdir extracted
+          unzip -q elxvro-blocks-v0.10.1.zip -d extracted
+          test -d extracted/elxvro-blocks-v0.10.1
+
+      - name: Restore all original screens and apply integrated 3D source
+        run: |
+          set -euo pipefail
+          rm -rf extracted/elxvro-blocks-v0.10.1/lib
+          cp -a source_snapshot/lib extracted/elxvro-blocks-v0.10.1/lib
+          cp source_snapshot/pubspec.yaml extracted/elxvro-blocks-v0.10.1/pubspec.yaml
+          echo "Original navigation/screens restored; 3D changes are limited to game visuals."
+
+      - name: Generate Android platform
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: |
+          flutter create             --platforms=android             --org com.elxvro             --project-name elxvro_blocks             .
+
+      - name: Apply Android branding
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: python tool/apply_android_branding.py
+
+      - name: Configure mandatory release signing
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ELXVRO_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ELXVRO_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ELXVRO_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ELXVRO_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "::error::Release signing secrets are missing."
+            exit 1
+          fi
+
+          printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > android/app/elxvro-release.jks
+
+          keytool -list             -keystore android/app/elxvro-release.jks             -alias "$KEY_ALIAS"             -storepass "$KEYSTORE_PASSWORD"             >/dev/null
+
+          {
+            printf 'storePassword=%s\n' "$KEYSTORE_PASSWORD"
+            printf 'keyPassword=%s\n' "$KEY_PASSWORD"
+            printf 'keyAlias=%s\n' "$KEY_ALIAS"
+            printf 'storeFile=elxvro-release.jks\n'
+          } > android/key.properties
+
+          python tool/configure_release_signing.py
+          echo 'RELEASE_SIGNING_CONFIGURED=true' >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: flutter pub get
+
+      - name: Install audio tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg curl
+
+      - name: Fetch game audio
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: |
+          bash tool/fetch_real_material_audio.sh
+          bash tool/fetch_real_puzzle_music.sh
+
+      - name: Fetch v0.16.1 CC0 music playlist
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/elxvro-music
+
+          curl -fL --retry 4 --retry-all-errors \
+            -A "ELXVRO-Blocks-GitHub-Build/0.16.1" \
+            "https://opengameart.org/sites/default/files/magic_puzzle_in-game_1_bpm110_0.ogg" \
+            -o /tmp/elxvro-music/magic.ogg
+
+          curl -fL --retry 4 --retry-all-errors \
+            -A "ELXVRO-Blocks-GitHub-Build/0.16.1" \
+            "https://opengameart.org/sites/default/files/cozy_puzzle_in-game_3_bpm108_0.ogg" \
+            -o /tmp/elxvro-music/cozy3.ogg
+
+          curl -fL --retry 4 --retry-all-errors \
+            -A "ELXVRO-Blocks-GitHub-Build/0.16.1" \
+            "https://opengameart.org/sites/default/files/Out%20in%20Space_0.ogg" \
+            -o /tmp/elxvro-music/space.ogg
+
+          ffmpeg -y -loglevel error -i /tmp/elxvro-music/magic.ogg \
+            -af "loudnorm=I=-20:TP=-2:LRA=11" -c:a libvorbis -q:a 4 \
+            assets/audio/bgm_magic_puzzle.ogg
+
+          ffmpeg -y -loglevel error -i /tmp/elxvro-music/cozy3.ogg \
+            -af "loudnorm=I=-20:TP=-2:LRA=11" -c:a libvorbis -q:a 4 \
+            assets/audio/bgm_cozy_puzzle_3.ogg
+
+          ffmpeg -y -loglevel error -i /tmp/elxvro-music/space.ogg \
+            -af "loudnorm=I=-20:TP=-2:LRA=11" -c:a libvorbis -q:a 4 \
+            assets/audio/bgm_out_in_space.ogg
+
+          cat > assets/audio/MUSIC_LICENSES_v015.txt <<'EOF'
+          ELXVRO Blocks v0.16.1 background playlist
+          License: CC0 / public domain dedication
+          1. Magic Puzzle In-Game 1 — MintoDog — OpenGameArt
+          2. Cozy Puzzle In-Game 3 — MintoDog — OpenGameArt
+          3. Out in Space — Agecaf — OpenGameArt
+          EOF
+
+          test -s assets/audio/bgm_magic_puzzle.ogg
+          test -s assets/audio/bgm_cozy_puzzle_3.ogg
+          test -s assets/audio/bgm_out_in_space.ogg
+          ls -lh assets/audio/bgm_*.ogg
+
+      - name: Verify v0.16.1 music playlist
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: |
+          set -euo pipefail
+          for track in \
+            assets/audio/bgm_magic_puzzle.ogg \
+            assets/audio/bgm_cozy_puzzle_3.ogg \
+            assets/audio/bgm_out_in_space.ogg; do
+            test -s "$track"
+            ffprobe -v error -show_entries format=duration \
+              -of default=noprint_wrappers=1:nokey=1 "$track"
+          done
+          test -s assets/audio/MUSIC_LICENSES_v015.txt
+
+      - name: Generate launcher icon and splash
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: |
+          dart run flutter_launcher_icons
+          dart run flutter_native_splash:create
+
+      - name: Analyze
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: flutter analyze
+
+      - name: Update version assertion for v0.16.1
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: |
+          sed -i 's/version: 0.10.1+27/version: 0.16.1+34/g' test/real_material_audio_test.dart
+
+      - name: Add strict line-clear regression tests
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: |
+          set -euo pipefail
+          if grep -q "_modeData.specialChance" lib/screens/game_screen.dart; then
+            echo "::error::Automatic destructive special generation is still enabled."
+            exit 1
+          fi
+
+          cat > test/line_clear_regression_test.dart <<'EOF'
+          import 'package:flutter_test/flutter_test.dart';
+          import 'package:elxvro_blocks/game/board_engine.dart';
+          import 'package:elxvro_blocks/models/block_piece.dart';
+
+          void main() {
+            final single = blockCatalog.firstWhere((piece) => piece.id == 'single');
+
+            test('incomplete row never clears', () {
+              final engine = BoardEngine(size: 4);
+              engine.restore(<List<bool>>[
+                <bool>[false, false, false, false],
+                <bool>[true, true, false, false],
+                <bool>[false, false, false, false],
+                <bool>[false, false, false, false],
+              ]);
+
+              final result = engine.place(single, 1, 2)!;
+
+              expect(result.clearedRows, isEmpty);
+              expect(result.clearedColumns, isEmpty);
+              expect(result.clearedCells, isEmpty);
+              expect(engine.grid[1], <bool>[true, true, true, false]);
+            });
+
+            test('completed row clears only that row and preserves other rows', () {
+              final engine = BoardEngine(size: 4);
+              engine.restore(<List<bool>>[
+                <bool>[true, false, false, false],
+                <bool>[true, true, false, true],
+                <bool>[false, true, false, false],
+                <bool>[false, false, false, false],
+              ]);
+
+              final result = engine.place(single, 1, 2)!;
+
+              expect(result.clearedRows, <int>[1]);
+              expect(result.clearedColumns, isEmpty);
+              expect(result.clearedCellCount, 4);
+              expect(engine.grid[1], <bool>[false, false, false, false]);
+              expect(engine.grid[0][0], isTrue);
+              expect(engine.grid[2][1], isTrue);
+            });
+          }
+          EOF
+
+      - name: Test
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: flutter test
+
+      - name: Build signed release APK
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: |
+          test "$RELEASE_SIGNING_CONFIGURED" = "true"
+          flutter build apk \
+            --release \
+            --obfuscate \
+            --split-debug-info=build/symbols/apk
+
+      - name: Build signed Google Play AAB
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: |
+          test "$RELEASE_SIGNING_CONFIGURED" = "true"
+          flutter build appbundle \
+            --release \
+            --obfuscate \
+            --split-debug-info=build/symbols/aab
+
+      - name: Prepare APK and AAB package
+        run: |
+          set -euo pipefail
+          APK="extracted/elxvro-blocks-v0.10.1/build/app/outputs/flutter-apk/app-release.apk"
+          AAB="extracted/elxvro-blocks-v0.10.1/build/app/outputs/bundle/release/app-release.aab"
+
+          test -s "$APK"
+          test -s "$AAB"
+
+          cp "$APK" ELXVRO-Blocks-v0.16.1-SIGNED.apk
+          cp "$AAB" ELXVRO-Blocks-v0.16.1-GOOGLE-PLAY.aab
+
+          sha256sum ELXVRO-Blocks-v0.16.1-SIGNED.apk > ELXVRO-Blocks-v0.16.1-SIGNED.apk.sha256
+          sha256sum ELXVRO-Blocks-v0.16.1-GOOGLE-PLAY.aab > ELXVRO-Blocks-v0.16.1-GOOGLE-PLAY.aab.sha256
+
+          mkdir -p ELXVRO-Blocks-v0.16.1-APK-AAB
+          cp ELXVRO-Blocks-v0.16.1-SIGNED.apk ELXVRO-Blocks-v0.16.1-APK-AAB/
+          cp ELXVRO-Blocks-v0.16.1-GOOGLE-PLAY.aab ELXVRO-Blocks-v0.16.1-APK-AAB/
+          cp ELXVRO-Blocks-v0.16.1-SIGNED.apk.sha256 ELXVRO-Blocks-v0.16.1-APK-AAB/
+          cp ELXVRO-Blocks-v0.16.1-GOOGLE-PLAY.aab.sha256 ELXVRO-Blocks-v0.16.1-APK-AAB/
+
+          ls -lh ELXVRO-Blocks-v0.16.1-SIGNED.apk
+          ls -lh ELXVRO-Blocks-v0.16.1-GOOGLE-PLAY.aab
+
+      - name: Upload APK and AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: ELXVRO-Blocks-v0.16.1-APK-AAB
+          path: |
+            ELXVRO-Blocks-v0.16.1-APK-AAB/
+          if-no-files-found: error
+          retention-days: 14
