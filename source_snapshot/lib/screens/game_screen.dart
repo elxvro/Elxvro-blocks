@@ -32,15 +32,15 @@ class GameScreen extends StatefulWidget {
 class _GameScreenState extends State<GameScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   static const int _boardSize = 10;
-  static const String _sessionBoardKey = 'active_game_board_v094';
-  static const String _sessionPiecesKey = 'active_game_pieces_v094';
-  static const String _sessionScoreKey = 'active_game_score_v094';
-  static const String _sessionComboKey = 'active_game_combo_v094';
-  static const String _sessionBestComboKey = 'active_game_best_combo_v094';
-  static const String _sessionLinesKey = 'active_game_lines_v094';
-  static const String _sessionBlocksKey = 'active_game_blocks_v094';
-  static const String _sessionPerfectKey = 'active_game_perfect_v094';
-  static const String _sessionValidKey = 'active_game_valid_v094';
+  static const String _sessionBoardKey = 'active_game_board_v0161';
+  static const String _sessionPiecesKey = 'active_game_pieces_v0161';
+  static const String _sessionScoreKey = 'active_game_score_v0161';
+  static const String _sessionComboKey = 'active_game_combo_v0161';
+  static const String _sessionBestComboKey = 'active_game_best_combo_v0161';
+  static const String _sessionLinesKey = 'active_game_lines_v0161';
+  static const String _sessionBlocksKey = 'active_game_blocks_v0161';
+  static const String _sessionPerfectKey = 'active_game_perfect_v0161';
+  static const String _sessionValidKey = 'active_game_valid_v0161';
   final BoardEngine _engine = BoardEngine(size: _boardSize);
   Random _random = Random();
   final GlobalKey _gridKey = GlobalKey();
@@ -365,16 +365,14 @@ class _GameScreenState extends State<GameScreen>
   }
 
   List<BlockPiece?> _generateRawPieces() {
-    var specialUsed = false;
-    return List<BlockPiece?>.generate(3, (_) {
-      final shouldUseSpecial =
-          !specialUsed && _random.nextDouble() < _modeData.specialChance;
-      if (shouldUseSpecial) {
-        specialUsed = true;
-        return specialBlockCatalog[_random.nextInt(specialBlockCatalog.length)];
-      }
-      return _normalPieceForMode();
-    });
+    // v0.16.1: normal tray generation must never inject a destructive
+    // special piece. In standard play, cells are cleared only when a complete
+    // row or column is formed. Special pieces remain available exclusively
+    // through the explicit ÖZEL inventory action.
+    return List<BlockPiece?>.generate(
+      3,
+      (_) => _normalPieceForMode(),
+    );
   }
 
   List<BlockPiece?> _generatePieces() {
@@ -591,17 +589,9 @@ class _GameScreenState extends State<GameScreen>
 
     var candidate = List<BlockPiece?>.from(_pieces);
     for (var attempt = 0; attempt < 30; attempt++) {
-      var specialUsed = false;
       candidate = List<BlockPiece?>.generate(3, (index) {
         if (_pieces[index] == null) {
           return null;
-        }
-        final useSpecial =
-            !specialUsed && _random.nextDouble() < _modeData.specialChance;
-        if (useSpecial) {
-          specialUsed = true;
-          return specialBlockCatalog[
-              _random.nextInt(specialBlockCatalog.length)];
         }
         return _normalPieceForMode();
       });
@@ -2238,7 +2228,7 @@ class _GameScreenState extends State<GameScreen>
             const SizedBox(height: 16),
             const _Rule(text: '1. Bloğu sürükle; hayalet alan nereye oturacağını gösterir.'),
             const _Rule(text: '2. Dolu satır veya sütunları temizleyerek combo yap.'),
-            const _Rule(text: '3. Bomba, Satır, Sütun ve Joker özel bloklarını kullan.'),
+            const _Rule(text: '3. Özel bloklar yalnızca ÖZEL hakkını kullandığında devreye girer.'),
             const _Rule(text: '4. Her oyunda 1 ücretsiz Geri Al ve 1 Yenile hakkın var.'),
             const _Rule(text: '5. Mağazadan ekstra hak ve Özel Blok gücü alabilirsin.'),
             const _Rule(text: '6. Mod hedefini tamamla veya mümkün olan en iyi skoru yap.'),
