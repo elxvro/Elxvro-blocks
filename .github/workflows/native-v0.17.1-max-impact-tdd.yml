@@ -50,7 +50,7 @@ jobs:
             cp -a source_snapshot/test/. "$APP/test/"
           fi
           if [ -f "$APP/test/real_material_audio_test.dart" ]; then
-            sed -i 's/version: 0.10.1+27/version: 0.17.0+36/g' "$APP/test/real_material_audio_test.dart"
+            sed -i 's/version: 0.10.1+27/version: 0.17.1+37/g' "$APP/test/real_material_audio_test.dart"
           fi
 
       - name: Apply v0.17 integration patch
