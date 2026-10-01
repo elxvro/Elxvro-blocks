@@ -12,6 +12,7 @@ dependencies:
   audioplayers: ^6.8.1
   shared_preferences: ^2.5.3
   games_services: 5.0.0
+  games_services_platform_interface: 5.0.0
 
 dev_dependencies:
   flutter_test:
