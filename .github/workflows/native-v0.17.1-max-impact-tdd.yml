@@ -1,0 +1,64 @@
+name: ELXVRO Blocks v0.17.1 MAX IMPACT TDD
+
+on:
+  push:
+    branches:
+      - release-v0.17.1
+    paths:
+      - "source_snapshot/**"
+      - ".github/scripts/apply_v017.py"
+      - ".github/workflows/native-v0.17.1-max-impact-tdd.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter 3.47.4
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.4'
+          channel: stable
+          cache: true
+
+      - name: Reconstruct project from snapshot
+        run: |
+          set -euo pipefail
+          rm -rf extracted
+          mkdir extracted
+          unzip -q elxvro-blocks-v0.10.1.zip -d extracted
+          APP=extracted/elxvro-blocks-v0.10.1
+          rm -rf "$APP/lib"
+          cp -a source_snapshot/lib "$APP/lib"
+          cp source_snapshot/pubspec.yaml "$APP/pubspec.yaml"
+          if [ -d source_snapshot/test ]; then
+            mkdir -p "$APP/test"
+            cp -a source_snapshot/test/. "$APP/test/"
+          fi
+          if [ -f "$APP/test/real_material_audio_test.dart" ]; then
+            sed -i 's/version: 0.10.1+27/version: 0.17.0+36/g' "$APP/test/real_material_audio_test.dart"
+          fi
+
+      - name: Apply v0.17 integration patch
+        run: python .github/scripts/apply_v017.py extracted/elxvro-blocks-v0.10.1
+
+      - name: Install dependencies
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: flutter pub get
+
+      - name: Run snapshot tests
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: flutter test
