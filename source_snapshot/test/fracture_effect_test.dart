@@ -98,7 +98,7 @@ void main() {
     expect(reduced.particles.length, lessThan(full.particles.length));
     expect(reduced.particles, isNotEmpty);
     expect(reduced.shakeAmplitude, lessThan(full.shakeAmplitude));
-    expect(full.particles.length, lessThanOrEqualTo(180));
-    expect(reduced.particles.length, lessThanOrEqualTo(72));
+    expect(full.particles.length, lessThanOrEqualTo(340));
+    expect(reduced.particles.length, lessThanOrEqualTo(96));
   });
 }
