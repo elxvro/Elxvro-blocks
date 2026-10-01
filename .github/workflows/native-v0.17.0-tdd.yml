@@ -47,6 +47,9 @@ jobs:
             mkdir -p "$APP/test"
             cp -a source_snapshot/test/. "$APP/test/"
           fi
+          if [ -f "$APP/test/real_material_audio_test.dart" ]; then
+            sed -i 's/version: 0.10.1+27/version: 0.16.2+35/g' "$APP/test/real_material_audio_test.dart"
+          fi
 
       - name: Install dependencies
         working-directory: extracted/elxvro-blocks-v0.10.1
