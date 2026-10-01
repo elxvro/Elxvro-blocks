@@ -6,6 +6,7 @@ on:
       - design-v0.17.0-impact-update
     paths:
       - "source_snapshot/**"
+      - ".github/scripts/apply_v017.py"
       - ".github/workflows/native-v0.17.0-tdd.yml"
   workflow_dispatch:
 
@@ -50,6 +51,9 @@ jobs:
           if [ -f "$APP/test/real_material_audio_test.dart" ]; then
             sed -i 's/version: 0.10.1+27/version: 0.16.2+35/g' "$APP/test/real_material_audio_test.dart"
           fi
+
+      - name: Apply v0.17 integration patch
+        run: python .github/scripts/apply_v017.py extracted/elxvro-blocks-v0.10.1
 
       - name: Install dependencies
         working-directory: extracted/elxvro-blocks-v0.10.1
