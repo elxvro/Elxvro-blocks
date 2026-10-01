@@ -7,6 +7,7 @@ on:
     paths:
       - "source_snapshot/**"
       - ".github/scripts/apply_v017.py"
+      - ".github/scripts/apply_max_impact.py"
       - ".github/workflows/native-v0.17.1-max-impact-tdd.yml"
   workflow_dispatch:
 
@@ -54,6 +55,9 @@ jobs:
 
       - name: Apply v0.17 integration patch
         run: python .github/scripts/apply_v017.py extracted/elxvro-blocks-v0.10.1
+
+      - name: Apply MAX IMPACT patch
+        run: python .github/scripts/apply_max_impact.py extracted/elxvro-blocks-v0.10.1
 
       - name: Install dependencies
         working-directory: extracted/elxvro-blocks-v0.10.1
