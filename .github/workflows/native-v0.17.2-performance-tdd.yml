@@ -50,13 +50,13 @@ jobs:
             cp -a source_snapshot/test/. "$APP/test/"
           fi
           if [ -f "$APP/test/real_material_audio_test.dart" ]; then
-            sed -i 's/version: 0.10.1+27/version: 0.17.1+37/g' "$APP/test/real_material_audio_test.dart"
+            sed -i 's/version: 0.10.1+27/version: 0.17.2+38/g' "$APP/test/real_material_audio_test.dart"
           fi
 
       - name: Apply v0.17 integration patch
         run: python .github/scripts/apply_v017.py extracted/elxvro-blocks-v0.10.1
 
-      - name: Apply MAX IMPACT patch
+      - name: Apply Smooth MAX IMPACT patch
         run: python .github/scripts/apply_max_impact.py extracted/elxvro-blocks-v0.10.1
 
       - name: Install dependencies
