@@ -35,7 +35,7 @@ class GamesServicesPlatformAdapter implements GamesPlatformAdapter {
   }) async {
     await GamesServices.submitScore(
       score: Score(
-        androidID: leaderboardId,
+        androidLeaderboardID: leaderboardId,
         value: score,
       ),
     );
@@ -119,8 +119,6 @@ class PlayGamesService implements SocialService {
   Future<bool> _ensureConnected() async {
     if (_connected) return true;
     if (_signInAttempted && _lastError != null) {
-      // Explicit UI actions may call signIn() again; background synchronization
-      // should not repeatedly interrupt the player after a failed attempt.
       return false;
     }
     return signIn();
