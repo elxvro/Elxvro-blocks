@@ -19,10 +19,17 @@ abstract interface class SocialService {
     required String leaderboardId,
     required int score,
   });
+
+  Future<void> unlockAchievement({required String achievementId});
+
+  Future<void> showLeaderboards();
+
+  Future<void> showAchievements();
 }
 
-/// Offline implementation used until Google Play Console credentials,
-/// leaderboards and achievements are configured for the release package.
+/// Offline implementation used when Play Games is unavailable or not yet
+/// configured. Every remote action is intentionally a safe no-op so gameplay
+/// and local progress never depend on a network/account connection.
 class LocalSocialService implements SocialService {
   const LocalSocialService();
 
@@ -31,7 +38,7 @@ class LocalSocialService implements SocialService {
     return const SocialConnectionInfo(
       connected: false,
       provider: 'Google Play Games',
-      message: 'Play Console bağlantısı bekleniyor. Oyun çevrimdışı çalışmaya devam eder.',
+      message: 'Play Games bağlı değil. Yerel kayıtlar kullanılmaya devam eder.',
     );
   }
 
@@ -42,8 +49,14 @@ class LocalSocialService implements SocialService {
   Future<void> submitScore({
     required String leaderboardId,
     required int score,
-  }) async {
-    // Intentionally no-op in the offline adapter. The same interface can be
-    // replaced by the Play Games implementation without touching gameplay.
-  }
+  }) async {}
+
+  @override
+  Future<void> unlockAchievement({required String achievementId}) async {}
+
+  @override
+  Future<void> showLeaderboards() async {}
+
+  @override
+  Future<void> showAchievements() async {}
 }
