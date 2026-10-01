@@ -12,7 +12,7 @@ void main() {
     (index) => BoardCell(index ~/ 10, index % 10),
   );
 
-  test('MAX IMPACT crystal burst is much larger and faster', () {
+  test('MAX IMPACT crystal burst stays bold inside the smooth budget', () {
     final burst = buildFractureBurst(
       clearedCells: cells,
       material: ThemeMaterial.crystal,
@@ -28,14 +28,14 @@ void main() {
     final avgSize = burst.particles.map((p) => p.size).reduce((a, b) => a + b) /
         burst.particles.length;
 
-    expect(burst.particles.length, greaterThanOrEqualTo(280));
-    expect(burst.particles.length, lessThanOrEqualTo(360));
-    expect(avgSpeed, greaterThan(2.2));
-    expect(avgSize, greaterThan(0.9));
-    expect(burst.shakeAmplitude, greaterThan(1.2));
+    expect(burst.particles.length, greaterThanOrEqualTo(160));
+    expect(burst.particles.length, lessThanOrEqualTo(220));
+    expect(avgSpeed, greaterThan(2.0));
+    expect(avgSize, greaterThan(0.85));
+    expect(burst.shakeAmplitude, greaterThan(1.0));
   });
 
-  test('performance mode still limits MAX IMPACT load', () {
+  test('performance mode tightly limits MAX IMPACT load', () {
     final burst = buildFractureBurst(
       clearedCells: cells,
       material: ThemeMaterial.crystal,
@@ -43,16 +43,19 @@ void main() {
       performanceMode: true,
       seed: 1701,
     );
-    expect(burst.particles.length, lessThanOrEqualTo(100));
+    expect(burst.particles.length, lessThanOrEqualTo(72));
     expect(burst.particles, isNotEmpty);
   });
 
-  test('MAX IMPACT block painter has stronger surface light and outer glow', () {
+  test('MAX IMPACT block painter keeps stronger surface light without halo blur', () {
     final source = File('lib/widgets/themed_block_tile.dart').readAsStringSync();
     expect(source, contains('_paintOuterGlow(canvas, size);'));
     expect(source, contains('Colors.white.withValues(alpha: 0.46)'));
     expect(source, contains('ThemeMaterial.glass => 0.68'));
     expect(source, contains('ThemeMaterial.crystal => 0.74'));
-    expect(source, contains('blurRadius'));
+
+    final start = source.indexOf('void _paintOuterGlow');
+    final end = source.indexOf('void _paintContactShadow', start);
+    expect(source.substring(start, end), isNot(contains('MaskFilter.blur')));
   });
 }
