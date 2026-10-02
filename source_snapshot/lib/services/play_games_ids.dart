@@ -8,9 +8,11 @@ class PlayGamesIds {
   const PlayGamesIds.fromEnvironment()
       : classicLeaderboardId = const String.fromEnvironment(
           'ELXVRO_PG_CLASSIC_LEADERBOARD_ID',
+          defaultValue: 'CgkI6arsvtAGEAIQAw',
         ),
         comboRushLeaderboardId = const String.fromEnvironment(
           'ELXVRO_PG_COMBO_RUSH_LEADERBOARD_ID',
+          defaultValue: 'CgkI6arsvtAGEAIQAg',
         ),
         achievementIds = const <String, String>{
           'first_game': String.fromEnvironment('ELXVRO_PG_ACH_FIRST_GAME'),
