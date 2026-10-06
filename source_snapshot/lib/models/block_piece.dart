@@ -5,6 +5,8 @@ enum PiecePower {
   bomb,
   rowClear,
   columnClear,
+  crossClear,
+  megaBomb,
   wild,
 }
 
@@ -39,6 +41,10 @@ class BlockPiece {
         return 'SATIR';
       case PiecePower.columnClear:
         return 'SÜTUN';
+      case PiecePower.crossClear:
+        return 'ARTI';
+      case PiecePower.megaBomb:
+        return 'MEGA';
       case PiecePower.wild:
         return 'JOKER';
       case PiecePower.normal:
@@ -237,6 +243,16 @@ const List<BlockPiece> specialBlockCatalog = <BlockPiece>[
     id: 'special_column',
     cells: <CellOffset>[CellOffset(0, 0)],
     power: PiecePower.columnClear,
+  ),
+  BlockPiece(
+    id: 'special_cross',
+    cells: <CellOffset>[CellOffset(0, 0)],
+    power: PiecePower.crossClear,
+  ),
+  BlockPiece(
+    id: 'special_mega_bomb',
+    cells: <CellOffset>[CellOffset(0, 0)],
+    power: PiecePower.megaBomb,
   ),
   BlockPiece(
     id: 'special_wild',
