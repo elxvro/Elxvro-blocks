@@ -1,7 +1,7 @@
 name: elxvro_blocks
 description: Premium block puzzle game for ELXVRO.
 publish_to: 'none'
-version: 0.17.3+39
+version: 0.18.0+40
 
 environment:
   sdk: '>=3.4.0 <4.0.0'
