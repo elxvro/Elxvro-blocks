@@ -5,6 +5,7 @@ import '../models/game_mode.dart';
 import '../models/game_theme.dart';
 import '../widgets/coin_badge.dart';
 import '../widgets/premium_background.dart';
+import 'adventure_screen.dart';
 import 'game_screen.dart';
 
 class ModesScreen extends StatelessWidget {
@@ -90,7 +91,7 @@ class ModesScreen extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 4, 24, 14),
                 child: Text(
-                  'Klasik, challenge, Zen ve Zor mod ile aynı çekirdek mekaniği farklı ritimlerde oyna.',
+                  'Macera, günlük challenge, Klasik, Zen ve Zor mod ile farklı hedeflerde ilerle.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.52),
@@ -102,11 +103,36 @@ class ModesScreen extends StatelessWidget {
               Expanded(
                 child: ListView.separated(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                  itemCount: GameMode.values.length,
+                  itemCount: GameMode.values.length + 1,
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
-                    final mode = GameMode.values[index];
-                    final data = gameModeData[mode]!;
+                    if (index == 0) {
+                      return _ModeCard(
+                        icon: Icons.map_rounded,
+                        title: 'MACERA',
+                        subtitle: '60 bölüm • kalıcı ilerleme',
+                        description:
+                            'Bölümleri sırayla aç, hız ve zor görevleri tamamla, ilk bitirişte coin kazan.',
+                        best: appState.adventureCompletedCount,
+                        bestLabel: 'TAMAMLANAN',
+                        reward: 0,
+                        rewardReady: false,
+                        accent: accent,
+                        surface: selectedTheme.board,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => AdventureScreen(appState: appState),
+                            ),
+                          );
+                        },
+                      );
+                    }
+
+                    final mode = GameMode.values[index - 1];
+                    final data = mode == GameMode.daily
+                        ? dailyChallengeData(DateTime.now())
+                        : gameModeData[mode]!;
                     final best = _bestFor(mode);
                     final dailyRewardReady = mode == GameMode.daily &&
                         appState.dailyChallengeRewardAvailable;
@@ -149,6 +175,7 @@ class _ModeCard extends StatelessWidget {
     required this.subtitle,
     required this.description,
     required this.best,
+    this.bestLabel = 'REKOR',
     required this.reward,
     required this.rewardReady,
     required this.accent,
@@ -161,6 +188,7 @@ class _ModeCard extends StatelessWidget {
   final String subtitle;
   final String description;
   final int best;
+  final String bestLabel;
   final int reward;
   final bool rewardReady;
   final Color accent;
@@ -246,7 +274,7 @@ class _ModeCard extends StatelessWidget {
                       spacing: 8,
                       runSpacing: 6,
                       children: <Widget>[
-                        _Badge(label: 'REKOR $best', accent: accent),
+                        _Badge(label: '$bestLabel $best', accent: accent),
                         if (reward > 0)
                           _Badge(label: '+$reward COIN', accent: accent),
                       ],
