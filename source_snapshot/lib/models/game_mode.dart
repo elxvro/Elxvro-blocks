@@ -40,6 +40,36 @@ class GameModeData {
   bool get hasTarget => targetScore != null;
 }
 
+int dailyChallengeSeed(DateTime date) =>
+    date.year * 10000 + date.month * 100 + date.day;
+
+int dailyChallengeTarget(DateTime date) {
+  final seed = dailyChallengeSeed(date);
+  return 3200 + (seed % 6) * 350;
+}
+
+int dailyChallengeDuration(DateTime date) {
+  final seed = dailyChallengeSeed(date);
+  return 165 + (seed % 3) * 15;
+}
+
+GameModeData dailyChallengeData(DateTime date) {
+  final target = dailyChallengeTarget(date);
+  final seconds = dailyChallengeDuration(date);
+  return GameModeData(
+    mode: GameMode.daily,
+    id: 'daily',
+    title: 'GÜNLÜK CHALLENGE',
+    subtitle: 'Aynı gün • aynı tahta • aynı seri',
+    description:
+        '$seconds saniye içinde $target puana ulaş. Günün seed\'i tüm oyuncular için aynıdır.',
+    durationSeconds: seconds,
+    targetScore: target,
+    completionReward: 150,
+    scoreMultiplier: 1.05,
+  );
+}
+
 const Map<GameMode, GameModeData> gameModeData = <GameMode, GameModeData>{
   GameMode.classic: GameModeData(
     mode: GameMode.classic,
