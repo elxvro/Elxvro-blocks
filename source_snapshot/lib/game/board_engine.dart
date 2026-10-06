@@ -151,6 +151,21 @@ class BoardEngine {
           addFilledCell(row, originCol);
         }
         break;
+      case PiecePower.crossClear:
+        for (var col = 0; col < size; col++) {
+          addFilledCell(originRow, col);
+        }
+        for (var row = 0; row < size; row++) {
+          addFilledCell(row, originCol);
+        }
+        break;
+      case PiecePower.megaBomb:
+        for (var row = originRow - 2; row <= originRow + 2; row++) {
+          for (var col = originCol - 2; col <= originCol + 2; col++) {
+            addFilledCell(row, col);
+          }
+        }
+        break;
       case PiecePower.normal:
       case PiecePower.wild:
         break;
