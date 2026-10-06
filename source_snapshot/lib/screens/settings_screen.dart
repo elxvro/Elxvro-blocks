@@ -184,7 +184,7 @@ class SettingsScreen extends StatelessWidget {
                               ),
                               SizedBox(height: 8),
                               Text(
-                                'v0.10.1  •  2D FX Engine',
+                                'v0.18.0  •  Adventure + Daily 2.0',
                                 style: TextStyle(color: Colors.white54),
                               ),
                               SizedBox(height: 6),
