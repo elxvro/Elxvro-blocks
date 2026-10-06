@@ -65,8 +65,8 @@ replace_once(
 )
 replace_once(
     'lib/screens/modes_screen.dart',
-    "'Klasik, challenge, Zen ve Zor mod ile aynı çekirdek mekaniği farklı ritimlerde oyna.'",
-    "'Klasik, Combo Rush, challenge, Zen ve Zor mod ile aynı çekirdek mekaniği farklı ritimlerde oyna.'",
+    "'Macera, günlük challenge, Klasik, Zen ve Zor mod ile farklı hedeflerde ilerle.'",
+    "'Macera, Combo Rush, günlük challenge, Klasik, Zen ve Zor mod ile farklı hedeflerde ilerle.'",
 )
 
 # ---------------------------------------------------------------------------
@@ -236,19 +236,41 @@ replace_once(
 )
 replace_once(
     'lib/screens/game_screen.dart',
-    "    final modeReward = await widget.appState.recordModeResult(\n      modeId: _modeData.id,\n      score: _score,\n      success: success,\n    );\n",
-    "    final modeReward = await widget.appState.recordModeResult(\n"
-    "      modeId: _modeData.id,\n"
-    "      score: _score,\n"
-    "      success: success,\n"
-    "    );\n"
-    "    if (widget.mode == GameMode.comboRush) {\n"
+    "    final adventure = widget.adventureLevel;\n"
+    "    final modeReward = adventure != null\n"
+    "        ? success\n"
+    "            ? await widget.appState.completeAdventureLevel(\n"
+    "                level: adventure.number,\n"
+    "                reward: adventure.reward,\n"
+    "              )\n"
+    "            : 0\n"
+    "        : await widget.appState.recordModeResult(\n"
+    "            modeId: _modeData.id,\n"
+    "            score: _score,\n"
+    "            success: success,\n"
+    "          );\n",
+    "    final adventure = widget.adventureLevel;\n"
+    "    final modeReward = adventure != null\n"
+    "        ? success\n"
+    "            ? await widget.appState.completeAdventureLevel(\n"
+    "                level: adventure.number,\n"
+    "                reward: adventure.reward,\n"
+    "              )\n"
+    "            : 0\n"
+    "        : await widget.appState.recordModeResult(\n"
+    "            modeId: _modeData.id,\n"
+    "            score: _score,\n"
+    "            success: success,\n"
+    "          );\n"
+    "    if (widget.mode == GameMode.comboRush && adventure == null) {\n"
     "      await widget.appState.recordComboRushResult(\n"
     "        score: _score,\n"
     "        bestCombo: _bestComboThisGame,\n"
     "      );\n"
     "    }\n"
-    "    await _syncPlayGamesAfterRound();\n",
+    "    if (adventure == null) {\n"
+    "      await _syncPlayGamesAfterRound();\n"
+    "    }\n",
 )
 replace_once(
     'lib/screens/game_screen.dart',
