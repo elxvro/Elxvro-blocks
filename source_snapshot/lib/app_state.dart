@@ -50,6 +50,8 @@ class AppState extends ChangeNotifier {
   static const String _weeklyScoreKey = 'weekly_score';
   static const String _weeklyBestScoreKey = 'weekly_best_score';
   static const String _weeklyRewardClaimKey = 'weekly_reward_claim';
+  static const String _adventureUnlockedLevelKey = 'adventure_unlocked_level';
+  static const String _adventureCompletedKey = 'adventure_completed';
 
   int bestScore = 0;
   int gamesPlayed = 0;
@@ -78,6 +80,7 @@ class AppState extends ChangeNotifier {
   int weeklyGames = 0;
   int weeklyScore = 0;
   int weeklyBestScore = 0;
+  int adventureUnlockedLevel = 1;
   String playerName = 'ELXVRO PLAYER';
   String _weeklyKey = '';
   String _weeklyRewardClaim = '';
@@ -89,6 +92,7 @@ class AppState extends ChangeNotifier {
   final Set<String> _dailyClaims = <String>{};
   final Set<String> _achievementClaims = <String>{};
   final Set<String> _unlockedThemes = <String>{'classic'};
+  final Set<int> _adventureCompleted = <int>{};
 
   bool soundEnabled = true;
   bool musicEnabled = true;
@@ -281,6 +285,26 @@ class AppState extends ChangeNotifier {
       tutorialCompleted = prefs.getBool(_tutorialCompletedKey) ?? false;
       playerName = prefs.getString(_playerNameKey) ?? 'ELXVRO PLAYER';
       _weeklyRewardClaim = prefs.getString(_weeklyRewardClaimKey) ?? '';
+
+      _adventureCompleted
+        ..clear()
+        ..addAll(
+          (prefs.getStringList(_adventureCompletedKey) ?? const <String>[])
+              .map(int.tryParse)
+              .whereType<int>()
+              .where((level) => level >= 1 && level <= 60),
+        );
+      final savedAdventureLevel =
+          (prefs.getInt(_adventureUnlockedLevelKey) ?? 1).clamp(1, 60).toInt();
+      final completedMax = _adventureCompleted.fold<int>(
+        0,
+        (current, level) => level > current ? level : current,
+      );
+      final inferredUnlocked =
+          completedMax >= 60 ? 60 : (completedMax + 1).clamp(1, 60).toInt();
+      adventureUnlockedLevel = savedAdventureLevel > inferredUnlocked
+          ? savedAdventureLevel
+          : inferredUnlocked;
 
       coins = prefs.getInt(_coinsKey) ?? 0;
       _lastRewardClaimDate = prefs.getString(_rewardClaimDateKey) ?? '';
@@ -760,6 +784,54 @@ class AppState extends ChangeNotifier {
     }
   }
 
+
+  int get adventureCompletedCount => _adventureCompleted.length;
+
+  double get adventureProgress =>
+      (adventureCompletedCount / 60).clamp(0.0, 1.0).toDouble();
+
+  bool isAdventureLevelUnlocked(int level) =>
+      level >= 1 && level <= adventureUnlockedLevel;
+
+  bool isAdventureLevelCompleted(int level) =>
+      _adventureCompleted.contains(level);
+
+  Future<int> completeAdventureLevel({
+    required int level,
+    required int reward,
+  }) async {
+    if (level < 1 || level > 60) {
+      return 0;
+    }
+
+    final firstCompletion = _adventureCompleted.add(level);
+    if (level >= adventureUnlockedLevel && adventureUnlockedLevel < 60) {
+      adventureUnlockedLevel = level + 1;
+    }
+
+    final earned = firstCompletion ? reward : 0;
+    if (earned > 0) {
+      coins += earned;
+    }
+    notifyListeners();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final completed = _adventureCompleted.toList()..sort();
+      await prefs.setInt(_adventureUnlockedLevelKey, adventureUnlockedLevel);
+      await prefs.setStringList(
+        _adventureCompletedKey,
+        completed.map((level) => '$level').toList(growable: false),
+      );
+      if (earned > 0) {
+        await prefs.setInt(_coinsKey, coins);
+      }
+    } catch (error) {
+      debugPrint('ELXVRO adventure progress save failed: $error');
+    }
+
+    return earned;
+  }
 
   Future<int> recordModeResult({
     required String modeId,
