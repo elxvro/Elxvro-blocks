@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../app_state.dart';
 import '../game/board_engine.dart';
+import '../models/adventure_level.dart';
 import '../models/block_piece.dart';
 import '../models/game_mode.dart';
 import '../models/game_theme.dart';
@@ -20,10 +21,12 @@ class GameScreen extends StatefulWidget {
     super.key,
     required this.appState,
     this.mode = GameMode.classic,
+    this.adventureLevel,
   });
 
   final AppState appState;
   final GameMode mode;
+  final AdventureLevel? adventureLevel;
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -88,7 +91,27 @@ class _GameScreenState extends State<GameScreen>
       );
 
 
-  GameModeData get _modeData => gameModeData[widget.mode]!;
+  GameModeData get _modeData {
+    final adventure = widget.adventureLevel;
+    if (adventure != null) {
+      return GameModeData(
+        mode: widget.mode,
+        id: 'adventure_${adventure.number}',
+        title: 'MACERA ${adventure.number}',
+        subtitle: 'Bölüm ${adventure.chapter} • ${adventure.difficultyLabel}',
+        description: adventure.objective,
+        durationSeconds: adventure.durationSeconds,
+        targetScore: adventure.targetScore,
+        completionReward: adventure.reward,
+        scoreMultiplier: adventure.scoreMultiplier,
+        hardPieces: adventure.hardPieces,
+      );
+    }
+    if (widget.mode == GameMode.daily) {
+      return dailyChallengeData(DateTime.now());
+    }
+    return gameModeData[widget.mode]!;
+  }
 
   int get _dailySeed {
     final now = DateTime.now();
@@ -96,6 +119,9 @@ class _GameScreenState extends State<GameScreen>
   }
 
   int get _modeBest {
+    if (widget.adventureLevel != null) {
+      return 0;
+    }
     switch (widget.mode) {
       case GameMode.classic:
         return widget.appState.bestScore;
@@ -123,14 +149,29 @@ class _GameScreenState extends State<GameScreen>
   }
 
   double get _recordProgress {
+    final adventure = widget.adventureLevel;
+    if (adventure != null) {
+      return (_score / adventure.targetScore).clamp(0.0, 1.0).toDouble();
+    }
     final best = _modeBest;
     if (best <= 0) return 0;
     return (_score / best).clamp(0.0, 1.0).toDouble();
   }
 
-  int get _recordGap => max(0, _modeBest - _score);
+  int get _recordGap {
+    final target = widget.adventureLevel?.targetScore;
+    if (target != null) {
+      return max(0, target - _score);
+    }
+    return max(0, _modeBest - _score);
+  }
 
   String get _recordStatus {
+    final adventure = widget.adventureLevel;
+    if (adventure != null) {
+      if (_score >= adventure.targetScore) return 'BÖLÜM TAMAM';
+      return 'HEDEFE $_recordGap';
+    }
     if (_modeBest <= 0) return 'İLK REKORUNU YAZ';
     if (_score > _modeBest) return 'YENİ REKOR';
     if (_recordProgress >= 0.85) return 'REKORA $_recordGap';
@@ -185,7 +226,7 @@ class _GameScreenState extends State<GameScreen>
           });
         }
       });
-    if (widget.mode == GameMode.classic) {
+    if (widget.adventureLevel == null && widget.mode == GameMode.classic) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           unawaited(_restoreSavedClassicGame());
@@ -246,9 +287,16 @@ class _GameScreenState extends State<GameScreen>
 
   void _prepareRound() {
     _modeTimer?.cancel();
-    _random = widget.mode == GameMode.daily ? Random(_dailySeed) : Random();
+    final adventure = widget.adventureLevel;
+    if (adventure != null) {
+      _random = Random(0x180000 + adventure.number * 9973);
+    } else {
+      _random = widget.mode == GameMode.daily ? Random(_dailySeed) : Random();
+    }
     _engine.reset();
-    if (widget.mode == GameMode.daily) {
+    if (adventure != null) {
+      _applyAdventureStartingBoard(adventure);
+    } else if (widget.mode == GameMode.daily) {
       _applyDailyStartingBoard();
     } else if (widget.mode == GameMode.target) {
       _applyTargetStartingBoard();
@@ -257,6 +305,27 @@ class _GameScreenState extends State<GameScreen>
     }
     _secondsLeft = _modeData.durationSeconds ?? 0;
     _pieces = _generatePieces();
+  }
+
+  void _applyAdventureStartingBoard(AdventureLevel level) {
+    final state = List<List<bool>>.generate(
+      _boardSize,
+      (_) => List<bool>.filled(_boardSize, false),
+    );
+    final rowCounts = List<int>.filled(_boardSize, 0);
+    var placed = 0;
+    final firstRow = level.hardPieces ? 3 : 4;
+    while (placed < level.startingBlocks) {
+      final row = firstRow + _random.nextInt(_boardSize - firstRow);
+      final col = _random.nextInt(_boardSize);
+      if (state[row][col] || rowCounts[row] >= 6) {
+        continue;
+      }
+      state[row][col] = true;
+      rowCounts[row] += 1;
+      placed += 1;
+    }
+    _engine.restore(state);
   }
 
   void _applyTargetStartingBoard() {
@@ -380,7 +449,7 @@ class _GameScreenState extends State<GameScreen>
     // Popular block puzzlers protect the flow from a tray that is instantly
     // unusable. We only reroll a completely dead tray; the board can still
     // naturally reach a true game-over state. Hard mode keeps a stricter tray.
-    final attempts = widget.mode == GameMode.hard ? 3 : 9;
+    final attempts = _modeData.hardPieces ? 3 : 9;
     for (var attempt = 0; attempt < attempts; attempt++) {
       if (_engine.hasAnyMove(candidate.whereType<BlockPiece>())) {
         return candidate;
@@ -399,7 +468,11 @@ class _GameScreenState extends State<GameScreen>
   }
 
   Future<void> _saveClassicGame() async {
-    if (widget.mode != GameMode.classic || _finishing) return;
+    if (widget.adventureLevel != null ||
+        widget.mode != GameMode.classic ||
+        _finishing) {
+      return;
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
       final board = _engine
@@ -423,7 +496,11 @@ class _GameScreenState extends State<GameScreen>
   }
 
   Future<void> _restoreSavedClassicGame() async {
-    if (widget.mode != GameMode.classic || _finishing) return;
+    if (widget.adventureLevel != null ||
+        widget.mode != GameMode.classic ||
+        _finishing) {
+      return;
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
       if (!(prefs.getBool(_sessionValidKey) ?? false)) return;
@@ -877,6 +954,10 @@ class _GameScreenState extends State<GameScreen>
       case PiecePower.rowClear:
       case PiecePower.columnClear:
         return 100 + result.clearedCellCount * 14;
+      case PiecePower.crossClear:
+        return 160 + result.clearedCellCount * 16;
+      case PiecePower.megaBomb:
+        return 220 + result.clearedCellCount * 18;
       case PiecePower.wild:
         return 50;
       case PiecePower.normal:
@@ -1281,7 +1362,7 @@ class _GameScreenState extends State<GameScreen>
               actions: <Widget>[
                 TextButton(
                   onPressed: () => Navigator.of(context).pop('home'),
-                  child: const Text('ANA MENÜ'),
+                  child: Text(adventure != null ? 'BÖLÜMLER' : 'ANA MENÜ'),
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop('restart'),
@@ -1520,12 +1601,21 @@ class _GameScreenState extends State<GameScreen>
       placedBlocks: _placedBlocksThisGame,
       perfectClearsThisGame: _perfectClearsThisGame,
     );
-    final modeReward = await widget.appState.recordModeResult(
-      modeId: _modeData.id,
-      score: _score,
-      success: success,
-    );
-    final isNewPersonalRecord = _score > previousModeBest;
+    final adventure = widget.adventureLevel;
+    final modeReward = adventure != null
+        ? success
+            ? await widget.appState.completeAdventureLevel(
+                level: adventure.number,
+                reward: adventure.reward,
+              )
+            : 0
+        : await widget.appState.recordModeResult(
+            modeId: _modeData.id,
+            score: _score,
+            success: success,
+          );
+    final isNewPersonalRecord =
+        adventure == null && _score > previousModeBest;
     if (!mounted) {
       return;
     }
@@ -1533,7 +1623,9 @@ class _GameScreenState extends State<GameScreen>
     if (isNewPersonalRecord) {
       unawaited(AudioService.instance.playRecordCelebration());
     } else if (success &&
-        (widget.mode == GameMode.target || widget.mode == GameMode.daily)) {
+        (adventure != null ||
+            widget.mode == GameMode.target ||
+            widget.mode == GameMode.daily)) {
       unawaited(AudioService.instance.playReward());
     } else {
       unawaited(AudioService.instance.playGameOver());
@@ -1543,7 +1635,9 @@ class _GameScreenState extends State<GameScreen>
     }
 
     var title = isNewPersonalRecord ? 'YENİ REKOR!' : 'OYUN BİTTİ';
-    if (!isNewPersonalRecord) {
+    if (adventure != null) {
+      title = success ? 'BÖLÜM TAMAMLANDI' : 'BÖLÜM BAŞARISIZ';
+    } else if (!isNewPersonalRecord) {
       if (widget.mode == GameMode.timed) {
         title = reason;
       } else if (widget.mode == GameMode.target || widget.mode == GameMode.daily) {
@@ -1673,7 +1767,9 @@ class _GameScreenState extends State<GameScreen>
               ],
               const SizedBox(height: 16),
               Text(
-                'MOD REKORU  ${max(_modeBest, _score)}',
+                adventure != null
+                    ? 'BÖLÜM HEDEFİ  ${adventure.targetScore}'
+                    : 'MOD REKORU  ${max(_modeBest, _score)}',
                 style: const TextStyle(
                   color: Color(0xFFFFC86E),
                   fontSize: 12,
@@ -2945,6 +3041,10 @@ class _SpecialBadge extends StatelessWidget {
         return Icons.swap_horiz_rounded;
       case PiecePower.columnClear:
         return Icons.swap_vert_rounded;
+      case PiecePower.crossClear:
+        return Icons.add_box_rounded;
+      case PiecePower.megaBomb:
+        return Icons.blur_circular_rounded;
       case PiecePower.wild:
         return Icons.auto_awesome_rounded;
       case PiecePower.normal:
