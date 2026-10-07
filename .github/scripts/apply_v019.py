@@ -454,12 +454,53 @@ replace_once(
 
 
 # ---------------------------------------------------------------------------
-# Legacy regression test compatibility: v0.19 expands theme catalog 6 -> 9.
+# Theme regression test for v0.19: 9 themes, 6 supported material profiles.
 # ---------------------------------------------------------------------------
 theme_test = ROOT / 'test/theme_refresh_test.dart'
 if theme_test.exists():
-    text = theme_test.read_text(encoding='utf-8')
-    text = text.replace('expect(gameThemes.length, 6);', 'expect(gameThemes.length, 9);')
-    theme_test.write_text(text, encoding='utf-8')
+    theme_test.write_text(
+        """import 'package:flutter_test/flutter_test.dart';
+import 'package:elxvro_blocks/models/game_theme.dart';
+
+void main() {
+  test('v0.19 premium theme set is complete and compatible', () {
+    expect(gameThemes, hasLength(9));
+
+    final ids = gameThemes.map((theme) => theme.id).toSet();
+    expect(ids, hasLength(9));
+    expect(
+      ids,
+      containsAll(<String>{
+        'classic',
+        'night',
+        'marble',
+        'fire',
+        'nature',
+        'aurora',
+        'obsidian',
+        'polar_aurora',
+        'magma',
+      }),
+    );
+
+    expect(ThemeMaterial.values, hasLength(6));
+
+    const supportedProfiles = <String>{
+      'glass',
+      'wood',
+      'stone',
+      'leaf',
+      'crystal',
+      'marble',
+    };
+    expect(
+      gameThemes.every((theme) => supportedProfiles.contains(theme.audioProfile)),
+      isTrue,
+    );
+  });
+}
+""",
+        encoding='utf-8',
+    )
 
 print('ELXVRO Blocks v0.19.0 themes + audio + Falling Blocks patch applied successfully.')
