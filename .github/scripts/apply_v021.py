@@ -160,8 +160,8 @@ replace_once(
 )
 replace_all_expected(
     'lib/screens/modes_screen.dart',
-    "                        surface: selectedTheme.board,\n",
-    "                        surface: selectedTheme.board,\n"
+    "surface: selectedTheme.board,\n",
+    "surface: selectedTheme.board,\n"
     "                        material: selectedTheme.material,\n"
     "                        block: selectedTheme.block,\n"
     "                        blockAccent: selectedTheme.blockAccent,\n",
