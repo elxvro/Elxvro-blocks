@@ -105,7 +105,7 @@ class AdventureScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Düşen blok macerası: her bölüm hızlanır, hedef büyür ve renk paleti değişir. İlk tamamlamada coin kazanırsın.',
+                            'Her bölümde hedef puan yükselir, düşüş hızlanır, başlangıç alanı zorlaşır ve renk paleti değişir.',
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.52),
                               fontSize: 10,
@@ -132,11 +132,12 @@ class AdventureScreen extends StatelessWidget {
                             appState.isAdventureLevelUnlocked(level.number);
                         final done =
                             appState.isAdventureLevelCompleted(level.number);
+                        final levelAccent = _adventureAccent(level.number, accent);
                         return _AdventureLevelCard(
                           level: level,
                           unlocked: unlocked,
                           completed: done,
-                          accent: accent,
+                          accent: levelAccent,
                           surface: theme.board,
                           onTap: unlocked
                               ? () async {
@@ -246,7 +247,7 @@ class _AdventureLevelCard extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                '${level.fallingTargetLines}',
+                '${level.fallingTargetScore}',
                 style: TextStyle(
                   color: foreground,
                   fontSize: 12,
@@ -254,7 +255,7 @@ class _AdventureLevelCard extends StatelessWidget {
                 ),
               ),
               Text(
-                'ÇİZGİ',
+                'PUAN',
                 style: TextStyle(
                   color: unlocked ? Colors.white38 : Colors.white.withValues(alpha: 0.18),
                   fontSize: 8,
@@ -286,4 +287,18 @@ class _AdventureLevelCard extends StatelessWidget {
       ),
     );
   }
+}
+
+Color _adventureAccent(int level, Color themeAccent) {
+  const colors = <Color>[
+    Color(0xFF6FE7FF),
+    Color(0xFFB38CFF),
+    Color(0xFFFF826B),
+    Color(0xFF72E99A),
+    Color(0xFFFFD56A),
+    Color(0xFFFF78C8),
+    Color(0xFF82A8FF),
+  ];
+  final levelColor = colors[(level - 1) % colors.length];
+  return Color.lerp(levelColor, themeAccent, 0.22)!;
 }

@@ -61,6 +61,12 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
   int get _difficultyLevel =>
       _isAdventure ? widget.adventureLevel!.number : _arcadeLevel;
 
+  int get _targetScore {
+    final level = widget.adventureLevel;
+    if (level == null) return 0;
+    return level.fallingTargetScore;
+  }
+
   int get _targetLines {
     final level = widget.adventureLevel;
     if (level == null) return 0;
@@ -77,19 +83,41 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
   }
 
   List<Color> get _palette {
-    const base = <Color>[
-      Color(0xFF62E6FF),
-      Color(0xFF8C7CFF),
-      Color(0xFFFF6F61),
-      Color(0xFFFFC857),
-      Color(0xFF65E889),
-      Color(0xFFFF78C8),
-      Color(0xFF72A7FF),
+    const palettes = <List<Color>>[
+      <Color>[
+        Color(0xFF7DEBFF), Color(0xFF4CB8FF), Color(0xFFB8F8FF),
+        Color(0xFF57D6D0), Color(0xFF8BA6FF), Color(0xFFD9FFFF), Color(0xFF65C7FF),
+      ],
+      <Color>[
+        Color(0xFFB38CFF), Color(0xFF6C63FF), Color(0xFFEE8CFF),
+        Color(0xFF6FD8FF), Color(0xFFC4A7FF), Color(0xFF8F7BFF), Color(0xFFFF9FE8),
+      ],
+      <Color>[
+        Color(0xFFFF7B62), Color(0xFFFFB347), Color(0xFFFFD56A),
+        Color(0xFFFF5A78), Color(0xFFFF916E), Color(0xFFFFC36A), Color(0xFFFF6B3D),
+      ],
+      <Color>[
+        Color(0xFF69EE9A), Color(0xFF37C97A), Color(0xFF9AF57B),
+        Color(0xFF4CE2C0), Color(0xFFB6FF8A), Color(0xFF51B96E), Color(0xFF7CF0D4),
+      ],
+      <Color>[
+        Color(0xFFFFD56A), Color(0xFFFFA94D), Color(0xFFFFF2A6),
+        Color(0xFFDFAF55), Color(0xFFFFC96B), Color(0xFFFFE08D), Color(0xFFCB8E3E),
+      ],
+      <Color>[
+        Color(0xFFFF76C8), Color(0xFFFF5E8D), Color(0xFFC85CFF),
+        Color(0xFFFFA4DB), Color(0xFF8D75FF), Color(0xFFFF7AA8), Color(0xFFD76DFF),
+      ],
+      <Color>[
+        Color(0xFF80A8FF), Color(0xFF4D78E8), Color(0xFF65E4FF),
+        Color(0xFF9FC2FF), Color(0xFF5771D9), Color(0xFF76C8FF), Color(0xFFA6B2FF),
+      ],
     ];
-    final shift = _isAdventure ? widget.adventureLevel!.number % base.length : 0;
-    return List<Color>.generate(base.length, (index) {
-      final source = base[(index + shift) % base.length];
-      return Color.lerp(source, _theme.block, 0.24)!;
+
+    final cycle = _isAdventure ? widget.adventureLevel!.colorCycle : 0;
+    final selected = palettes[cycle % palettes.length];
+    return List<Color>.generate(selected.length, (index) {
+      return Color.lerp(selected[index], _theme.block, 0.12)!;
     });
   }
 
@@ -149,7 +177,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
     final level = widget.adventureLevel!;
     final seeded = Random(level.number * 9173 + 31);
     final maxRows = (3 + level.chapter).clamp(3, 8);
-    final desired = level.startingBlocks.clamp(0, 28);
+    final desired = level.startingBlocks.clamp(0, 32);
     var placed = 0;
     var guard = 0;
 
@@ -334,7 +362,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
       }
     }
 
-    if (_isAdventure && _lines >= _targetLines) {
+    if (_isAdventure && _score >= _targetScore) {
       await _finish(success: true);
       return;
     }
@@ -431,7 +459,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
               const SizedBox(height: 14),
               Text(
                 _isAdventure
-                    ? '$_lines/$_targetLines çizgi'
+                    ? 'Hedef $_targetScore puan  •  $_lines çizgi'
                         '${earned > 0 ? '  •  +$earned coin' : ''}'
                     : '$_lines çizgi  •  Seviye $_arcadeLevel\n'
                         'En iyi: ${widget.appState.fallingBlocksBestScore}',
@@ -500,9 +528,29 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
     return result;
   }
 
+  Map<int, int> get _ghostCells {
+    if (_paused || _gameOver || _finishing) return const <int, int>{};
+    var distance = 0;
+    while (_canPlace(_piece, _row + distance + 1, _col)) {
+      distance += 1;
+    }
+    if (distance == 0) return const <int, int>{};
+
+    final result = <int, int>{};
+    for (final cell in _piece.cells) {
+      final r = _row + distance + cell.$1;
+      final c = _col + cell.$2;
+      if (r >= 0 && r < _rows && c >= 0 && c < _cols) {
+        result[r * _cols + c] = _piece.colorIndex;
+      }
+    }
+    return result;
+  }
+
   @override
   Widget build(BuildContext context) {
     final active = _activeCells;
+    final ghost = _ghostCells;
     final levelAccent = _palette.first;
 
     return Scaffold(
@@ -520,13 +568,28 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
                     : 'DÜŞEN BLOKLAR',
                 score: _score,
                 lines: _lines,
-                targetLines: _targetLines,
+                targetScore: _targetScore,
                 level: _difficultyLevel,
                 accent: levelAccent,
                 paused: _paused,
                 onBack: () => Navigator.of(context).pop(),
                 onPause: _togglePause,
               ),
+              if (_isAdventure)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 6),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      minHeight: 5,
+                      value: _targetScore <= 0
+                          ? 0
+                          : (_score / _targetScore).clamp(0.0, 1.0).toDouble(),
+                      backgroundColor: Colors.white.withValues(alpha: 0.055),
+                      valueColor: AlwaysStoppedAnimation<Color>(levelAccent),
+                    ),
+                  ),
+                ),
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
@@ -547,17 +610,32 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
                           height: boardHeight,
                           padding: const EdgeInsets.all(3),
                           decoration: BoxDecoration(
-                            color: _theme.board.withValues(alpha: 0.91),
-                            borderRadius: BorderRadius.circular(16),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: <Color>[
+                                Color.lerp(_theme.board, levelAccent, 0.12)!
+                                    .withValues(alpha: 0.97),
+                                _theme.board.withValues(alpha: 0.94),
+                                Color.lerp(_theme.board, Colors.black, 0.24)!
+                                    .withValues(alpha: 0.98),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(18),
                             border: Border.all(
-                              color: levelAccent.withValues(alpha: 0.42),
-                              width: 1.2,
+                              color: levelAccent.withValues(alpha: 0.58),
+                              width: 1.6,
                             ),
                             boxShadow: <BoxShadow>[
                               BoxShadow(
-                                color: levelAccent.withValues(alpha: 0.18),
-                                blurRadius: 26,
+                                color: levelAccent.withValues(alpha: 0.22),
+                                blurRadius: 30,
                                 spreadRadius: 1,
+                              ),
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.34),
+                                blurRadius: 18,
+                                offset: const Offset(0, 8),
                               ),
                             ],
                           ),
@@ -573,36 +651,51 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
                               final row = index ~/ _cols;
                               final col = index % _cols;
                               final fixedColor = _board[row][col];
-                              final colorIndex =
-                                  active[index] ?? fixedColor;
+                              final activeColor = active[index];
+                              final ghostColor = ghost[index];
+                              final colorIndex = activeColor ?? fixedColor;
                               final filled = colorIndex >= 0;
 
-                              if (!filled) {
+                              if (!filled && ghostColor == null) {
                                 return Container(
                                   margin: const EdgeInsets.all(0.45),
                                   decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(2.5),
-                                    color: _theme.cell.withValues(alpha: 0.26),
+                                    borderRadius: BorderRadius.circular(3.2),
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: <Color>[
+                                        _theme.cell.withValues(alpha: 0.31),
+                                        Color.lerp(_theme.cell, Colors.black, 0.28)!
+                                            .withValues(alpha: 0.22),
+                                      ],
+                                    ),
                                     border: Border.all(
-                                      color: Colors.white.withValues(alpha: 0.025),
-                                      width: 0.45,
+                                      color: levelAccent.withValues(alpha: 0.045),
+                                      width: 0.5,
                                     ),
                                   ),
                                 );
                               }
 
+                              final displayIndex =
+                                  filled ? colorIndex : ghostColor!;
                               final base =
-                                  _palette[colorIndex % _palette.length];
+                                  _palette[displayIndex % _palette.length];
                               final accent =
-                                  Color.lerp(base, Colors.white, 0.52)!;
-                              return Padding(
-                                padding: const EdgeInsets.all(0.25),
+                                  Color.lerp(base, Colors.white, 0.58)!;
+                              final tile = Padding(
+                                padding: const EdgeInsets.all(0.20),
                                 child: ThemedBlockTile(
                                   material: _theme.material,
                                   base: base,
                                   accent: accent,
                                 ),
                               );
+                              if (!filled && ghostColor != null) {
+                                return Opacity(opacity: 0.22, child: tile);
+                              }
+                              return tile;
                             },
                           ),
                         ),
@@ -652,7 +745,7 @@ class _Header extends StatelessWidget {
     required this.title,
     required this.score,
     required this.lines,
-    required this.targetLines,
+    required this.targetScore,
     required this.level,
     required this.accent,
     required this.paused,
@@ -663,7 +756,7 @@ class _Header extends StatelessWidget {
   final String title;
   final int score;
   final int lines;
-  final int targetLines;
+  final int targetScore;
   final int level;
   final Color accent;
   final bool paused;
@@ -694,8 +787,8 @@ class _Header extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  targetLines > 0
-                      ? 'SKOR $score  •  ÇİZGİ $lines/$targetLines  •  ZORLUK $level'
+                  targetScore > 0
+                      ? 'SKOR $score/$targetScore  •  ÇİZGİ $lines  •  ZORLUK $level'
                       : 'SKOR $score  •  ÇİZGİ $lines  •  HIZ $level',
                   style: const TextStyle(
                     color: Colors.white54,

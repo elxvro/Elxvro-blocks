@@ -27,19 +27,21 @@ class AdventureLevel {
     return 'KLASİK';
   }
 
+  int get fallingTargetScore => targetScore;
+
   int get fallingTargetLines =>
-      (4 + ((number - 1) ~/ 3) + (hardPieces ? 2 : 0)).clamp(4, 26).toInt();
+      (5 + ((number - 1) ~/ 5)).clamp(5, 18).toInt();
 
   int get fallingIntervalMs {
-    final chapterPenalty = (chapter - 1) * 18;
-    final hardPenalty = hardPieces ? 55 : 0;
-    return (690 - number * 7 - chapterPenalty - hardPenalty)
-        .clamp(135, 690)
-        .toInt();
+    final step = number - 1;
+    final chapterPenalty = (chapter - 1) * 12;
+    return (710 - step * 9 - chapterPenalty).clamp(135, 710).toInt();
   }
 
+  int get colorCycle => (number - 1) % 7;
+
   String get objective =>
-      '$fallingTargetLines çizgiyi temizle • düşen blok kontrolü';
+      '$fallingTargetScore puana ulaş • hız ve renk her bölüm değişir';
 }
 
 const int adventureLevelCount = 60;
@@ -49,7 +51,8 @@ AdventureLevel adventureLevelFor(int number) {
   final hard = safe % 5 == 0;
   final timed = safe % 3 == 0;
   final chapter = ((safe - 1) ~/ 10) + 1;
-  final target = 900 + safe * 260 + chapter * 180;
+  final step = safe - 1;
+  final target = 1000 + step * 650 + step * step * 6 + (chapter - 1) * 500;
   final duration = timed
       ? (190 - chapter * 8 - (hard ? 10 : 0)).clamp(125, 190).toInt()
       : null;
@@ -57,7 +60,8 @@ AdventureLevel adventureLevelFor(int number) {
     number: safe,
     targetScore: target,
     reward: 35 + safe * 5 + (hard ? 40 : 0),
-    startingBlocks: (6 + chapter * 2 + (hard ? 5 : 0)).clamp(6, 24).toInt(),
+    startingBlocks:
+        (4 + chapter * 2 + (safe ~/ 4) + (hard ? 4 : 0)).clamp(4, 32).toInt(),
     scoreMultiplier: hard ? 1.22 : (timed ? 1.08 : 1.0),
     hardPieces: hard,
     durationSeconds: duration,

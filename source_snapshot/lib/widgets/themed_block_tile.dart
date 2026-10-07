@@ -591,12 +591,13 @@ class _Premium3DBlockPainter extends CustomPainter {
     final w = size.width;
     final h = size.height;
     final pane = Path()
-      ..moveTo(w * 0.10, h * 0.05)
-      ..lineTo(w * 0.88, h * 0.09)
-      ..lineTo(w * 0.95, h * 0.78)
-      ..lineTo(w * 0.78, h * 0.94)
-      ..lineTo(w * 0.08, h * 0.88)
-      ..lineTo(w * 0.04, h * 0.23)
+      ..moveTo(w * 0.11, h * 0.035)
+      ..lineTo(w * 0.84, h * 0.065)
+      ..lineTo(w * 0.955, h * 0.20)
+      ..lineTo(w * 0.93, h * 0.81)
+      ..lineTo(w * 0.80, h * 0.945)
+      ..lineTo(w * 0.10, h * 0.89)
+      ..lineTo(w * 0.045, h * 0.21)
       ..close();
 
     canvas.drawPath(
@@ -605,11 +606,34 @@ class _Premium3DBlockPainter extends CustomPainter {
         ..shader = LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
+          stops: const <double>[0.0, 0.24, 0.56, 0.82, 1.0],
           colors: <Color>[
-            Colors.white.withValues(alpha: 0.58),
-            accent.withValues(alpha: 0.40),
-            base.withValues(alpha: 0.28),
-            const Color(0xFF0A3B55).withValues(alpha: 0.58),
+            Colors.white.withValues(alpha: 0.70),
+            accent.withValues(alpha: 0.46),
+            base.withValues(alpha: 0.30),
+            const Color(0xFF2B88A8).withValues(alpha: 0.34),
+            const Color(0xFF062E45).withValues(alpha: 0.64),
+          ],
+        ).createShader(Offset.zero & size),
+    );
+
+    final inner = Path()
+      ..moveTo(w * 0.18, h * 0.16)
+      ..lineTo(w * 0.77, h * 0.12)
+      ..lineTo(w * 0.84, h * 0.70)
+      ..lineTo(w * 0.66, h * 0.82)
+      ..lineTo(w * 0.19, h * 0.75)
+      ..close();
+    canvas.drawPath(
+      inner,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            Colors.white.withValues(alpha: 0.20),
+            Colors.transparent,
+            accent.withValues(alpha: 0.10),
           ],
         ).createShader(Offset.zero & size),
     );
@@ -618,33 +642,52 @@ class _Premium3DBlockPainter extends CustomPainter {
       pane,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = math.max(0.9, size.shortestSide * 0.040)
-        ..color = Colors.white.withValues(alpha: 0.72),
+        ..strokeWidth = math.max(1.0, size.shortestSide * 0.042)
+        ..color = Colors.white.withValues(alpha: 0.78),
     );
 
-    final refraction = Path()
-      ..moveTo(w * 0.16, h * 0.26)
-      ..lineTo(w * 0.76, h * 0.16)
-      ..lineTo(w * 0.48, h * 0.55)
-      ..lineTo(w * 0.82, h * 0.70);
-    canvas.drawPath(
+    final refraction = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = math.max(0.50, size.shortestSide * 0.018)
+      ..color = Colors.white.withValues(alpha: 0.27);
+    canvas.drawLine(
+      Offset(w * 0.18, h * 0.30),
+      Offset(w * 0.72, h * 0.18),
       refraction,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = math.max(0.55, size.shortestSide * 0.020)
-        ..color = Colors.white.withValues(alpha: 0.30),
+    );
+    canvas.drawLine(
+      Offset(w * 0.29, h * 0.67),
+      Offset(w * 0.79, h * 0.46),
+      refraction,
+    );
+    canvas.drawLine(
+      Offset(w * 0.56, h * 0.17),
+      Offset(w * 0.44, h * 0.78),
+      refraction..color = accent.withValues(alpha: 0.15),
     );
 
-    canvas.drawOval(
-      Rect.fromLTWH(w * 0.18, h * 0.12, w * 0.45, h * 0.16),
-      Paint()
-        ..shader = RadialGradient(
-          colors: <Color>[
-            Colors.white.withValues(alpha: 0.34),
-            Colors.transparent,
-          ],
-        ).createShader(Rect.fromLTWH(w * 0.18, h * 0.12, w * 0.45, h * 0.16)),
+    final glint = Paint()
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = math.max(0.8, size.shortestSide * 0.030)
+      ..color = Colors.white.withValues(alpha: 0.64);
+    canvas.drawLine(
+      Offset(w * 0.18, h * 0.13),
+      Offset(w * 0.48, h * 0.09),
+      glint,
     );
+
+    final bubble = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(0.45, size.shortestSide * 0.014)
+      ..color = Colors.white.withValues(alpha: 0.28);
+    for (final p in <Offset>[
+      Offset(w * 0.28, h * 0.52),
+      Offset(w * 0.72, h * 0.63),
+      Offset(w * 0.62, h * 0.33),
+    ]) {
+      canvas.drawCircle(p, size.shortestSide * 0.025, bubble);
+    }
   }
 
   void _wood(Canvas canvas, Size size) {
@@ -724,46 +767,89 @@ class _Premium3DBlockPainter extends CustomPainter {
   }
 
   void _stone(Canvas canvas, Size size) {
-    final c = size.shortestSide * 0.10;
-    final path = Path()
-      ..moveTo(c, 1)
-      ..lineTo(size.width - c * 0.50, 1)
-      ..lineTo(size.width - 1, c)
-      ..lineTo(size.width - c * 0.20, size.height - c * 0.75)
-      ..lineTo(size.width - c, size.height - 1)
-      ..lineTo(c * 0.75, size.height - 1)
-      ..lineTo(1, size.height - c)
-      ..lineTo(1, c * 0.72)
+    final w = size.width;
+    final h = size.height;
+    final c = size.shortestSide * 0.105;
+    final rock = Path()
+      ..moveTo(c * 0.75, h * 0.045)
+      ..lineTo(w * 0.72, h * 0.02)
+      ..lineTo(w - c * 0.28, c * 0.58)
+      ..lineTo(w * 0.975, h * 0.62)
+      ..lineTo(w - c * 0.72, h * 0.95)
+      ..lineTo(w * 0.32, h * 0.985)
+      ..lineTo(c * 0.35, h * 0.82)
+      ..lineTo(w * 0.025, h * 0.31)
       ..close();
 
     canvas.drawPath(
-      path,
-      _gradient(size, <Color>[
-        Color.lerp(accent, Colors.white, 0.10)!,
-        base,
-        const Color(0xFF353C42),
-      ]),
+      rock,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          stops: const <double>[0.0, 0.30, 0.66, 1.0],
+          colors: <Color>[
+            Color.lerp(accent, Colors.white, 0.20)!,
+            base,
+            Color.lerp(base, const Color(0xFF59636C), 0.42)!,
+            const Color(0xFF252B30),
+          ],
+        ).createShader(Offset.zero & size),
     );
 
-    final crack = Paint()
+    canvas.drawPath(
+      rock,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(1.0, size.shortestSide * 0.045)
+        ..color = const Color(0xFF151A1D).withValues(alpha: 0.68),
+    );
+
+    final fracture = Paint()
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = math.max(0.65, size.shortestSide * 0.024)
-      ..color = const Color(0xFF151A1D).withValues(alpha: 0.70);
+      ..strokeJoin = StrokeJoin.round
+      ..strokeWidth = math.max(0.65, size.shortestSide * 0.022)
+      ..color = const Color(0xFF121619).withValues(alpha: 0.72);
+    final mid = Offset(w * 0.53, h * 0.44);
+    final crack = Path()
+      ..moveTo(mid.dx, mid.dy)
+      ..lineTo(w * 0.73, h * 0.24)
+      ..lineTo(w * 0.86, h * 0.19)
+      ..moveTo(mid.dx, mid.dy)
+      ..lineTo(w * 0.78, h * 0.58)
+      ..lineTo(w * 0.89, h * 0.67)
+      ..moveTo(mid.dx, mid.dy)
+      ..lineTo(w * 0.38, h * 0.67)
+      ..lineTo(w * 0.31, h * 0.84);
+    canvas.drawPath(crack, fracture);
 
-    final mid = Offset(size.width * 0.53, size.height * 0.46);
-    canvas.drawLine(mid, Offset(size.width * 0.79, size.height * 0.20), crack);
-    canvas.drawLine(mid, Offset(size.width * 0.86, size.height * 0.62), crack);
-    canvas.drawLine(mid, Offset(size.width * 0.34, size.height * 0.80), crack);
-
-    final speck = Paint()..color = Colors.white.withValues(alpha: 0.17);
-    for (final p in <Offset>[
-      Offset(size.width * 0.23, size.height * 0.28),
-      Offset(size.width * 0.73, size.height * 0.34),
-      Offset(size.width * 0.31, size.height * 0.59),
-    ]) {
-      canvas.drawCircle(p, size.shortestSide * 0.022, speck);
+    final poreDark = Paint()..color = Colors.black.withValues(alpha: 0.24);
+    final poreLight = Paint()..color = Colors.white.withValues(alpha: 0.15);
+    final pores = <(double, double, double)>[
+      (0.19, 0.25, 0.024), (0.32, 0.42, 0.016), (0.71, 0.34, 0.021),
+      (0.22, 0.68, 0.019), (0.67, 0.73, 0.026), (0.82, 0.48, 0.015),
+      (0.49, 0.18, 0.013), (0.46, 0.78, 0.018),
+    ];
+    for (final pore in pores) {
+      final center = Offset(w * pore.$1, h * pore.$2);
+      final r = size.shortestSide * pore.$3;
+      canvas.drawCircle(center, r, poreDark);
+      canvas.drawCircle(
+        center - Offset(r * 0.35, r * 0.42),
+        r * 0.36,
+        poreLight,
+      );
     }
+
+    canvas.drawLine(
+      Offset(w * 0.16, h * 0.12),
+      Offset(w * 0.61, h * 0.08),
+      Paint()
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = math.max(0.75, size.shortestSide * 0.025)
+        ..color = Colors.white.withValues(alpha: 0.22),
+    );
   }
 
   void _leaf(Canvas canvas, Size size) {
