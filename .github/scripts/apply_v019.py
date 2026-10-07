@@ -452,4 +452,15 @@ replace_once(
     "    ]) {\n",
 )
 
+
+# ---------------------------------------------------------------------------
+# Legacy regression test compatibility: v0.19 expands theme catalog 6 -> 9.
+# ---------------------------------------------------------------------------
+theme_test = ROOT / 'test/theme_refresh_test.dart'
+if theme_test.exists():
+    text = theme_test.read_text(encoding='utf-8')
+    text = text.replace('expect(gameThemes.length, 6);', 'expect(gameThemes.length, 9);')
+    text = text.replace('hasLength(6)', 'hasLength(9)')
+    theme_test.write_text(text, encoding='utf-8')
+
 print('ELXVRO Blocks v0.19.0 themes + audio + Falling Blocks patch applied successfully.')
