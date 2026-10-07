@@ -184,7 +184,7 @@ class SettingsScreen extends StatelessWidget {
                               ),
                               SizedBox(height: 8),
                               Text(
-                                'v0.19.0  •  Themes + Audio 3.0 + Falling Blocks',
+                                'v0.20.0  •  Falling Adventure + Audio 4.0',
                                 style: TextStyle(color: Colors.white54),
                               ),
                               SizedBox(height: 6),
