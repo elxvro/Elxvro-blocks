@@ -27,13 +27,19 @@ class AdventureLevel {
     return 'KLASİK';
   }
 
-  String get objective {
-    final timer = durationSeconds;
-    if (timer == null) {
-      return '$targetScore puana ulaş';
-    }
-    return '$timer sn içinde $targetScore puana ulaş';
+  int get fallingTargetLines =>
+      (4 + ((number - 1) ~/ 3) + (hardPieces ? 2 : 0)).clamp(4, 26).toInt();
+
+  int get fallingIntervalMs {
+    final chapterPenalty = (chapter - 1) * 18;
+    final hardPenalty = hardPieces ? 55 : 0;
+    return (690 - number * 7 - chapterPenalty - hardPenalty)
+        .clamp(135, 690)
+        .toInt();
   }
+
+  String get objective =>
+      '$fallingTargetLines çizgiyi temizle • düşen blok kontrolü';
 }
 
 const int adventureLevelCount = 60;
