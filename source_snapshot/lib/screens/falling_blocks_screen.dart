@@ -308,8 +308,8 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
         3 => 500,
         _ => 800,
       };
-      _score += (base * max(1, _difficultyLevel)) +
-          max(0, _combo - 1) * 90;
+      final comboBonus = _combo > 1 ? (_combo - 1) * 90 : 0;
+      _score += base * _difficultyLevel + comboBonus;
 
       unawaited(
         AudioService.instance.playClearTier(

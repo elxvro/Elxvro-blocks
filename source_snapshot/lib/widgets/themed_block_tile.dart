@@ -60,6 +60,7 @@ class _Premium3DBlockPainter extends CustomPainter {
       math.max(2, size.height - depth),
     );
 
+    _paintOuterGlow(canvas, size);
     _paintContactShadow(canvas, size, depth);
     if (material != ThemeMaterial.glass &&
         material != ThemeMaterial.crystal &&
@@ -128,6 +129,35 @@ class _Premium3DBlockPainter extends CustomPainter {
           ..color = accent.withValues(alpha: 0.78 * flash),
       );
     }
+  }
+
+  void _paintOuterGlow(Canvas canvas, Size size) {
+    final strength = switch (material) {
+      ThemeMaterial.glass => 0.68,
+      ThemeMaterial.crystal => 0.74,
+      ThemeMaterial.marble => 0.50,
+      ThemeMaterial.wood => 0.34,
+      ThemeMaterial.stone => 0.30,
+      ThemeMaterial.leaf => 0.28,
+    };
+    final rr = RRect.fromRectAndRadius(
+      Rect.fromLTWH(1.5, 1.5, size.width - 3, size.height - 3),
+      Radius.circular(size.shortestSide * 0.18),
+    );
+    canvas.drawRRect(
+      rr,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(1.6, size.shortestSide * 0.070)
+        ..color = accent.withValues(alpha: strength * 0.28),
+    );
+    canvas.drawRRect(
+      rr,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(0.8, size.shortestSide * 0.025)
+        ..color = Colors.white.withValues(alpha: 0.46),
+    );
   }
 
   void _paintContactShadow(Canvas canvas, Size size, double depth) {
