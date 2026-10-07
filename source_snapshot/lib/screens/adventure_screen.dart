@@ -258,7 +258,7 @@ class _AdventureLevelCard extends StatelessWidget {
                     ? 'PUAN'
                     : '${level.durationSeconds} SN',
                 style: TextStyle(
-                  color: unlocked ? Colors.white38 : Colors.white18,
+                  color: unlocked ? Colors.white38 : Colors.white.withValues(alpha: 0.18),
                   fontSize: 8,
                   fontWeight: FontWeight.w700,
                 ),
@@ -269,13 +269,13 @@ class _AdventureLevelCard extends StatelessWidget {
                   Icon(
                     Icons.monetization_on_rounded,
                     size: 11,
-                    color: unlocked ? accent : Colors.white18,
+                    color: unlocked ? accent : Colors.white.withValues(alpha: 0.18),
                   ),
                   const SizedBox(width: 3),
                   Text(
                     '+${level.reward}',
                     style: TextStyle(
-                      color: unlocked ? accent : Colors.white18,
+                      color: unlocked ? accent : Colors.white.withValues(alpha: 0.18),
                       fontSize: 9,
                       fontWeight: FontWeight.w900,
                     ),
