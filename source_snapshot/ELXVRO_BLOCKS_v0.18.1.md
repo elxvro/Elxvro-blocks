@@ -16,6 +16,5 @@ Sürüm: **0.18.1+41**
 
 - versionName: `0.18.1`
 - versionCode: `41`
-- Yeni define: `ELXVRO_PG_ADVENTURE_LEADERBOARD_ID`
-- GitHub secret önerisi: `ELXVRO_PG_ADVENTURE_LEADERBOARD_ID`
+- Macera Turnuvası leaderboard: `CgkI6arsvtAGEAIQBA`
 - APK + Google Play AAB imzalı build korunur.
