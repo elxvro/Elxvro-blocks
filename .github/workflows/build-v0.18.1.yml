@@ -249,7 +249,7 @@ jobs:
         env:
           PG_CLASSIC: 'CgkI6arsvtAGEAIQAw'
           PG_RUSH: 'CgkI6arsvtAGEAIQAg'
-          PG_ADVENTURE: ${{ secrets.ELXVRO_PG_ADVENTURE_LEADERBOARD_ID }}
+          PG_ADVENTURE: 'CgkI6arsvtAGEAIQBA'
           ACH_FIRST: ${{ secrets.ELXVRO_PG_ACH_FIRST_GAME }}
           ACH_SCORE_1000: ${{ secrets.ELXVRO_PG_ACH_SCORE_1000 }}
           ACH_COMBO_3: ${{ secrets.ELXVRO_PG_ACH_COMBO_3 }}
@@ -282,7 +282,7 @@ jobs:
         env:
           PG_CLASSIC: 'CgkI6arsvtAGEAIQAw'
           PG_RUSH: 'CgkI6arsvtAGEAIQAg'
-          PG_ADVENTURE: ${{ secrets.ELXVRO_PG_ADVENTURE_LEADERBOARD_ID }}
+          PG_ADVENTURE: 'CgkI6arsvtAGEAIQBA'
           ACH_FIRST: ${{ secrets.ELXVRO_PG_ACH_FIRST_GAME }}
           ACH_SCORE_1000: ${{ secrets.ELXVRO_PG_ACH_SCORE_1000 }}
           ACH_COMBO_3: ${{ secrets.ELXVRO_PG_ACH_COMBO_3 }}
