@@ -1,0 +1,335 @@
+name: ELXVRO Blocks v0.18.1 Adventure Tournament Signed APK + AAB
+
+on:
+  push:
+    branches:
+      - release-v0.18.1
+    paths:
+      - "source_snapshot/**"
+      - ".github/scripts/apply_v017.py"
+      - ".github/scripts/apply_max_impact.py"
+      - ".github/scripts/apply_v0181_tournament.py"
+      - ".github/workflows/build-v0.18.1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter 3.47.4
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.4'
+          channel: stable
+          cache: true
+
+      - name: Extract original ELXVRO Blocks
+        run: |
+          set -euo pipefail
+          test -f elxvro-blocks-v0.10.1.zip
+          unzip -t elxvro-blocks-v0.10.1.zip
+          rm -rf extracted
+          mkdir extracted
+          unzip -q elxvro-blocks-v0.10.1.zip -d extracted
+          test -d extracted/elxvro-blocks-v0.10.1
+
+      - name: Restore current source and tests
+        run: |
+          set -euo pipefail
+          APP=extracted/elxvro-blocks-v0.10.1
+          rm -rf "$APP/lib"
+          cp -a source_snapshot/lib "$APP/lib"
+          cp source_snapshot/pubspec.yaml "$APP/pubspec.yaml"
+          if [ -d source_snapshot/test ]; then
+            mkdir -p "$APP/test"
+            cp -a source_snapshot/test/. "$APP/test/"
+          fi
+          if [ -f "$APP/test/real_material_audio_test.dart" ]; then
+            sed -i 's/version: 0.10.1+27/version: 0.18.1+41/g' "$APP/test/real_material_audio_test.dart"
+          fi
+          grep -F 'version: 0.18.1+41' "$APP/pubspec.yaml"
+          grep -F "defaultValue: 'CgkI6arsvtAGEAIQAw'" "$APP/lib/services/play_games_ids.dart"
+          grep -F "defaultValue: 'CgkI6arsvtAGEAIQAg'" "$APP/lib/services/play_games_ids.dart"
+
+      - name: Apply v0.17 integration update
+        run: |
+          set -euo pipefail
+          python .github/scripts/apply_v017.py extracted/elxvro-blocks-v0.10.1
+          sed -i 's/v0.10.1  •  2D FX Engine/v0.18.1  •  Adventure Tournament/g' \
+            extracted/elxvro-blocks-v0.10.1/lib/screens/settings_screen.dart
+
+      - name: Apply Smooth MAX IMPACT optimization
+        run: python .github/scripts/apply_max_impact.py extracted/elxvro-blocks-v0.10.1
+
+      - name: Apply Adventure Tournament update
+        run: python .github/scripts/apply_v0181_tournament.py extracted/elxvro-blocks-v0.10.1
+
+      - name: Generate Android platform
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: |
+          flutter create \
+            --platforms=android \
+            --org com.elxvro \
+            --project-name elxvro_blocks \
+            .
+
+      - name: Apply Android branding
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: python tool/apply_android_branding.py
+
+      - name: Configure live Play Games app id
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        env:
+          PG_APP_ID: '227765065065'
+        run: |
+          set -euo pipefail
+          mkdir -p android/app/src/main/res/values
+          cat > android/app/src/main/res/values/elxvro_play_games.xml <<EOF
+          <resources>
+              <string name="elxvro_play_games_app_id" translatable="false">${PG_APP_ID}</string>
+          </resources>
+          EOF
+          python - <<'PY'
+          from pathlib import Path
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          text = manifest.read_text()
+          needle = '</application>'
+          meta = '        <meta-data android:name="com.google.android.gms.games.APP_ID" android:value="@string/elxvro_play_games_app_id" />\n'
+          if text.count(needle) != 1:
+              raise SystemExit('AndroidManifest application anchor mismatch')
+          if 'com.google.android.gms.games.APP_ID' not in text:
+              text = text.replace(needle, meta + '    ' + needle, 1)
+          manifest.write_text(text)
+          PY
+          grep -F '227765065065' android/app/src/main/res/values/elxvro_play_games.xml
+          grep -F 'com.google.android.gms.games.APP_ID' android/app/src/main/AndroidManifest.xml
+
+      - name: Configure mandatory release signing
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ELXVRO_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ELXVRO_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ELXVRO_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ELXVRO_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "::error::Release signing secrets are missing."
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > android/app/elxvro-release.jks
+          keytool -list \
+            -keystore android/app/elxvro-release.jks \
+            -alias "$KEY_ALIAS" \
+            -storepass "$KEYSTORE_PASSWORD" \
+            >/dev/null
+          keytool -list -v \
+            -keystore android/app/elxvro-release.jks \
+            -alias "$KEY_ALIAS" \
+            -storepass "$KEYSTORE_PASSWORD" \
+            | grep -E 'SHA1:|SHA-1:' || true
+          {
+            printf 'storePassword=%s\n' "$KEYSTORE_PASSWORD"
+            printf 'keyPassword=%s\n' "$KEY_PASSWORD"
+            printf 'keyAlias=%s\n' "$KEY_ALIAS"
+            printf 'storeFile=elxvro-release.jks\n'
+          } > android/key.properties
+          python tool/configure_release_signing.py
+          echo 'RELEASE_SIGNING_CONFIGURED=true' >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: flutter pub get
+
+      - name: Install audio tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg curl
+
+      - name: Fetch game material audio
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: |
+          bash tool/fetch_real_material_audio.sh
+          bash tool/fetch_real_puzzle_music.sh
+
+      - name: Fetch six-track CC0 playlist
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/elxvro-music assets/audio
+          UA="ELXVRO-Blocks-GitHub-Build/0.17.3"
+          curl -fL --retry 4 --retry-all-errors -A "$UA" \
+            "https://opengameart.org/sites/default/files/magic_puzzle_in-game_1_bpm110_0.ogg" \
+            -o /tmp/elxvro-music/track1.ogg
+          curl -fL --retry 4 --retry-all-errors -A "$UA" \
+            "https://opengameart.org/sites/default/files/cozy_puzzle_in-game_3_bpm108_0.ogg" \
+            -o /tmp/elxvro-music/track2.ogg
+          curl -fL --retry 4 --retry-all-errors -A "$UA" \
+            "https://opengameart.org/sites/default/files/Out%20in%20Space_0.ogg" \
+            -o /tmp/elxvro-music/track3.ogg
+          curl -fL --retry 4 --retry-all-errors -A "$UA" \
+            "https://opengameart.org/sites/default/files/cozy_puzzle_in-game_1_bpm118_0.ogg" \
+            -o /tmp/elxvro-music/track4.ogg
+          curl -fL --retry 4 --retry-all-errors -A "$UA" \
+            "https://opengameart.org/sites/default/files/cozy_puzzle_title_bpm95_0.ogg" \
+            -o /tmp/elxvro-music/track5.ogg
+          curl -fL --retry 4 --retry-all-errors -A "$UA" \
+            "https://opengameart.org/sites/default/files/cozy_puzzle_stage_select_bpm100_0.ogg" \
+            -o /tmp/elxvro-music/track6.ogg
+
+          normalize() {
+            ffmpeg -y -loglevel error -i "$1" \
+              -af "loudnorm=I=-20:TP=-2:LRA=11" -c:a libvorbis -q:a 4 "$2"
+          }
+          normalize /tmp/elxvro-music/track1.ogg assets/audio/bgm_magic_puzzle.ogg
+          normalize /tmp/elxvro-music/track2.ogg assets/audio/bgm_cozy_puzzle_3.ogg
+          normalize /tmp/elxvro-music/track3.ogg assets/audio/bgm_out_in_space.ogg
+          normalize /tmp/elxvro-music/track4.ogg assets/audio/bgm_calm_4.ogg
+          normalize /tmp/elxvro-music/track5.ogg assets/audio/bgm_calm_5.ogg
+          normalize /tmp/elxvro-music/track6.ogg assets/audio/bgm_calm_6.ogg
+
+          cat > assets/audio/MUSIC_LICENSES_v0181.txt <<'EOF'
+          ELXVRO Blocks v0.18.1 background playlist
+          All tracks: CC0 / public-domain dedication via OpenGameArt.
+          1. Magic Puzzle In-Game 1 — MintoDog
+          2. Cozy Puzzle In-Game 3 — MintoDog
+          3. Out in Space — Agecaf
+          4. Cozy Puzzle In-Game 1 — MintoDog
+          5. Cozy Puzzle Title — MintoDog
+          6. Cozy Puzzle Stage Select — MintoDog
+          EOF
+
+      - name: Verify six-track playlist
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: |
+          set -euo pipefail
+          for track in \
+            assets/audio/bgm_magic_puzzle.ogg \
+            assets/audio/bgm_cozy_puzzle_3.ogg \
+            assets/audio/bgm_out_in_space.ogg \
+            assets/audio/bgm_calm_4.ogg \
+            assets/audio/bgm_calm_5.ogg \
+            assets/audio/bgm_calm_6.ogg; do
+            test -s "$track"
+            ffprobe -v error -show_entries format=duration \
+              -of default=noprint_wrappers=1:nokey=1 "$track"
+          done
+          test -s assets/audio/MUSIC_LICENSES_v0181.txt
+
+      - name: Generate launcher icon and splash
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: |
+          dart run flutter_launcher_icons
+          dart run flutter_native_splash:create
+
+      - name: Analyze
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: flutter analyze
+
+      - name: Test
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: flutter test
+
+      - name: Build signed release APK
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        env:
+          PG_CLASSIC: 'CgkI6arsvtAGEAIQAw'
+          PG_RUSH: 'CgkI6arsvtAGEAIQAg'
+          PG_ADVENTURE: ${{ secrets.ELXVRO_PG_ADVENTURE_LEADERBOARD_ID }}
+          ACH_FIRST: ${{ secrets.ELXVRO_PG_ACH_FIRST_GAME }}
+          ACH_SCORE_1000: ${{ secrets.ELXVRO_PG_ACH_SCORE_1000 }}
+          ACH_COMBO_3: ${{ secrets.ELXVRO_PG_ACH_COMBO_3 }}
+          ACH_LINES_25: ${{ secrets.ELXVRO_PG_ACH_LINES_25 }}
+          ACH_GAMES_10: ${{ secrets.ELXVRO_PG_ACH_GAMES_10 }}
+          ACH_BLOCKS_250: ${{ secrets.ELXVRO_PG_ACH_BLOCKS_250 }}
+          ACH_SCORE_10000: ${{ secrets.ELXVRO_PG_ACH_SCORE_10000 }}
+          ACH_LEVEL_5: ${{ secrets.ELXVRO_PG_ACH_LEVEL_5 }}
+          ACH_PERFECT_3: ${{ secrets.ELXVRO_PG_ACH_PERFECT_3 }}
+          ACH_LEVEL_15: ${{ secrets.ELXVRO_PG_ACH_LEVEL_15 }}
+        run: |
+          test "$RELEASE_SIGNING_CONFIGURED" = "true"
+          flutter build apk --release --obfuscate --split-debug-info=build/symbols/apk \
+            --dart-define="ELXVRO_PG_CLASSIC_LEADERBOARD_ID=${PG_CLASSIC}" \
+            --dart-define="ELXVRO_PG_COMBO_RUSH_LEADERBOARD_ID=${PG_RUSH}" \
+            --dart-define="ELXVRO_PG_ADVENTURE_LEADERBOARD_ID=${PG_ADVENTURE:-}" \
+            --dart-define="ELXVRO_PG_ACH_FIRST_GAME=${ACH_FIRST:-}" \
+            --dart-define="ELXVRO_PG_ACH_SCORE_1000=${ACH_SCORE_1000:-}" \
+            --dart-define="ELXVRO_PG_ACH_COMBO_3=${ACH_COMBO_3:-}" \
+            --dart-define="ELXVRO_PG_ACH_LINES_25=${ACH_LINES_25:-}" \
+            --dart-define="ELXVRO_PG_ACH_GAMES_10=${ACH_GAMES_10:-}" \
+            --dart-define="ELXVRO_PG_ACH_BLOCKS_250=${ACH_BLOCKS_250:-}" \
+            --dart-define="ELXVRO_PG_ACH_SCORE_10000=${ACH_SCORE_10000:-}" \
+            --dart-define="ELXVRO_PG_ACH_LEVEL_5=${ACH_LEVEL_5:-}" \
+            --dart-define="ELXVRO_PG_ACH_PERFECT_3=${ACH_PERFECT_3:-}" \
+            --dart-define="ELXVRO_PG_ACH_LEVEL_15=${ACH_LEVEL_15:-}"
+
+      - name: Build signed Google Play AAB
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        env:
+          PG_CLASSIC: 'CgkI6arsvtAGEAIQAw'
+          PG_RUSH: 'CgkI6arsvtAGEAIQAg'
+          PG_ADVENTURE: ${{ secrets.ELXVRO_PG_ADVENTURE_LEADERBOARD_ID }}
+          ACH_FIRST: ${{ secrets.ELXVRO_PG_ACH_FIRST_GAME }}
+          ACH_SCORE_1000: ${{ secrets.ELXVRO_PG_ACH_SCORE_1000 }}
+          ACH_COMBO_3: ${{ secrets.ELXVRO_PG_ACH_COMBO_3 }}
+          ACH_LINES_25: ${{ secrets.ELXVRO_PG_ACH_LINES_25 }}
+          ACH_GAMES_10: ${{ secrets.ELXVRO_PG_ACH_GAMES_10 }}
+          ACH_BLOCKS_250: ${{ secrets.ELXVRO_PG_ACH_BLOCKS_250 }}
+          ACH_SCORE_10000: ${{ secrets.ELXVRO_PG_ACH_SCORE_10000 }}
+          ACH_LEVEL_5: ${{ secrets.ELXVRO_PG_ACH_LEVEL_5 }}
+          ACH_PERFECT_3: ${{ secrets.ELXVRO_PG_ACH_PERFECT_3 }}
+          ACH_LEVEL_15: ${{ secrets.ELXVRO_PG_ACH_LEVEL_15 }}
+        run: |
+          test "$RELEASE_SIGNING_CONFIGURED" = "true"
+          flutter build appbundle --release --obfuscate --split-debug-info=build/symbols/aab \
+            --dart-define="ELXVRO_PG_CLASSIC_LEADERBOARD_ID=${PG_CLASSIC}" \
+            --dart-define="ELXVRO_PG_COMBO_RUSH_LEADERBOARD_ID=${PG_RUSH}" \
+            --dart-define="ELXVRO_PG_ADVENTURE_LEADERBOARD_ID=${PG_ADVENTURE:-}" \
+            --dart-define="ELXVRO_PG_ACH_FIRST_GAME=${ACH_FIRST:-}" \
+            --dart-define="ELXVRO_PG_ACH_SCORE_1000=${ACH_SCORE_1000:-}" \
+            --dart-define="ELXVRO_PG_ACH_COMBO_3=${ACH_COMBO_3:-}" \
+            --dart-define="ELXVRO_PG_ACH_LINES_25=${ACH_LINES_25:-}" \
+            --dart-define="ELXVRO_PG_ACH_GAMES_10=${ACH_GAMES_10:-}" \
+            --dart-define="ELXVRO_PG_ACH_BLOCKS_250=${ACH_BLOCKS_250:-}" \
+            --dart-define="ELXVRO_PG_ACH_SCORE_10000=${ACH_SCORE_10000:-}" \
+            --dart-define="ELXVRO_PG_ACH_LEVEL_5=${ACH_LEVEL_5:-}" \
+            --dart-define="ELXVRO_PG_ACH_PERFECT_3=${ACH_PERFECT_3:-}" \
+            --dart-define="ELXVRO_PG_ACH_LEVEL_15=${ACH_LEVEL_15:-}"
+
+      - name: Prepare APK and AAB package
+        run: |
+          set -euo pipefail
+          APK="extracted/elxvro-blocks-v0.10.1/build/app/outputs/flutter-apk/app-release.apk"
+          AAB="extracted/elxvro-blocks-v0.10.1/build/app/outputs/bundle/release/app-release.aab"
+          test -s "$APK"
+          test -s "$AAB"
+          cp "$APK" ELXVRO-Blocks-v0.18.1-SIGNED.apk
+          cp "$AAB" ELXVRO-Blocks-v0.18.1-TOURNAMENT-GOOGLE-PLAY.aab
+          sha256sum ELXVRO-Blocks-v0.18.1-SIGNED.apk > ELXVRO-Blocks-v0.18.1-SIGNED.apk.sha256
+          sha256sum ELXVRO-Blocks-v0.18.1-TOURNAMENT-GOOGLE-PLAY.aab > ELXVRO-Blocks-v0.18.1-TOURNAMENT-GOOGLE-PLAY.aab.sha256
+          mkdir -p ELXVRO-Blocks-v0.18.1-APK-AAB
+          cp ELXVRO-Blocks-v0.18.1-SIGNED.apk* ELXVRO-Blocks-v0.18.1-APK-AAB/
+          cp ELXVRO-Blocks-v0.18.1-TOURNAMENT-GOOGLE-PLAY.aab* ELXVRO-Blocks-v0.18.1-APK-AAB/
+          ls -lh ELXVRO-Blocks-v0.18.1-APK-AAB/
+
+      - name: Upload APK and AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: ELXVRO-Blocks-v0.18.1-APK-AAB
+          path: ELXVRO-Blocks-v0.18.1-APK-AAB/
+          if-no-files-found: error
+          retention-days: 14
