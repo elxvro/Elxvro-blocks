@@ -9,6 +9,7 @@ class FakeGamesPlatformAdapter implements GamesPlatformAdapter {
   final List<(String, int)> scores = <(String, int)>[];
   final List<String> achievements = <String>[];
   int leaderboardUiCalls = 0;
+  final List<String> specificLeaderboardUiCalls = <String>[];
   int achievementUiCalls = 0;
 
   @override
@@ -30,6 +31,11 @@ class FakeGamesPlatformAdapter implements GamesPlatformAdapter {
 
   @override
   Future<void> showLeaderboards() async => leaderboardUiCalls += 1;
+
+  @override
+  Future<void> showLeaderboard({required String leaderboardId}) async {
+    specificLeaderboardUiCalls.add(leaderboardId);
+  }
 
   @override
   Future<void> showAchievements() async => achievementUiCalls += 1;
@@ -81,6 +87,15 @@ void main() {
     await service.unlockAchievement(achievementId: '');
     await service.unlockAchievement(achievementId: 'ach-first');
     expect(adapter.achievements, <String>['ach-first']);
+  });
+
+  test('specific leaderboard opens exact tournament id', () async {
+    final adapter = FakeGamesPlatformAdapter();
+    final service = PlayGamesService(ids: ids, adapter: adapter);
+
+    await service.showLeaderboard(leaderboardId: 'adventure');
+
+    expect(adapter.specificLeaderboardUiCalls, <String>['adventure']);
   });
 
   test('leaderboard and achievement UI can sign in lazily without throwing', () async {
