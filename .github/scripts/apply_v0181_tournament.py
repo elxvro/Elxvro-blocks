@@ -179,6 +179,7 @@ replace_once(
     "        ),\n"
     "        adventureLeaderboardId = const String.fromEnvironment(\n"
     "          'ELXVRO_PG_ADVENTURE_LEADERBOARD_ID',\n"
+    "          defaultValue: 'CgkI6arsvtAGEAIQBA',\n"
     "        ),\n"
     "        achievementIds = const <String, String>{\n",
 )
