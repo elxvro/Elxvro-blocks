@@ -439,8 +439,7 @@ replace_block(
     "      return;\n"
     "    }\n\n"
     "    await _playVariant(safe, 'clear', 3, 0.72);\n"
-    "  }\n\n"
-    "  Future<void> playCombo(String profile)",
+    "  }\n\n",
 )
 
 replace_once(
