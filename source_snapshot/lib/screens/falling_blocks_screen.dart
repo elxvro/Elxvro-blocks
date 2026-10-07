@@ -5,14 +5,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app_state.dart';
+import '../models/adventure_level.dart';
 import '../models/game_theme.dart';
 import '../services/audio_service.dart';
+import '../services/play_games_service.dart';
 import '../widgets/premium_background.dart';
+import '../widgets/themed_block_tile.dart';
 
 class FallingBlocksScreen extends StatefulWidget {
-  const FallingBlocksScreen({super.key, required this.appState});
+  const FallingBlocksScreen({
+    super.key,
+    required this.appState,
+    this.adventureLevel,
+  });
 
   final AppState appState;
+  final AdventureLevel? adventureLevel;
 
   @override
   State<FallingBlocksScreen> createState() => _FallingBlocksScreenState();
@@ -22,9 +30,10 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
     with WidgetsBindingObserver {
   static const int _rows = 20;
   static const int _cols = 10;
+  static const String _adventureLeaderboardId = 'CgkI6arsvtAGEAIQBA';
 
   final Random _random = Random();
-  late List<List<bool>> _board;
+  late List<List<int>> _board;
   late _FallingPiece _piece;
   late _FallingPiece _nextPiece;
   Timer? _timer;
@@ -37,17 +46,57 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
   bool _paused = false;
   bool _gameOver = false;
   bool _finishing = false;
+  double _dragDx = 0;
+  double _dragDy = 0;
+
+  bool get _isAdventure => widget.adventureLevel != null;
 
   GameThemeData get _theme => gameThemes.firstWhere(
         (theme) => theme.id == widget.appState.themeId,
         orElse: () => gameThemes.first,
       );
 
-  int get _level => 1 + (_lines ~/ 10);
+  int get _arcadeLevel => 1 + (_lines ~/ 10);
+
+  int get _difficultyLevel =>
+      _isAdventure ? widget.adventureLevel!.number : _arcadeLevel;
+
+  int get _targetLines {
+    final level = widget.adventureLevel;
+    if (level == null) return 0;
+    final base = 4 + ((level.number - 1) ~/ 3);
+    return (base + (level.hardPieces ? 2 : 0)).clamp(4, 26).toInt();
+  }
 
   Duration get _fallInterval {
-    final ms = max(125, 620 - (_level - 1) * 48);
+    if (_isAdventure) {
+      final level = widget.adventureLevel!;
+      final chapterPenalty = (level.chapter - 1) * 18;
+      final hardPenalty = level.hardPieces ? 55 : 0;
+      final ms = (690 - level.number * 7 - chapterPenalty - hardPenalty)
+          .clamp(135, 690)
+          .toInt();
+      return Duration(milliseconds: ms);
+    }
+    final ms = max(125, 620 - (_arcadeLevel - 1) * 48);
     return Duration(milliseconds: ms);
+  }
+
+  List<Color> get _palette {
+    const base = <Color>[
+      Color(0xFF62E6FF),
+      Color(0xFF8C7CFF),
+      Color(0xFFFF6F61),
+      Color(0xFFFFC857),
+      Color(0xFF65E889),
+      Color(0xFFFF78C8),
+      Color(0xFF72A7FF),
+    ];
+    final shift = _isAdventure ? widget.adventureLevel!.number % base.length : 0;
+    return List<Color>.generate(base.length, (index) {
+      final source = base[(index + shift) % base.length];
+      return Color.lerp(source, _theme.block, 0.24)!;
+    });
   }
 
   @override
@@ -78,10 +127,13 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
 
   void _reset() {
     _timer?.cancel();
-    _board = List<List<bool>>.generate(
+    _board = List<List<int>>.generate(
       _rows,
-      (_) => List<bool>.filled(_cols, false),
+      (_) => List<int>.filled(_cols, -1),
     );
+    if (_isAdventure) {
+      _seedAdventureBoard();
+    }
     _piece = _randomPiece();
     _nextPiece = _randomPiece();
     _row = 0;
@@ -92,14 +144,36 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
     _paused = false;
     _gameOver = false;
     _finishing = false;
+    _dragDx = 0;
+    _dragDy = 0;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _restartTimer();
     });
   }
 
+  void _seedAdventureBoard() {
+    final level = widget.adventureLevel!;
+    final seeded = Random(level.number * 9173 + 31);
+    final maxRows = (3 + level.chapter).clamp(3, 8);
+    final desired = level.startingBlocks.clamp(0, 28);
+    var placed = 0;
+    var guard = 0;
+
+    while (placed < desired && guard < 500) {
+      guard += 1;
+      final row = _rows - 1 - seeded.nextInt(maxRows);
+      final col = seeded.nextInt(_cols);
+      if (_board[row][col] >= 0) continue;
+      final occupied = _board[row].where((cell) => cell >= 0).length;
+      if (occupied >= _cols - 3) continue;
+      _board[row][col] = seeded.nextInt(7);
+      placed += 1;
+    }
+  }
+
   _FallingPiece _randomPiece() {
     final shape = _shapes[_random.nextInt(_shapes.length)];
-    return _FallingPiece(shape);
+    return _FallingPiece(shape, _random.nextInt(7));
   }
 
   void _restartTimer() {
@@ -117,17 +191,18 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
       final r = row + cell.$1;
       final c = col + cell.$2;
       if (c < 0 || c >= _cols || r >= _rows) return false;
-      if (r >= 0 && _board[r][c]) return false;
+      if (r >= 0 && _board[r][c] >= 0) return false;
     }
     return true;
   }
 
   void _stepDown() {
+    if (_paused || _gameOver || _finishing) return;
     if (_canPlace(_piece, _row + 1, _col)) {
       setState(() => _row += 1);
       return;
     }
-    _lockPiece();
+    unawaited(_lockPiece());
   }
 
   void _move(int delta) {
@@ -169,7 +244,32 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
       _row += distance;
       _score += distance * 2;
     });
-    _lockPiece();
+    unawaited(_lockPiece());
+  }
+
+  void _onPanUpdate(DragUpdateDetails details) {
+    if (_paused || _gameOver || _finishing) return;
+    _dragDx += details.delta.dx;
+    _dragDy += details.delta.dy;
+
+    const horizontalStep = 23.0;
+    if (_dragDx.abs() >= horizontalStep) {
+      final direction = _dragDx > 0 ? 1 : -1;
+      _move(direction);
+      _dragDx = 0;
+    }
+
+    if (_dragDy >= 28) {
+      _stepDown();
+      _dragDy = 0;
+    } else if (_dragDy <= -40) {
+      _dragDy = 0;
+    }
+  }
+
+  void _onPanEnd(DragEndDetails details) {
+    _dragDx = 0;
+    _dragDy = 0;
   }
 
   Future<void> _lockPiece() async {
@@ -184,18 +284,18 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
         continue;
       }
       if (r < _rows && c >= 0 && c < _cols) {
-        _board[r][c] = true;
+        _board[r][c] = _piece.colorIndex;
       }
     }
 
     if (overflow) {
-      await _finish();
+      await _finish(success: false);
       return;
     }
 
     final cleared = <int>[];
     for (var r = 0; r < _rows; r++) {
-      if (_board[r].every((cell) => cell)) cleared.add(r);
+      if (_board[r].every((cell) => cell >= 0)) cleared.add(r);
     }
 
     if (cleared.isNotEmpty) {
@@ -203,7 +303,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
         _board.removeAt(r);
       }
       while (_board.length < _rows) {
-        _board.insert(0, List<bool>.filled(_cols, false));
+        _board.insert(0, List<int>.filled(_cols, -1));
       }
 
       _combo += 1;
@@ -214,7 +314,8 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
         3 => 500,
         _ => 800,
       };
-      _score += (base * _level) + max(0, _combo - 1) * 80;
+      _score += (base * max(1, _difficultyLevel)) +
+          max(0, _combo - 1) * 90;
 
       unawaited(
         AudioService.instance.playClearTier(
@@ -239,13 +340,18 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
       }
     }
 
+    if (_isAdventure && _lines >= _targetLines) {
+      await _finish(success: true);
+      return;
+    }
+
     _piece = _nextPiece;
     _nextPiece = _randomPiece();
     _row = -1;
     _col = ((_cols - _piece.width) ~/ 2).clamp(0, _cols - 1);
 
     if (!_canPlace(_piece, _row, _col)) {
-      await _finish();
+      await _finish(success: false);
       return;
     }
 
@@ -255,30 +361,62 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
     }
   }
 
-  Future<void> _finish() async {
+  Future<void> _finish({required bool success}) async {
     if (_finishing) return;
     _finishing = true;
     _timer?.cancel();
-    await widget.appState.recordFallingBlocksScore(_score);
-    if (!mounted) return;
 
+    var earned = 0;
+    if (_isAdventure && success) {
+      final level = widget.adventureLevel!;
+      earned = await widget.appState.completeAdventureLevel(
+        level: level.number,
+        reward: level.reward,
+        score: _score,
+      );
+
+      final playGames = PlayGamesService.production();
+      unawaited(
+        playGames.submitScore(
+          leaderboardId: _adventureLeaderboardId,
+          score: widget.appState.adventureTournamentScore,
+        ),
+      );
+    } else if (!_isAdventure) {
+      await widget.appState.recordFallingBlocksScore(_score);
+    }
+
+    if (!mounted) return;
     setState(() => _gameOver = true);
-    unawaited(AudioService.instance.playGameOver());
+
+    if (success) {
+      unawaited(AudioService.instance.playReward());
+    } else {
+      unawaited(AudioService.instance.playGameOver());
+    }
 
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
+      builder: (dialogContext) {
+        final adventure = widget.adventureLevel;
+        final canGoNext =
+            success && adventure != null && adventure.number < adventureLevelCount;
+
         return AlertDialog(
           backgroundColor: const Color(0xFF101719),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
-          title: const Text(
-            'DÜŞEN BLOKLAR',
+          title: Text(
+            _isAdventure
+                ? success
+                    ? 'BÖLÜM TAMAMLANDI'
+                    : 'BÖLÜM BAŞARISIZ'
+                : 'DÜŞEN BLOKLAR',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Color(0xFFFFD98B),
+              color: success ? _palette.first : const Color(0xFFFFD98B),
               fontWeight: FontWeight.w900,
-              letterSpacing: 1.6,
+              letterSpacing: 1.4,
             ),
           ),
           content: Column(
@@ -298,7 +436,11 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
               ),
               const SizedBox(height: 14),
               Text(
-                '$_lines çizgi  •  Seviye $_level\nEn iyi: ${widget.appState.fallingBlocksBestScore}',
+                _isAdventure
+                    ? '$_lines/$_targetLines çizgi'
+                        '${earned > 0 ? '  •  +$earned coin' : ''}'
+                    : '$_lines çizgi  •  Seviye $_arcadeLevel\n'
+                        'En iyi: ${widget.appState.fallingBlocksBestScore}',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.white60, height: 1.5),
               ),
@@ -308,21 +450,33 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
           actions: <Widget>[
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop();
+                Navigator.of(dialogContext).pop();
                 Navigator.of(context).pop();
               },
-              child: const Text('MODLAR'),
+              child: Text(_isAdventure ? 'BÖLÜMLER' : 'MODLAR'),
             ),
             FilledButton(
               onPressed: () {
-                Navigator.of(context).pop();
+                Navigator.of(dialogContext).pop();
+                if (canGoNext) {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute<void>(
+                      builder: (_) => FallingBlocksScreen(
+                        appState: widget.appState,
+                        adventureLevel:
+                            adventureLevelFor(adventure.number + 1),
+                      ),
+                    ),
+                  );
+                  return;
+                }
                 setState(_reset);
               },
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFC7863C),
-                foregroundColor: const Color(0xFF160D06),
+                backgroundColor: _palette.first,
+                foregroundColor: const Color(0xFF071014),
               ),
-              child: const Text('TEKRAR OYNA'),
+              child: Text(canGoNext ? 'SONRAKİ' : 'TEKRAR OYNA'),
             ),
           ],
         );
@@ -340,13 +494,13 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
     }
   }
 
-  Set<int> get _activeCells {
-    final result = <int>{};
+  Map<int, int> get _activeCells {
+    final result = <int, int>{};
     for (final cell in _piece.cells) {
       final r = _row + cell.$1;
       final c = _col + cell.$2;
       if (r >= 0 && r < _rows && c >= 0 && c < _cols) {
-        result.add(r * _cols + c);
+        result[r * _cols + c] = _piece.colorIndex;
       }
     }
     return result;
@@ -355,6 +509,8 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
   @override
   Widget build(BuildContext context) {
     final active = _activeCells;
+    final levelAccent = _palette.first;
+
     return Scaffold(
       body: PremiumBackground(
         top: _theme.backgroundTop,
@@ -362,156 +518,134 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
         material: _theme.material,
         accent: _theme.blockAccent,
         child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final boardWidth = min(constraints.maxWidth - 104, 330.0);
-              final cell = boardWidth / _cols;
-              final boardHeight = cell * _rows;
+          child: Column(
+            children: <Widget>[
+              _Header(
+                title: _isAdventure
+                    ? 'MACERA • BÖLÜM ${widget.adventureLevel!.number}'
+                    : 'DÜŞEN BLOKLAR',
+                score: _score,
+                lines: _lines,
+                targetLines: _targetLines,
+                level: _difficultyLevel,
+                accent: levelAccent,
+                paused: _paused,
+                onBack: () => Navigator.of(context).pop(),
+                onPause: _togglePause,
+              ),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final widthByScreen = constraints.maxWidth - 16;
+                    final widthByHeight = constraints.maxHeight / 2;
+                    final boardWidth =
+                        min(widthByScreen, widthByHeight).clamp(220.0, 420.0);
+                    final cell = boardWidth / _cols;
+                    final boardHeight = cell * _rows;
 
-              return Column(
-                children: <Widget>[
-                  _Header(
-                    score: _score,
-                    best: widget.appState.fallingBlocksBestScore,
-                    lines: _lines,
-                    level: _level,
-                    accent: _theme.blockAccent,
-                    paused: _paused,
-                    onBack: () => Navigator.of(context).pop(),
-                    onPause: _togglePause,
-                  ),
-                  Expanded(
-                    child: Center(
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Container(
-                            width: boardWidth,
-                            height: boardHeight,
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: _theme.board.withValues(alpha: 0.94),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: _theme.blockAccent.withValues(alpha: 0.30),
-                              ),
-                              boxShadow: <BoxShadow>[
-                                BoxShadow(
-                                  color: _theme.block.withValues(alpha: 0.20),
-                                  blurRadius: 22,
-                                  spreadRadius: 2,
-                                ),
-                              ],
+                    return Center(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onPanUpdate: _onPanUpdate,
+                        onPanEnd: _onPanEnd,
+                        child: Container(
+                          width: boardWidth,
+                          height: boardHeight,
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: _theme.board.withValues(alpha: 0.91),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: levelAccent.withValues(alpha: 0.42),
+                              width: 1.2,
                             ),
-                            child: GridView.builder(
-                              physics: const NeverScrollableScrollPhysics(),
-                              padding: EdgeInsets.zero,
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: _cols,
+                            boxShadow: <BoxShadow>[
+                              BoxShadow(
+                                color: levelAccent.withValues(alpha: 0.18),
+                                blurRadius: 26,
+                                spreadRadius: 1,
                               ),
-                              itemCount: _rows * _cols,
-                              itemBuilder: (context, index) {
-                                final row = index ~/ _cols;
-                                final col = index % _cols;
-                                final filled = _board[row][col] ||
-                                    active.contains(index);
+                            ],
+                          ),
+                          child: GridView.builder(
+                            physics: const NeverScrollableScrollPhysics(),
+                            padding: EdgeInsets.zero,
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: _cols,
+                            ),
+                            itemCount: _rows * _cols,
+                            itemBuilder: (context, index) {
+                              final row = index ~/ _cols;
+                              final col = index % _cols;
+                              final fixedColor = _board[row][col];
+                              final colorIndex =
+                                  active[index] ?? fixedColor;
+                              final filled = colorIndex >= 0;
+
+                              if (!filled) {
                                 return Container(
-                                  margin: const EdgeInsets.all(0.7),
+                                  margin: const EdgeInsets.all(0.45),
                                   decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(3),
-                                    gradient: filled
-                                        ? LinearGradient(
-                                            begin: Alignment.topLeft,
-                                            end: Alignment.bottomRight,
-                                            colors: <Color>[
-                                              _theme.blockAccent,
-                                              _theme.block,
-                                              Color.lerp(
-                                                _theme.block,
-                                                Colors.black,
-                                                0.22,
-                                              )!,
-                                            ],
-                                          )
-                                        : null,
-                                    color: filled
-                                        ? null
-                                        : _theme.cell.withValues(alpha: 0.34),
+                                    borderRadius: BorderRadius.circular(2.5),
+                                    color: _theme.cell.withValues(alpha: 0.26),
                                     border: Border.all(
-                                      color: filled
-                                          ? Colors.white.withValues(alpha: 0.34)
-                                          : Colors.white.withValues(alpha: 0.035),
-                                      width: filled ? 0.8 : 0.45,
+                                      color: Colors.white.withValues(alpha: 0.025),
+                                      width: 0.45,
                                     ),
-                                    boxShadow: filled
-                                        ? <BoxShadow>[
-                                            BoxShadow(
-                                              color: _theme.block
-                                                  .withValues(alpha: 0.42),
-                                              blurRadius: 4,
-                                            ),
-                                          ]
-                                        : null,
                                   ),
                                 );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          SizedBox(
-                            width: 74,
-                            child: Column(
-                              children: <Widget>[
-                                const Text(
-                                  'SONRAKİ',
-                                  style: TextStyle(
-                                    color: Colors.white38,
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.8,
-                                  ),
+                              }
+
+                              final base =
+                                  _palette[colorIndex % _palette.length];
+                              final accent =
+                                  Color.lerp(base, Colors.white, 0.52)!;
+                              return Padding(
+                                padding: const EdgeInsets.all(0.25),
+                                child: ThemedBlockTile(
+                                  material: _theme.material,
+                                  base: base,
+                                  accent: accent,
                                 ),
-                                const SizedBox(height: 8),
-                                _NextPiece(
-                                  piece: _nextPiece,
-                                  theme: _theme,
-                                ),
-                                const SizedBox(height: 18),
-                                _SideStat(label: 'COMBO', value: 'x$_combo'),
-                                const SizedBox(height: 8),
-                                _SideStat(label: 'HIZ', value: '$_level'),
-                              ],
-                            ),
+                              );
+                            },
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (_paused)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Text(
-                        'DURAKLATILDI',
-                        style: TextStyle(
-                          color: _theme.blockAccent,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.6,
                         ),
                       ),
+                    );
+                  },
+                ),
+              ),
+              if (_paused)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    'DURAKLATILDI',
+                    style: TextStyle(
+                      color: levelAccent,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.6,
                     ),
-                  _Controls(
-                    accent: _theme.blockAccent,
-                    onLeft: () => _move(-1),
-                    onRotate: _rotate,
-                    onRight: () => _move(1),
-                    onDown: _stepDown,
-                    onDrop: _hardDrop,
                   ),
-                ],
-              );
-            },
+                ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 4, 14, 6),
+                child: Text(
+                  'Sağa/sola sürükle • Aşağı kaydır',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.42),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              _Controls(
+                accent: levelAccent,
+                onRotate: _rotate,
+                onDrop: _hardDrop,
+              ),
+            ],
           ),
         ),
       ),
@@ -521,9 +655,10 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
 
 class _Header extends StatelessWidget {
   const _Header({
+    required this.title,
     required this.score,
-    required this.best,
     required this.lines,
+    required this.targetLines,
     required this.level,
     required this.accent,
     required this.paused,
@@ -531,9 +666,10 @@ class _Header extends StatelessWidget {
     required this.onPause,
   });
 
+  final String title;
   final int score;
-  final int best;
   final int lines;
+  final int targetLines;
   final int level;
   final Color accent;
   final bool paused;
@@ -543,7 +679,7 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(6, 4, 6, 6),
+      padding: const EdgeInsets.fromLTRB(4, 2, 4, 4),
       child: Row(
         children: <Widget>[
           IconButton(
@@ -554,16 +690,19 @@ class _Header extends StatelessWidget {
             child: Column(
               children: <Widget>[
                 Text(
-                  'DÜŞEN BLOKLAR',
+                  title,
                   style: TextStyle(
                     color: accent,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5,
+                    letterSpacing: 1.25,
+                    fontSize: 13,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'SKOR $score  •  REKOR $best  •  ÇİZGİ $lines  •  SV $level',
+                  targetLines > 0
+                      ? 'SKOR $score  •  ÇİZGİ $lines/$targetLines  •  ZORLUK $level'
+                      : 'SKOR $score  •  ÇİZGİ $lines  •  HIZ $level',
                   style: const TextStyle(
                     color: Colors.white54,
                     fontSize: 8,
@@ -589,37 +728,50 @@ class _Header extends StatelessWidget {
 class _Controls extends StatelessWidget {
   const _Controls({
     required this.accent,
-    required this.onLeft,
     required this.onRotate,
-    required this.onRight,
-    required this.onDown,
     required this.onDrop,
   });
 
   final Color accent;
-  final VoidCallback onLeft;
   final VoidCallback onRotate;
-  final VoidCallback onRight;
-  final VoidCallback onDown;
   final VoidCallback onDrop;
 
   @override
   Widget build(BuildContext context) {
-    Widget button(IconData icon, VoidCallback onTap, {bool emphasized = false}) {
+    Widget button(
+      IconData icon,
+      String label,
+      VoidCallback onTap, {
+      bool emphasized = false,
+    }) {
       return Expanded(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 3),
+          padding: const EdgeInsets.symmetric(horizontal: 5),
           child: Material(
             color: emphasized
-                ? accent.withValues(alpha: 0.20)
-                : Colors.white.withValues(alpha: 0.055),
-            borderRadius: BorderRadius.circular(16),
+                ? accent.withValues(alpha: 0.24)
+                : Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(18),
             child: InkWell(
               onTap: onTap,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(18),
               child: SizedBox(
-                height: 54,
-                child: Icon(icon, color: accent, size: 25),
+                height: 58,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    Icon(icon, color: accent, size: 25),
+                    const SizedBox(width: 7),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: accent,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -628,108 +780,27 @@ class _Controls extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+      padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
       child: Row(
         children: <Widget>[
-          button(Icons.arrow_left_rounded, onLeft),
-          button(Icons.rotate_right_rounded, onRotate),
-          button(Icons.arrow_right_rounded, onRight),
-          button(Icons.arrow_downward_rounded, onDown),
-          button(Icons.vertical_align_bottom_rounded, onDrop, emphasized: true),
-        ],
-      ),
-    );
-  }
-}
-
-class _SideStat extends StatelessWidget {
-  const _SideStat({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 9),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: <Widget>[
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-              fontSize: 13,
-            ),
-          ),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white38,
-              fontSize: 7,
-              fontWeight: FontWeight.w800,
-            ),
+          button(Icons.rotate_right_rounded, 'DÖNDÜR', onRotate),
+          button(
+            Icons.vertical_align_bottom_rounded,
+            'HIZLI İNDİR',
+            onDrop,
+            emphasized: true,
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _NextPiece extends StatelessWidget {
-  const _NextPiece({required this.piece, required this.theme});
-
-  final _FallingPiece piece;
-  final GameThemeData theme;
-
-  @override
-  Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: 1,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final cellSize = constraints.maxWidth / 5;
-          return Stack(
-            alignment: Alignment.center,
-            children: <Widget>[
-              for (final cell in piece.cells)
-                Positioned(
-                  left: (cell.$2 + (5 - piece.width) / 2) * cellSize,
-                  top: (cell.$1 + (5 - piece.height) / 2) * cellSize,
-                  width: cellSize - 1,
-                  height: cellSize - 1,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(3),
-                      gradient: LinearGradient(
-                        colors: <Color>[theme.blockAccent, theme.block],
-                      ),
-                      boxShadow: <BoxShadow>[
-                        BoxShadow(
-                          color: theme.block.withValues(alpha: 0.35),
-                          blurRadius: 4,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          );
-        },
       ),
     );
   }
 }
 
 class _FallingPiece {
-  const _FallingPiece(this.cells);
+  const _FallingPiece(this.cells, this.colorIndex);
 
   final List<(int, int)> cells;
+  final int colorIndex;
 
   int get width {
     var maxCol = 0;
@@ -763,6 +834,7 @@ class _FallingPiece {
       rotated
           .map((cell) => (cell.$1 - minRow, cell.$2 - minCol))
           .toList(growable: false),
+      colorIndex,
     );
   }
 }
