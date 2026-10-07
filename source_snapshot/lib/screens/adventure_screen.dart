@@ -5,7 +5,7 @@ import '../models/adventure_level.dart';
 import '../models/game_theme.dart';
 import '../widgets/coin_badge.dart';
 import '../widgets/premium_background.dart';
-import 'game_screen.dart';
+import 'falling_blocks_screen.dart';
 
 class AdventureScreen extends StatelessWidget {
   const AdventureScreen({super.key, required this.appState});
@@ -105,7 +105,7 @@ class AdventureScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Her 3. bölüm hız, her 5. bölüm zor görevdir. İlk tamamlamada coin kazanırsın.',
+                            'Düşen blok macerası: her bölüm hızlanır, hedef büyür ve renk paleti değişir. İlk tamamlamada coin kazanırsın.',
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.52),
                               fontSize: 10,
@@ -142,7 +142,7 @@ class AdventureScreen extends StatelessWidget {
                               ? () async {
                                   await Navigator.of(context).push(
                                     MaterialPageRoute<void>(
-                                      builder: (_) => GameScreen(
+                                      builder: (_) => FallingBlocksScreen(
                                         appState: appState,
                                         adventureLevel: level,
                                       ),
@@ -246,7 +246,7 @@ class _AdventureLevelCard extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                '${level.targetScore}',
+                '${(4 + ((level.number - 1) ~/ 3) + (level.hardPieces ? 2 : 0)).clamp(4, 26)}',
                 style: TextStyle(
                   color: foreground,
                   fontSize: 12,
@@ -254,9 +254,7 @@ class _AdventureLevelCard extends StatelessWidget {
                 ),
               ),
               Text(
-                level.durationSeconds == null
-                    ? 'PUAN'
-                    : '${level.durationSeconds} SN',
+                'ÇİZGİ',
                 style: TextStyle(
                   color: unlocked ? Colors.white38 : Colors.white.withValues(alpha: 0.18),
                   fontSize: 8,
