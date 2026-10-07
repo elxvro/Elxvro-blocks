@@ -136,6 +136,21 @@ replace_block(
 """,
 )
 
+# Prewarm processed material break layers to avoid a first-hit latency spike.
+replace_once(
+    'lib/services/audio_service.dart',
+    "      'audio/menu_fun_v3.wav',\n"
+    "    ]) {\n",
+    "      'audio/menu_fun_v3.wav',\n"
+    "      'audio/pro_glass_break.wav',\n"
+    "      'audio/pro_crystal_break.wav',\n"
+    "      'audio/pro_wood_break.wav',\n"
+    "      'audio/pro_leaf_break.wav',\n"
+    "      'audio/pro_stone_break.wav',\n"
+    "      'audio/pro_marble_break.wav',\n"
+    "    ]) {\n",
+)
+
 # Modes: every card gets a live material mini-board instead of a flat icon tile.
 replace_once(
     'lib/screens/modes_screen.dart',
@@ -271,6 +286,12 @@ replace_once(
 }
 
 class _Badge extends StatelessWidget {""",
+)
+
+replace_once(
+    'lib/screens/modes_screen.dart',
+    "                            'Sürükleyerek kontrol et; her bölüm hızlanır, hedef ve renk düzeni değişir.',\n",
+    "                            'Her bölümde puan hedefi yükselir; hız, başlangıç zorluğu ve renk paleti değişir.',\n",
 )
 
 # Theme screen copy and live preview become more material-focused.
