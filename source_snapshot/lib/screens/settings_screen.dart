@@ -184,7 +184,7 @@ class SettingsScreen extends StatelessWidget {
                               ),
                               SizedBox(height: 8),
                               Text(
-                                'v0.18.0  •  Adventure + Daily 2.0',
+                                'v0.18.1  •  Adventure Tournament',
                                 style: TextStyle(color: Colors.white54),
                               ),
                               SizedBox(height: 6),
