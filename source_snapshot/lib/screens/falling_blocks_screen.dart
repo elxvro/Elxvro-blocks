@@ -64,19 +64,13 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
   int get _targetLines {
     final level = widget.adventureLevel;
     if (level == null) return 0;
-    final base = 4 + ((level.number - 1) ~/ 3);
-    return (base + (level.hardPieces ? 2 : 0)).clamp(4, 26).toInt();
+    return level.fallingTargetLines;
   }
 
   Duration get _fallInterval {
     if (_isAdventure) {
       final level = widget.adventureLevel!;
-      final chapterPenalty = (level.chapter - 1) * 18;
-      final hardPenalty = level.hardPieces ? 55 : 0;
-      final ms = (690 - level.number * 7 - chapterPenalty - hardPenalty)
-          .clamp(135, 690)
-          .toInt();
-      return Duration(milliseconds: ms);
+      return Duration(milliseconds: level.fallingIntervalMs);
     }
     final ms = max(125, 620 - (_arcadeLevel - 1) * 48);
     return Duration(milliseconds: ms);
