@@ -246,7 +246,7 @@ class _AdventureLevelCard extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                '${(4 + ((level.number - 1) ~/ 3) + (level.hardPieces ? 2 : 0)).clamp(4, 26)}',
+                '${level.fallingTargetLines}',
                 style: TextStyle(
                   color: foreground,
                   fontSize: 12,
