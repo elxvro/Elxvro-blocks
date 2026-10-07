@@ -43,6 +43,9 @@ replace_once(
     "    'audio/bgm_magic_puzzle.ogg',\n"
     "    'audio/bgm_cozy_puzzle_3.ogg',\n"
     "    'audio/bgm_out_in_space.ogg',\n"
+    "    'audio/bgm_calm_4.ogg',\n"
+    "    'audio/bgm_calm_5.ogg',\n"
+    "    'audio/bgm_calm_6.ogg',\n"
     "  ];\n",
     "  static const List<String> _musicTracks = <String>[\n"
     "    'audio/bgm_magic_puzzle.ogg',\n"
