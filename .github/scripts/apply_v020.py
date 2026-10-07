@@ -149,9 +149,9 @@ replace_once(
 
 replace_once(
     'lib/services/audio_service.dart',
-    "      'audio/ui_tap_v\$variant.wav',\n"
+    "      'audio/ui_tap_v$variant.wav',\n"
     "      (_uiVolume * 0.68).clamp(0.0, 1.0).toDouble(),\n",
-    "      'audio/menu_fun_v\$variant.wav',\n"
+    "      'audio/menu_fun_v$variant.wav',\n"
     "      (_uiVolume * 0.76).clamp(0.0, 1.0).toDouble(),\n",
 )
 
