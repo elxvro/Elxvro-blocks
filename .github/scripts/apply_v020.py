@@ -103,15 +103,15 @@ replace_block(
     "    await Future<void>.delayed(fractureDelay);\n"
     "    unawaited(_play(breakAsset, strong ? 0.94 : medium ? 0.78 : 0.58));\n\n"
     "    if (strong) {\n"
-    "      unawaited(_play('audio/\${safe}_combo.wav', 0.86));\n"
+    "      unawaited(_play('audio/${safe}_combo.wav', 0.86));\n"
     "      await Future<void>.delayed(const Duration(milliseconds: 62));\n"
     "      final firework = 1 + _random.nextInt(3);\n"
-    "      await _play('audio/firework_combo_v\$firework.wav', 0.92);\n"
+    "      await _play('audio/firework_combo_v$firework.wav', 0.92);\n"
     "      return;\n"
     "    }\n\n"
     "    if (medium && combo >= 3) {\n"
     "      final firework = 1 + _random.nextInt(3);\n"
-    "      await _play('audio/firework_combo_v\$firework.wav', 0.70);\n"
+    "      await _play('audio/firework_combo_v$firework.wav', 0.70);\n"
     "    }\n"
     "  }\n\n",
 )
@@ -119,12 +119,12 @@ replace_block(
 replace_once(
     'lib/services/audio_service.dart',
     "  Future<void> playCombo(String profile) =>\n"
-    "      _play('audio/\${_safeProfile(profile)}_combo.wav', 0.74);\n",
+    "      _play('audio/${_safeProfile(profile)}_combo.wav', 0.74);\n",
     "  Future<void> playCombo(String profile) async {\n"
     "    final safe = _safeProfile(profile);\n"
-    "    unawaited(_play('audio/\${safe}_combo.wav', 0.82));\n"
+    "    unawaited(_play('audio/${safe}_combo.wav', 0.82));\n"
     "    final firework = 1 + _random.nextInt(3);\n"
-    "    await _play('audio/firework_combo_v\$firework.wav', 0.68);\n"
+    "    await _play('audio/firework_combo_v$firework.wav', 0.68);\n"
     "  }\n",
 )
 
