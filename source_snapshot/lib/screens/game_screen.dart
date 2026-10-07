@@ -1362,7 +1362,7 @@ class _GameScreenState extends State<GameScreen>
               actions: <Widget>[
                 TextButton(
                   onPressed: () => Navigator.of(context).pop('home'),
-                  child: Text(adventure != null ? 'BÖLÜMLER' : 'ANA MENÜ'),
+                  child: Text(widget.adventureLevel != null ? 'BÖLÜMLER' : 'ANA MENÜ'),
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop('restart'),
