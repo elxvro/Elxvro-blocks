@@ -67,12 +67,6 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
     return level.fallingTargetScore;
   }
 
-  int get _targetLines {
-    final level = widget.adventureLevel;
-    if (level == null) return 0;
-    return level.fallingTargetLines;
-  }
-
   Duration get _fallInterval {
     if (_isAdventure) {
       final level = widget.adventureLevel!;
