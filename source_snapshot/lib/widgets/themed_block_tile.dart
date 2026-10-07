@@ -61,7 +61,11 @@ class _Premium3DBlockPainter extends CustomPainter {
     );
 
     _paintContactShadow(canvas, size, depth);
-    _paintDepthFaces(canvas, size, depth);
+    if (material != ThemeMaterial.glass &&
+        material != ThemeMaterial.crystal &&
+        material != ThemeMaterial.leaf) {
+      _paintDepthFaces(canvas, size, depth);
+    }
 
     canvas.save();
     canvas.translate(0, 0);
@@ -554,100 +558,138 @@ class _Premium3DBlockPainter extends CustomPainter {
   }
 
   void _glass(Canvas canvas, Size size) {
-    final rr = _topRRect(size, radiusFactor: 0.20);
-    canvas.drawRRect(
-      rr,
-      _gradient(size, <Color>[
-        Colors.white.withValues(alpha: 0.38),
-        accent.withValues(alpha: 0.82),
-        base.withValues(alpha: 0.58),
-        const Color(0xFF0B425E).withValues(alpha: 0.88),
-      ]),
-    );
-    canvas.drawRRect(
-      rr,
+    final w = size.width;
+    final h = size.height;
+    final pane = Path()
+      ..moveTo(w * 0.10, h * 0.05)
+      ..lineTo(w * 0.88, h * 0.09)
+      ..lineTo(w * 0.95, h * 0.78)
+      ..lineTo(w * 0.78, h * 0.94)
+      ..lineTo(w * 0.08, h * 0.88)
+      ..lineTo(w * 0.04, h * 0.23)
+      ..close();
+
+    canvas.drawPath(
+      pane,
       Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = math.max(1, size.shortestSide * 0.055)
-        ..color = Colors.white.withValues(alpha: 0.68),
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            Colors.white.withValues(alpha: 0.58),
+            accent.withValues(alpha: 0.40),
+            base.withValues(alpha: 0.28),
+            const Color(0xFF0A3B55).withValues(alpha: 0.58),
+          ],
+        ).createShader(Offset.zero & size),
     );
 
-    final inner = RRect.fromRectAndRadius(
-      Rect.fromLTWH(
-        size.width * 0.10,
-        size.height * 0.11,
-        size.width * 0.73,
-        size.height * 0.69,
-      ),
-      Radius.circular(size.shortestSide * 0.11),
-    );
-    canvas.drawRRect(
-      inner,
+    canvas.drawPath(
+      pane,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = math.max(0.7, size.shortestSide * 0.022)
-        ..color = Colors.white.withValues(alpha: 0.24),
+        ..strokeWidth = math.max(0.9, size.shortestSide * 0.040)
+        ..color = Colors.white.withValues(alpha: 0.72),
     );
 
-    canvas.drawCircle(
-      Offset(size.width * 0.74, size.height * 0.67),
-      size.shortestSide * 0.075,
+    final refraction = Path()
+      ..moveTo(w * 0.16, h * 0.26)
+      ..lineTo(w * 0.76, h * 0.16)
+      ..lineTo(w * 0.48, h * 0.55)
+      ..lineTo(w * 0.82, h * 0.70);
+    canvas.drawPath(
+      refraction,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(0.55, size.shortestSide * 0.020)
+        ..color = Colors.white.withValues(alpha: 0.30),
+    );
+
+    canvas.drawOval(
+      Rect.fromLTWH(w * 0.18, h * 0.12, w * 0.45, h * 0.16),
       Paint()
         ..shader = RadialGradient(
           colors: <Color>[
-            Colors.white.withValues(alpha: 0.48),
-            accent.withValues(alpha: 0.04),
+            Colors.white.withValues(alpha: 0.34),
+            Colors.transparent,
           ],
-        ).createShader(
-          Rect.fromCircle(
-            center: Offset(size.width * 0.74, size.height * 0.67),
-            radius: size.shortestSide * 0.11,
-          ),
-        ),
+        ).createShader(Rect.fromLTWH(w * 0.18, h * 0.12, w * 0.45, h * 0.16)),
     );
   }
 
   void _wood(Canvas canvas, Size size) {
-    final rr = _topRRect(size, radiusFactor: 0.13);
+    final rect = Rect.fromLTWH(
+      size.width * 0.04,
+      size.height * 0.10,
+      size.width * 0.90,
+      size.height * 0.78,
+    );
+    final rr = RRect.fromRectAndRadius(
+      rect,
+      Radius.circular(size.shortestSide * 0.30),
+    );
+
     canvas.drawRRect(
       rr,
-      _gradient(size, <Color>[
-        Color.lerp(accent, Colors.white, 0.18)!,
-        base,
-        const Color(0xFF7C421B),
-        const Color(0xFF48220E),
-      ]),
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            const Color(0xFFFFC47A),
+            base,
+            const Color(0xFF8A4C22),
+            const Color(0xFF4C250F),
+          ],
+        ).createShader(rect),
+    );
+
+    canvas.drawRRect(
+      rr,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(1.0, size.shortestSide * 0.045)
+        ..color = const Color(0xFF4A210C).withValues(alpha: 0.72),
     );
 
     final grain = Paint()
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = math.max(0.55, size.shortestSide * 0.023)
-      ..color = const Color(0xFF3F1E0D).withValues(alpha: 0.58);
+      ..strokeWidth = math.max(0.55, size.shortestSide * 0.020)
+      ..color = const Color(0xFF4D260F).withValues(alpha: 0.58);
 
-    for (var i = 0; i < 5; i++) {
-      final y = size.height * (0.17 + i * 0.15);
+    for (var i = 0; i < 4; i++) {
+      final y = rect.top + rect.height * (0.22 + i * 0.18);
       final path = Path()
-        ..moveTo(size.width * 0.07, y)
+        ..moveTo(rect.left + rect.width * 0.08, y)
         ..cubicTo(
-          size.width * 0.25,
-          y - size.height * 0.07,
-          size.width * 0.52,
-          y + size.height * 0.08,
-          size.width * 0.91,
+          rect.left + rect.width * 0.30,
+          y - size.height * 0.06,
+          rect.left + rect.width * 0.58,
+          y + size.height * 0.05,
+          rect.right - rect.width * 0.07,
           y - size.height * 0.015,
         );
       canvas.drawPath(path, grain);
     }
 
-    final knot = Offset(size.width * 0.67, size.height * 0.50);
+    final knot = Offset(rect.left + rect.width * 0.68, rect.center.dy);
     canvas.drawOval(
       Rect.fromCenter(
         center: knot,
-        width: size.width * 0.23,
-        height: size.height * 0.16,
+        width: rect.width * 0.22,
+        height: rect.height * 0.20,
       ),
-      grain..strokeWidth = math.max(0.8, size.shortestSide * 0.028),
+      grain..strokeWidth = math.max(0.85, size.shortestSide * 0.028),
+    );
+
+    canvas.drawLine(
+      Offset(rect.left + rect.width * 0.12, rect.top + rect.height * 0.18),
+      Offset(rect.left + rect.width * 0.34, rect.top - size.height * 0.02),
+      Paint()
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = math.max(1.2, size.shortestSide * 0.055)
+        ..color = const Color(0xFF6B3718).withValues(alpha: 0.76),
     );
   }
 
@@ -695,41 +737,64 @@ class _Premium3DBlockPainter extends CustomPainter {
   }
 
   void _leaf(Canvas canvas, Size size) {
-    final rr = _topRRect(size, radiusFactor: 0.22);
-    canvas.drawRRect(
-      rr,
-      _gradient(size, <Color>[
-        const Color(0xFFB8FF8F),
-        accent,
-        base,
-        const Color(0xFF0F5E2E),
-      ]),
+    final w = size.width;
+    final h = size.height;
+    final leaf = Path()
+      ..moveTo(w * 0.12, h * 0.58)
+      ..cubicTo(w * 0.18, h * 0.16, w * 0.64, h * 0.03, w * 0.91, h * 0.16)
+      ..cubicTo(w * 0.93, h * 0.52, w * 0.67, h * 0.88, w * 0.27, h * 0.90)
+      ..cubicTo(w * 0.19, h * 0.82, w * 0.13, h * 0.70, w * 0.12, h * 0.58)
+      ..close();
+
+    canvas.drawPath(
+      leaf,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            const Color(0xFFD8FFA8),
+            accent,
+            base,
+            const Color(0xFF0F5E2E),
+          ],
+        ).createShader(Offset.zero & size),
     );
 
     final vein = Paint()
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = math.max(0.7, size.shortestSide * 0.026)
-      ..color = const Color(0xFFE4FFC8).withValues(alpha: 0.46);
+      ..strokeWidth = math.max(0.7, size.shortestSide * 0.024)
+      ..color = const Color(0xFFE9FFD2).withValues(alpha: 0.52);
 
-    final a = Offset(size.width * 0.18, size.height * 0.80);
-    final b = Offset(size.width * 0.78, size.height * 0.20);
+    final a = Offset(w * 0.24, h * 0.79);
+    final b = Offset(w * 0.78, h * 0.22);
     canvas.drawLine(a, b, vein);
-    for (var i = 1; i <= 3; i++) {
-      final t = i / 4;
-      final x = a.dx + (b.dx - a.dx) * t;
-      final y = a.dy + (b.dy - a.dy) * t;
+    for (var i = 1; i <= 4; i++) {
+      final t = i / 5;
+      final p = Offset(
+        a.dx + (b.dx - a.dx) * t,
+        a.dy + (b.dy - a.dy) * t,
+      );
       canvas.drawLine(
-        Offset(x, y),
-        Offset(x - size.width * 0.14, y - size.height * 0.02),
+        p,
+        Offset(p.dx - w * 0.13, p.dy - h * 0.03),
         vein,
       );
       canvas.drawLine(
-        Offset(x, y),
-        Offset(x + size.width * 0.11, y + size.height * 0.10),
+        p,
+        Offset(p.dx + w * 0.11, p.dy + h * 0.09),
         vein,
       );
     }
+
+    canvas.drawPath(
+      leaf,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(0.7, size.shortestSide * 0.026)
+        ..color = Colors.white.withValues(alpha: 0.20),
+    );
   }
 
   void _crystal(Canvas canvas, Size size) {
