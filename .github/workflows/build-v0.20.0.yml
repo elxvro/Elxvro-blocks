@@ -8,6 +8,7 @@ on:
       - "source_snapshot/**"
       - ".github/scripts/apply_v017.py"
       - ".github/scripts/apply_max_impact.py"
+      - ".github/scripts/apply_max_impact_v020.py"
       - ".github/scripts/apply_v0181_tournament.py"
       - ".github/scripts/apply_v019.py"
       - ".github/scripts/apply_v020.py"
@@ -75,7 +76,7 @@ jobs:
             extracted/elxvro-blocks-v0.10.1/lib/screens/settings_screen.dart
 
       - name: Apply Smooth MAX IMPACT optimization
-        run: python .github/scripts/apply_max_impact.py extracted/elxvro-blocks-v0.10.1
+        run: python .github/scripts/apply_max_impact_v020.py extracted/elxvro-blocks-v0.10.1
 
       - name: Apply Adventure Tournament update
         run: python .github/scripts/apply_v0181_tournament.py extracted/elxvro-blocks-v0.10.1
