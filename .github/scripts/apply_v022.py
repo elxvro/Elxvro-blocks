@@ -525,8 +525,18 @@ replace_once(
 )
 replace_once(
     'lib/screens/falling_blocks_screen.dart',
-    "          button(Icons.vertical_align_bottom_rounded, 'HIZLI İNDİR', onDrop,",
-    "          button(Icons.vertical_align_bottom_rounded, l.t('falling.drop'), onDrop,",
+    """          button(
+            Icons.vertical_align_bottom_rounded,
+            'HIZLI İNDİR',
+            onDrop,
+            emphasized: true,
+          ),""",
+    """          button(
+            Icons.vertical_align_bottom_rounded,
+            l.t('falling.drop'),
+            onDrop,
+            emphasized: true,
+          ),""",
 )
 
 # ---------------------------------------------------------------------------
