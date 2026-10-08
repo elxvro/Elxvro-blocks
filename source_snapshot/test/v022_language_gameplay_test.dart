@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
+import 'dart:io';\n\nimport 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:elxvro_blocks/app_state.dart';
@@ -31,6 +31,13 @@ void main() {
     expect(const AppStrings('tr').t('home.play'), 'OYNA');
     expect(const AppStrings('en').t('home.play'), 'PLAY');
     expect(const AppStrings('en').t('falling.rotate'), 'ROTATE');
+  });
+
+  test('v0.22 build patch enlarges both gameplay boards', () {
+    final patch = File('../../.github/scripts/apply_v022.py').readAsStringSync();
+    expect(patch, contains('constraints.maxWidth - 12'));
+    expect(patch, contains('clamp(228.0, 448.0)'));
+    expect(patch, contains('GameplayBackground'));
   });
 
   testWidgets('gameplay background renders for themed gameplay', (tester) async {
