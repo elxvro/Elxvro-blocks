@@ -23,6 +23,7 @@ class AppState extends ChangeNotifier {
   static const String _uiVolumeKey = 'ui_volume';
   static const String _hapticsEnabledKey = 'haptics_enabled';
   static const String _performanceModeKey = 'performance_mode';
+  static const String _languageCodeKey = 'language_code';
 
   static const String _coinsKey = 'coins';
   static const String _rewardClaimDateKey = 'reward_claim_date';
@@ -105,6 +106,7 @@ class AppState extends ChangeNotifier {
   Timer? _uiVolumeSaveTimer;
   bool hapticsEnabled = true;
   bool performanceMode = false;
+  String languageCode = 'tr';
   bool isLoaded = false;
 
   static const int weeklyGoal = 25000;
@@ -280,6 +282,8 @@ class AppState extends ChangeNotifier {
       uiVolume = (savedUiVolume == null || (savedUiVolume - 0.72).abs() < 0.0001 ? 0.66 : savedUiVolume).clamp(0.0, 1.0).toDouble();
       hapticsEnabled = prefs.getBool(_hapticsEnabledKey) ?? true;
       performanceMode = prefs.getBool(_performanceModeKey) ?? false;
+      final savedLanguage = prefs.getString(_languageCodeKey) ?? 'tr';
+      languageCode = savedLanguage == 'en' ? 'en' : 'tr';
       xp = prefs.getInt(_xpKey) ?? 0;
       perfectClears = prefs.getInt(_perfectClearsKey) ?? 0;
       tutorialCompleted = prefs.getBool(_tutorialCompletedKey) ?? false;
@@ -536,6 +540,19 @@ class AppState extends ChangeNotifier {
       debugPrint('ELXVRO theme unlock save failed: $error');
     }
     return true;
+  }
+
+  Future<void> setLanguage(String code) async {
+    final normalized = code == 'en' ? 'en' : 'tr';
+    if (languageCode == normalized) return;
+    languageCode = normalized;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_languageCodeKey, languageCode);
+    } catch (error) {
+      debugPrint('ELXVRO language setting save failed: $error');
+    }
   }
 
   Future<void> setSoundEnabled(bool value) async {
