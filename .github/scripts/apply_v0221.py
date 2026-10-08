@@ -106,11 +106,15 @@ replace_if(rel, "      builder: (context, _) {\n        final selectedTheme", " 
 deconst_dynamic(rel)
 replace_if(rel, "'BAŞARIMLAR'", "l.f('BAŞARIMLAR', 'ACHIEVEMENTS')")
 replace_if(rel, "'${appState.unlockedAchievements}/${_items.length} açıldı'", "l.f('${appState.unlockedAchievements}/${_items.length} açıldı', '${appState.unlockedAchievements}/${_items.length} unlocked')")
-replace_if(rel, "title: item.title,", "title: _achievementTitle(item.id, item.title, l),")
-replace_if(rel, "subtitle: item.subtitle,", "subtitle: _achievementSubtitle(item.id, item.subtitle, l),")
+replace_if(rel, "                          accent: selectedTheme.blockAccent,\n", "                          accent: selectedTheme.blockAccent,\n                          languageCode: appState.languageCode,\n")
 replace_if(rel, "'+${item.reward} coin kazandın.'", "l.f('+${item.reward} coin kazandın.', '+${item.reward} coins earned.')")
+replace_if(rel, "    required this.accent,\n    required this.onClaim,", "    required this.accent,\n    required this.languageCode,\n    required this.onClaim,")
+replace_if(rel, "  final Color accent;\n  final VoidCallback onClaim;", "  final Color accent;\n  final String languageCode;\n  final VoidCallback onClaim;")
+replace_if(rel, "  Widget build(BuildContext context) {\n    return Container(", "  Widget build(BuildContext context) {\n    final l = AppStrings(languageCode);\n    return Container(")
+replace_if(rel, "                  item.title,", "                  _achievementTitle(item.id, item.title, l),")
+replace_if(rel, "                  item.subtitle,", "                  _achievementSubtitle(item.id, item.subtitle, l),")
 text=read(rel)
-if '_achievementTitle(' not in text:
+if '_achievementTitle(item.id' not in text:
     raise SystemExit('achievement display patch missing')
 if 'String _achievementTitle' not in text:
     text += """
