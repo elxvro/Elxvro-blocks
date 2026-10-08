@@ -1,0 +1,508 @@
+name: ELXVRO Blocks v0.22.0 Languages Themed Gameplay Signed APK + AAB
+
+on:
+  push:
+    branches:
+      - release-v0.22.0
+    paths:
+      - "source_snapshot/**"
+      - ".github/scripts/apply_v017.py"
+      - ".github/scripts/apply_max_impact.py"
+      - ".github/scripts/apply_max_impact_v020.py"
+      - ".github/scripts/apply_v0181_tournament.py"
+      - ".github/scripts/apply_v019.py"
+      - ".github/scripts/apply_v020.py"
+      - ".github/scripts/apply_v021.py"
+      - ".github/scripts/apply_v022.py"
+      - ".github/workflows/build-v0.22.0.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter 3.47.4
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.4'
+          channel: stable
+          cache: true
+
+      - name: Extract original ELXVRO Blocks
+        run: |
+          set -euo pipefail
+          test -f elxvro-blocks-v0.10.1.zip
+          unzip -t elxvro-blocks-v0.10.1.zip
+          rm -rf extracted
+          mkdir extracted
+          unzip -q elxvro-blocks-v0.10.1.zip -d extracted
+          test -d extracted/elxvro-blocks-v0.10.1
+
+      - name: Restore current source and tests
+        run: |
+          set -euo pipefail
+          APP=extracted/elxvro-blocks-v0.10.1
+          rm -rf "$APP/lib"
+          cp -a source_snapshot/lib "$APP/lib"
+          cp source_snapshot/pubspec.yaml "$APP/pubspec.yaml"
+          if [ -d source_snapshot/test ]; then
+            mkdir -p "$APP/test"
+            cp -a source_snapshot/test/. "$APP/test/"
+          fi
+          if [ -f "$APP/test/real_material_audio_test.dart" ]; then
+            sed -i 's/version: 0.10.1+27/version: 0.22.0+45/g' "$APP/test/real_material_audio_test.dart"
+          fi
+          grep -F 'version: 0.22.0+45' "$APP/pubspec.yaml"
+          grep -F "defaultValue: 'CgkI6arsvtAGEAIQAw'" "$APP/lib/services/play_games_ids.dart"
+          grep -F "defaultValue: 'CgkI6arsvtAGEAIQAg'" "$APP/lib/services/play_games_ids.dart"
+
+      - name: Apply v0.17 integration update
+        run: |
+          set -euo pipefail
+          python .github/scripts/apply_v017.py extracted/elxvro-blocks-v0.10.1
+          sed -i 's/v0.10.1  •  2D FX Engine/v0.22.0  •  Languages + Themed Gameplay/g' \
+            extracted/elxvro-blocks-v0.10.1/lib/screens/settings_screen.dart
+
+      - name: Apply Smooth MAX IMPACT optimization
+        run: python .github/scripts/apply_max_impact_v020.py extracted/elxvro-blocks-v0.10.1
+
+      - name: Apply Adventure Tournament update
+        run: python .github/scripts/apply_v0181_tournament.py extracted/elxvro-blocks-v0.10.1
+
+      - name: Apply v0.19 themes audio and Falling Blocks
+        run: python .github/scripts/apply_v019.py extracted/elxvro-blocks-v0.10.1
+
+      - name: Apply v0.20 Falling Adventure and Audio 4.0
+        run: python .github/scripts/apply_v020.py extracted/elxvro-blocks-v0.10.1
+
+      - name: Apply v0.21 Real Materials Adventure 2.0 and Audio 5.0
+        run: python .github/scripts/apply_v021.py extracted/elxvro-blocks-v0.10.1
+
+      - name: Apply v0.22 Languages and Themed Gameplay
+        run: python .github/scripts/apply_v022.py extracted/elxvro-blocks-v0.10.1
+
+      - name: Generate Android platform
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: |
+          flutter create \
+            --platforms=android \
+            --org com.elxvro \
+            --project-name elxvro_blocks \
+            .
+
+      - name: Apply Android branding
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: python tool/apply_android_branding.py
+
+      - name: Configure live Play Games app id
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        env:
+          PG_APP_ID: '227765065065'
+        run: |
+          set -euo pipefail
+          mkdir -p android/app/src/main/res/values
+          cat > android/app/src/main/res/values/elxvro_play_games.xml <<EOF
+          <resources>
+              <string name="elxvro_play_games_app_id" translatable="false">${PG_APP_ID}</string>
+          </resources>
+          EOF
+          python - <<'PY'
+          from pathlib import Path
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          text = manifest.read_text()
+          needle = '</application>'
+          meta = '        <meta-data android:name="com.google.android.gms.games.APP_ID" android:value="@string/elxvro_play_games_app_id" />\n'
+          if text.count(needle) != 1:
+              raise SystemExit('AndroidManifest application anchor mismatch')
+          if 'com.google.android.gms.games.APP_ID' not in text:
+              text = text.replace(needle, meta + '    ' + needle, 1)
+          manifest.write_text(text)
+          PY
+          grep -F '227765065065' android/app/src/main/res/values/elxvro_play_games.xml
+          grep -F 'com.google.android.gms.games.APP_ID' android/app/src/main/AndroidManifest.xml
+
+      - name: Configure mandatory release signing
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ELXVRO_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ELXVRO_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ELXVRO_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ELXVRO_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "::error::Release signing secrets are missing."
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > android/app/elxvro-release.jks
+          keytool -list \
+            -keystore android/app/elxvro-release.jks \
+            -alias "$KEY_ALIAS" \
+            -storepass "$KEYSTORE_PASSWORD" \
+            >/dev/null
+          keytool -list -v \
+            -keystore android/app/elxvro-release.jks \
+            -alias "$KEY_ALIAS" \
+            -storepass "$KEYSTORE_PASSWORD" \
+            | grep -E 'SHA1:|SHA-1:' || true
+          {
+            printf 'storePassword=%s\n' "$KEYSTORE_PASSWORD"
+            printf 'keyPassword=%s\n' "$KEY_PASSWORD"
+            printf 'keyAlias=%s\n' "$KEY_ALIAS"
+            printf 'storeFile=elxvro-release.jks\n'
+          } > android/key.properties
+          python tool/configure_release_signing.py
+          echo 'RELEASE_SIGNING_CONFIGURED=true' >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: flutter pub get
+
+      - name: Install audio tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg curl
+
+      - name: Fetch game material audio
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: |
+          bash tool/fetch_real_material_audio.sh
+          bash tool/fetch_real_puzzle_music.sh
+
+      - name: Build Audio 4.0 real breaks fireworks and menu chimes
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/elxvro-cc0-breaks assets/audio
+
+          curl -fL --retry 4 --retry-all-errors -A "ELXVRO-Blocks-GitHub-Build/0.22.0" \
+            "https://opengameart.org/sites/default/files/sfx_breaking_and_falling.zip" \
+            -o /tmp/elxvro-cc0-breaks/breaks.zip
+
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+          root = Path('/tmp/elxvro-cc0-breaks')
+          with zipfile.ZipFile(root / 'breaks.zip') as z:
+              z.extractall(root / 'raw')
+          PY
+
+          pick_audio() {
+            pattern="$1"
+            found="$(find /tmp/elxvro-cc0-breaks/raw -type f | grep -Ei '\.(wav|ogg|mp3|flac)$' | grep -Ei "$pattern" | sort | head -n 1 || true)"
+            if [ -z "$found" ]; then
+              found="$(find /tmp/elxvro-cc0-breaks/raw -type f | grep -Ei '\.(wav|ogg|mp3|flac)$' | sort | head -n 1)"
+            fi
+            test -n "$found"
+            printf '%s' "$found"
+          }
+
+          GLASS_SRC="$(pick_audio 'glass|bottle|crystal')"
+          WOOD_SRC="$(pick_audio 'wood|branch|stick|plank')"
+          STONE_SRC="$(pick_audio 'stone|rock|brick|concrete')"
+
+          normalize_break() {
+            ffmpeg -y -loglevel error -i "$1" \
+              -af "highpass=f=55,loudnorm=I=-12:TP=-1.2:LRA=8,alimiter=limit=0.97" \
+              -ar 44100 -ac 2 "$2"
+          }
+
+          normalize_break "$GLASS_SRC" assets/audio/cc0_glass_break.wav
+          normalize_break "$WOOD_SRC" assets/audio/cc0_wood_break.wav
+          normalize_break "$STONE_SRC" assets/audio/cc0_stone_break.wav
+
+          # Three short, playful menu chimes.
+          make_chime() {
+            f1="$1"; f2="$2"; out="$3"
+            ffmpeg -y -loglevel error \
+              -f lavfi -i "sine=frequency=$f1:duration=0.24:sample_rate=44100" \
+              -f lavfi -i "sine=frequency=$f2:duration=0.20:sample_rate=44100" \
+              -filter_complex "[0:a]volume=0.34,afade=t=out:st=0.08:d=0.16[a0];[1:a]adelay=42|42,volume=0.23,afade=t=out:st=0.07:d=0.13[a1];[a0][a1]amix=inputs=2:normalize=0,alimiter=limit=0.88" \
+              -ar 44100 -ac 2 "$out"
+          }
+          make_chime 660 990 assets/audio/menu_fun_v1.wav
+          make_chime 740 1110 assets/audio/menu_fun_v2.wav
+          make_chime 820 1230 assets/audio/menu_fun_v3.wav
+
+          # Firework/explosion variants: low boom + bright crackle + real impact layer.
+          make_firework() {
+            freq="$1"; delay="$2"; impact="$3"; out="$4"
+            ffmpeg -y -loglevel error \
+              -f lavfi -i "anoisesrc=color=pink:amplitude=0.82:d=1.35:r=44100" \
+              -f lavfi -i "anoisesrc=color=white:amplitude=0.58:d=0.82:r=44100" \
+              -i "$impact" \
+              -filter_complex "[0:a]lowpass=f=$freq,afade=t=out:st=0.08:d=1.20,volume=1.18[boom];[1:a]highpass=f=2100,adelay=$delay|$delay,afade=t=out:st=0.04:d=0.72,volume=0.62[crackle];[2:a]adelay=28|28,volume=0.48[hit];[boom][crackle][hit]amix=inputs=3:normalize=0,alimiter=limit=0.96" \
+              -ar 44100 -ac 2 "$out"
+          }
+          make_firework 390 70 assets/audio/cc0_stone_break.wav assets/audio/firework_combo_v1.wav
+          make_firework 470 92 assets/audio/cc0_glass_break.wav assets/audio/firework_combo_v2.wav
+          make_firework 330 58 assets/audio/cc0_wood_break.wav assets/audio/firework_combo_v3.wav
+
+          for f in \
+            assets/audio/cc0_glass_break.wav \
+            assets/audio/cc0_wood_break.wav \
+            assets/audio/cc0_stone_break.wav \
+            assets/audio/menu_fun_v1.wav \
+            assets/audio/menu_fun_v2.wav \
+            assets/audio/menu_fun_v3.wav \
+            assets/audio/firework_combo_v1.wav \
+            assets/audio/firework_combo_v2.wav \
+            assets/audio/firework_combo_v3.wav; do
+            test -s "$f"
+          done
+
+      - name: Build Audio 5.0 material impact layers
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: |
+          set -euo pipefail
+
+          for source in \
+            assets/audio/cc0_glass_break.wav \
+            assets/audio/cc0_wood_break.wav \
+            assets/audio/cc0_stone_break.wav \
+            assets/audio/glass_clear_v2.wav \
+            assets/audio/crystal_clear_v2.wav \
+            assets/audio/wood_clear_v2.wav \
+            assets/audio/leaf_clear_v2.wav \
+            assets/audio/stone_clear_v2.wav \
+            assets/audio/marble_clear_v2.wav; do
+            test -s "$source"
+          done
+
+          mix_break() {
+            real="$1"
+            detail="$2"
+            real_gain="$3"
+            detail_gain="$4"
+            delay_ms="$5"
+            output="$6"
+
+            ffmpeg -y -loglevel error \
+              -i "$real" \
+              -i "$detail" \
+              -filter_complex "[0:a]volume=$real_gain,highpass=f=45[a0];[1:a]adelay=$delay_ms|$delay_ms,volume=$detail_gain[a1];[a0][a1]amix=inputs=2:normalize=0,acompressor=threshold=-10dB:ratio=2.2:attack=4:release=95,alimiter=limit=0.97" \
+              -ar 44100 -ac 2 "$output"
+          }
+
+          mix_break assets/audio/cc0_glass_break.wav assets/audio/glass_clear_v2.wav 0.94 0.82 12 assets/audio/pro_glass_break.wav
+          mix_break assets/audio/cc0_glass_break.wav assets/audio/crystal_clear_v2.wav 0.82 0.94 8 assets/audio/pro_crystal_break.wav
+          mix_break assets/audio/cc0_wood_break.wav assets/audio/wood_clear_v2.wav 0.96 0.76 22 assets/audio/pro_wood_break.wav
+          mix_break assets/audio/cc0_wood_break.wav assets/audio/leaf_clear_v2.wav 0.58 0.90 18 assets/audio/pro_leaf_break.wav
+          mix_break assets/audio/cc0_stone_break.wav assets/audio/stone_clear_v2.wav 1.00 0.82 30 assets/audio/pro_stone_break.wav
+          mix_break assets/audio/cc0_stone_break.wav assets/audio/marble_clear_v2.wav 0.84 0.96 24 assets/audio/pro_marble_break.wav
+
+          for output in \
+            assets/audio/pro_glass_break.wav \
+            assets/audio/pro_crystal_break.wav \
+            assets/audio/pro_wood_break.wav \
+            assets/audio/pro_leaf_break.wav \
+            assets/audio/pro_stone_break.wav \
+            assets/audio/pro_marble_break.wav; do
+            test -s "$output"
+            ffprobe -v error -show_entries format=duration \
+              -of default=noprint_wrappers=1:nokey=1 "$output"
+          done
+
+      - name: Fetch upbeat CC0 background playlist
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/elxvro-music assets/audio
+          UA="ELXVRO-Blocks-GitHub-Build/0.22.0"
+
+          curl -fL --retry 4 --retry-all-errors -A "$UA" \
+            "https://opengameart.org/sites/default/files/magic_puzzle_in-game_1_bpm110_0.ogg" \
+            -o /tmp/elxvro-music/magic.ogg
+          curl -fL --retry 4 --retry-all-errors -A "$UA" \
+            "https://opengameart.org/sites/default/files/cozy_puzzle_in-game_1_bpm118_0.ogg" \
+            -o /tmp/elxvro-music/cozy1.ogg
+          curl -fL --retry 4 --retry-all-errors -A "$UA" \
+            "https://opengameart.org/sites/default/files/cozy_puzzle_in-game_3_bpm108_0.ogg" \
+            -o /tmp/elxvro-music/cozy3.ogg
+          curl -fL --retry 4 --retry-all-errors -A "$UA" \
+            "https://opengameart.org/sites/default/files/platformer_alt.ogg" \
+            -o /tmp/elxvro-music/platformer.ogg
+          curl -fL --retry 4 --retry-all-errors -A "$UA" \
+            "https://opengameart.org/sites/default/files/othercenter.ogg" \
+            -o /tmp/elxvro-music/othercenter.ogg
+          curl -fL --retry 4 --retry-all-errors -A "$UA" \
+            "https://opengameart.org/sites/default/files/cozy_puzzle_title_bpm95_0.ogg" \
+            -o /tmp/elxvro-music/title.ogg
+
+          normalize() {
+            ffmpeg -y -loglevel error -i "$1" \
+              -af "loudnorm=I=-19:TP=-1.8:LRA=10" -c:a libvorbis -q:a 4 "$2"
+          }
+          normalize /tmp/elxvro-music/magic.ogg assets/audio/bgm_magic_puzzle.ogg
+          normalize /tmp/elxvro-music/cozy1.ogg assets/audio/bgm_cozy_puzzle_1.ogg
+          normalize /tmp/elxvro-music/cozy3.ogg assets/audio/bgm_cozy_puzzle_3.ogg
+          normalize /tmp/elxvro-music/platformer.ogg assets/audio/bgm_platformer_alt.ogg
+          normalize /tmp/elxvro-music/othercenter.ogg assets/audio/bgm_othercenter.ogg
+          normalize /tmp/elxvro-music/title.ogg assets/audio/bgm_cozy_title.ogg
+
+          cat > assets/audio/AUDIO_LICENSES_v0220.txt <<'EOF'
+          ELXVRO Blocks v0.22.0 audio sources
+          Music — CC0 / public-domain dedication via OpenGameArt:
+          - Magic Puzzle In-Game 1 — MintoDog
+          - Cozy Puzzle In-Game 1 — MintoDog
+          - Cozy Puzzle In-Game 3 — MintoDog
+          - Overworld Theme / platformer_alt — Louswan
+          - Other Center — zesona / Chris Murphy
+          - Cozy Puzzle Title — MintoDog
+          Sound effects — CC0 via OpenGameArt:
+          - 75 CC0 breaking / falling / hit sfx — rubberduck
+          Menu chimes and firework layering are generated/processed during the ELXVRO build.
+          EOF
+
+      - name: Verify Audio 4.0 assets
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: |
+          set -euo pipefail
+          for track in \
+            assets/audio/bgm_magic_puzzle.ogg \
+            assets/audio/bgm_cozy_puzzle_1.ogg \
+            assets/audio/bgm_cozy_puzzle_3.ogg \
+            assets/audio/bgm_platformer_alt.ogg \
+            assets/audio/bgm_othercenter.ogg \
+            assets/audio/bgm_cozy_title.ogg; do
+            test -s "$track"
+            ffprobe -v error -show_entries format=duration \
+              -of default=noprint_wrappers=1:nokey=1 "$track"
+          done
+          for sfx in \
+            assets/audio/cc0_glass_break.wav \
+            assets/audio/cc0_wood_break.wav \
+            assets/audio/cc0_stone_break.wav \
+            assets/audio/menu_fun_v1.wav \
+            assets/audio/menu_fun_v2.wav \
+            assets/audio/menu_fun_v3.wav \
+            assets/audio/firework_combo_v1.wav \
+            assets/audio/firework_combo_v2.wav \
+            assets/audio/firework_combo_v3.wav \
+            assets/audio/pro_glass_break.wav \
+            assets/audio/pro_crystal_break.wav \
+            assets/audio/pro_wood_break.wav \
+            assets/audio/pro_leaf_break.wav \
+            assets/audio/pro_stone_break.wav \
+            assets/audio/pro_marble_break.wav; do
+            test -s "$sfx"
+          done
+          test -s assets/audio/AUDIO_LICENSES_v0220.txt
+
+      - name: Generate launcher icon and splash
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: |
+          dart run flutter_launcher_icons
+          dart run flutter_native_splash:create
+
+      - name: Analyze
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: flutter analyze
+
+      - name: Test
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        run: flutter test
+
+      - name: Build signed release APK
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        env:
+          PG_CLASSIC: 'CgkI6arsvtAGEAIQAw'
+          PG_RUSH: 'CgkI6arsvtAGEAIQAg'
+          PG_ADVENTURE: 'CgkI6arsvtAGEAIQBA'
+          ACH_FIRST: ${{ secrets.ELXVRO_PG_ACH_FIRST_GAME }}
+          ACH_SCORE_1000: ${{ secrets.ELXVRO_PG_ACH_SCORE_1000 }}
+          ACH_COMBO_3: ${{ secrets.ELXVRO_PG_ACH_COMBO_3 }}
+          ACH_LINES_25: ${{ secrets.ELXVRO_PG_ACH_LINES_25 }}
+          ACH_GAMES_10: ${{ secrets.ELXVRO_PG_ACH_GAMES_10 }}
+          ACH_BLOCKS_250: ${{ secrets.ELXVRO_PG_ACH_BLOCKS_250 }}
+          ACH_SCORE_10000: ${{ secrets.ELXVRO_PG_ACH_SCORE_10000 }}
+          ACH_LEVEL_5: ${{ secrets.ELXVRO_PG_ACH_LEVEL_5 }}
+          ACH_PERFECT_3: ${{ secrets.ELXVRO_PG_ACH_PERFECT_3 }}
+          ACH_LEVEL_15: ${{ secrets.ELXVRO_PG_ACH_LEVEL_15 }}
+        run: |
+          test "$RELEASE_SIGNING_CONFIGURED" = "true"
+          flutter build apk --release --obfuscate --split-debug-info=build/symbols/apk \
+            --dart-define="ELXVRO_PG_CLASSIC_LEADERBOARD_ID=${PG_CLASSIC}" \
+            --dart-define="ELXVRO_PG_COMBO_RUSH_LEADERBOARD_ID=${PG_RUSH}" \
+            --dart-define="ELXVRO_PG_ADVENTURE_LEADERBOARD_ID=${PG_ADVENTURE:-}" \
+            --dart-define="ELXVRO_PG_ACH_FIRST_GAME=${ACH_FIRST:-}" \
+            --dart-define="ELXVRO_PG_ACH_SCORE_1000=${ACH_SCORE_1000:-}" \
+            --dart-define="ELXVRO_PG_ACH_COMBO_3=${ACH_COMBO_3:-}" \
+            --dart-define="ELXVRO_PG_ACH_LINES_25=${ACH_LINES_25:-}" \
+            --dart-define="ELXVRO_PG_ACH_GAMES_10=${ACH_GAMES_10:-}" \
+            --dart-define="ELXVRO_PG_ACH_BLOCKS_250=${ACH_BLOCKS_250:-}" \
+            --dart-define="ELXVRO_PG_ACH_SCORE_10000=${ACH_SCORE_10000:-}" \
+            --dart-define="ELXVRO_PG_ACH_LEVEL_5=${ACH_LEVEL_5:-}" \
+            --dart-define="ELXVRO_PG_ACH_PERFECT_3=${ACH_PERFECT_3:-}" \
+            --dart-define="ELXVRO_PG_ACH_LEVEL_15=${ACH_LEVEL_15:-}"
+
+      - name: Build signed Google Play AAB
+        working-directory: extracted/elxvro-blocks-v0.10.1
+        env:
+          PG_CLASSIC: 'CgkI6arsvtAGEAIQAw'
+          PG_RUSH: 'CgkI6arsvtAGEAIQAg'
+          PG_ADVENTURE: 'CgkI6arsvtAGEAIQBA'
+          ACH_FIRST: ${{ secrets.ELXVRO_PG_ACH_FIRST_GAME }}
+          ACH_SCORE_1000: ${{ secrets.ELXVRO_PG_ACH_SCORE_1000 }}
+          ACH_COMBO_3: ${{ secrets.ELXVRO_PG_ACH_COMBO_3 }}
+          ACH_LINES_25: ${{ secrets.ELXVRO_PG_ACH_LINES_25 }}
+          ACH_GAMES_10: ${{ secrets.ELXVRO_PG_ACH_GAMES_10 }}
+          ACH_BLOCKS_250: ${{ secrets.ELXVRO_PG_ACH_BLOCKS_250 }}
+          ACH_SCORE_10000: ${{ secrets.ELXVRO_PG_ACH_SCORE_10000 }}
+          ACH_LEVEL_5: ${{ secrets.ELXVRO_PG_ACH_LEVEL_5 }}
+          ACH_PERFECT_3: ${{ secrets.ELXVRO_PG_ACH_PERFECT_3 }}
+          ACH_LEVEL_15: ${{ secrets.ELXVRO_PG_ACH_LEVEL_15 }}
+        run: |
+          test "$RELEASE_SIGNING_CONFIGURED" = "true"
+          flutter build appbundle --release --obfuscate --split-debug-info=build/symbols/aab \
+            --dart-define="ELXVRO_PG_CLASSIC_LEADERBOARD_ID=${PG_CLASSIC}" \
+            --dart-define="ELXVRO_PG_COMBO_RUSH_LEADERBOARD_ID=${PG_RUSH}" \
+            --dart-define="ELXVRO_PG_ADVENTURE_LEADERBOARD_ID=${PG_ADVENTURE:-}" \
+            --dart-define="ELXVRO_PG_ACH_FIRST_GAME=${ACH_FIRST:-}" \
+            --dart-define="ELXVRO_PG_ACH_SCORE_1000=${ACH_SCORE_1000:-}" \
+            --dart-define="ELXVRO_PG_ACH_COMBO_3=${ACH_COMBO_3:-}" \
+            --dart-define="ELXVRO_PG_ACH_LINES_25=${ACH_LINES_25:-}" \
+            --dart-define="ELXVRO_PG_ACH_GAMES_10=${ACH_GAMES_10:-}" \
+            --dart-define="ELXVRO_PG_ACH_BLOCKS_250=${ACH_BLOCKS_250:-}" \
+            --dart-define="ELXVRO_PG_ACH_SCORE_10000=${ACH_SCORE_10000:-}" \
+            --dart-define="ELXVRO_PG_ACH_LEVEL_5=${ACH_LEVEL_5:-}" \
+            --dart-define="ELXVRO_PG_ACH_PERFECT_3=${ACH_PERFECT_3:-}" \
+            --dart-define="ELXVRO_PG_ACH_LEVEL_15=${ACH_LEVEL_15:-}"
+
+      - name: Prepare APK and AAB package
+        run: |
+          set -euo pipefail
+          APK="extracted/elxvro-blocks-v0.10.1/build/app/outputs/flutter-apk/app-release.apk"
+          AAB="extracted/elxvro-blocks-v0.10.1/build/app/outputs/bundle/release/app-release.aab"
+          test -s "$APK"
+          test -s "$AAB"
+          cp "$APK" ELXVRO-Blocks-v0.22.0-SIGNED.apk
+          cp "$AAB" ELXVRO-Blocks-v0.22.0-GOOGLE-PLAY.aab
+          sha256sum ELXVRO-Blocks-v0.22.0-SIGNED.apk > ELXVRO-Blocks-v0.22.0-SIGNED.apk.sha256
+          sha256sum ELXVRO-Blocks-v0.22.0-GOOGLE-PLAY.aab > ELXVRO-Blocks-v0.22.0-GOOGLE-PLAY.aab.sha256
+          mkdir -p ELXVRO-Blocks-v0.22.0-APK-AAB
+          cp ELXVRO-Blocks-v0.22.0-SIGNED.apk* ELXVRO-Blocks-v0.22.0-APK-AAB/
+          cp ELXVRO-Blocks-v0.22.0-GOOGLE-PLAY.aab* ELXVRO-Blocks-v0.22.0-APK-AAB/
+          ls -lh ELXVRO-Blocks-v0.22.0-APK-AAB/
+
+      - name: Upload APK and AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: ELXVRO-Blocks-v0.22.0-APK-AAB
+          path: ELXVRO-Blocks-v0.22.0-APK-AAB/
+          if-no-files-found: error
+          retention-days: 14
