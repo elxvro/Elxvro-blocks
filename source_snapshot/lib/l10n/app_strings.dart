@@ -5,6 +5,8 @@ class AppStrings {
 
   bool get isEnglish => languageCode == 'en';
 
+  String f(String tr, String en) => isEnglish ? en : tr;
+
   String t(String key) {
     final pair = _values[key];
     if (pair == null) return key;
