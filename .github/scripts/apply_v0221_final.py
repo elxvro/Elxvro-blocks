@@ -101,4 +101,58 @@ patch('lib/screens/settings_screen.dart', [
     ("'HAZIRLIK'", "AppStrings.current.f('HAZIRLIK', 'PREPARING')"),
 ])
 
+
+# Extra gameplay dialog/tutorial strings and const cleanup.
+patch('lib/screens/game_screen.dart', [
+    ("'HIZLI EĞİTİM'", "AppStrings.current.f('HIZLI EĞİTİM', 'QUICK TUTORIAL')"),
+    ("'SÜRÜKLE & BIRAK'", "AppStrings.current.f('SÜRÜKLE & BIRAK', 'DRAG & DROP')"),
+    ("'Alttaki blokları tahtadaki hayalet konuma bırak.'", "AppStrings.current.f('Alttaki blokları tahtadaki hayalet konuma bırak.', 'Drag the blocks onto the ghost position.')"),
+    ("'ÇİZGİLERİ TEMİZLE'", "AppStrings.current.f('ÇİZGİLERİ TEMİZLE', 'CLEAR LINES')"),
+    ("'Dolu satır ve sütunlar temizlenir; seri yaparsan combo büyür.'", "AppStrings.current.f('Dolu satır ve sütunlar temizlenir; seri yaparsan combo büyür.', 'Full rows and columns clear. Consecutive clears grow the combo.')"),
+    ("'Tahtayı tamamen boşaltırsan +1000 skor ve bonus coin kazanırsın.'", "AppStrings.current.f('Tahtayı tamamen boşaltırsan +1000 skor ve bonus coin kazanırsın.', 'Clear the full board to earn +1000 score and bonus coins.')"),
+    ("'GÜÇLER'", "AppStrings.current.f('GÜÇLER', 'POWER UPS')"),
+    ("'Geri Al, Yenile ve Özel blok haklarını kritik anda kullan.'", "AppStrings.current.f('Geri Al, Yenile ve Özel blok haklarını kritik anda kullan.', 'Use Undo, Refresh and Special Block charges at critical moments.')"),
+    ("'OYUNA BAŞLA'", "AppStrings.current.f('OYUNA BAŞLA', 'START GAME')"),
+    ("'Ses efektleri'", "AppStrings.current.f('Ses efektleri', 'Sound effects')"),
+    ("'Müzik'", "AppStrings.current.f('Müzik', 'Music')"),
+    ("'Titreşim'", "AppStrings.current.f('Titreşim', 'Haptics')"),
+    ("'YENİ REKOR!'", "AppStrings.current.f('YENİ REKOR!', 'NEW RECORD!')"),
+    ("'OYUN BİTTİ'", "AppStrings.current.f('OYUN BİTTİ', 'GAME OVER')"),
+    ("'BÖLÜM TAMAMLANDI'", "AppStrings.current.f('BÖLÜM TAMAMLANDI', 'LEVEL COMPLETE')"),
+    ("'BÖLÜM BAŞARISIZ'", "AppStrings.current.f('BÖLÜM BAŞARISIZ', 'LEVEL FAILED')"),
+    ("'HEDEF TAMAMLANDI'", "AppStrings.current.f('HEDEF TAMAMLANDI', 'TARGET COMPLETE')"),
+    ("'CHALLENGE BİTTİ'", "AppStrings.current.f('CHALLENGE BİTTİ', 'CHALLENGE OVER')"),
+    ("'ZOR MOD BİTTİ'", "AppStrings.current.f('ZOR MOD BİTTİ', 'HARD MODE OVER')"),
+    ("'ZEN OTURUMU'", "AppStrings.current.f('ZEN OTURUMU', 'ZEN SESSION')"),
+    ("'ÇİZGİ'", "AppStrings.current.f('ÇİZGİ', 'LINES')"),
+    ("'BLOK'", "AppStrings.current.f('BLOK', 'BLOCK')"),
+    ("'ANA MENÜ'", "AppStrings.current.f('ANA MENÜ', 'MAIN MENU')"),
+    ("'YENİDEN'", "AppStrings.current.f('YENİDEN', 'RESTART')"),
+    ("'DEVAM ET'", "AppStrings.current.f('DEVAM ET', 'RESUME')"),
+    ("'GERİ AL'", "AppStrings.current.f('GERİ AL', 'UNDO')"),
+    ("'YENİLE'", "AppStrings.current.f('YENİLE', 'REFRESH')"),
+    ("'ÖZEL'", "AppStrings.current.f('ÖZEL', 'SPECIAL')"),
+    ("'Nasıl oynanır?'", "AppStrings.current.f('Nasıl oynanır?', 'How to play?')"),
+])
+
+for rel in [
+    'lib/screens/game_screen.dart',
+    'lib/screens/settings_screen.dart',
+    'lib/screens/home_screen.dart',
+    'lib/screens/modes_screen.dart',
+    'lib/screens/themes_screen.dart',
+    'lib/screens/adventure_screen.dart',
+    'lib/screens/falling_blocks_screen.dart',
+]:
+    p = ROOT / rel
+    text = p.read_text(encoding='utf-8')
+    text = text.replace('const Text(', 'Text(')
+    text = text.replace('const Column(', 'Column(')
+    text = text.replace('const Expanded(', 'Expanded(')
+    text = text.replace('children: const <Widget>[', 'children: <Widget>[')
+    text = text.replace('const _TutorialLine(', '_TutorialLine(')
+    text = text.replace('const _StatusCard(', '_StatusCard(')
+    text = text.replace('const SnackBar(', 'SnackBar(')
+    p.write_text(text, encoding='utf-8')
+
 print('v0.22.1 final localization patch applied')
