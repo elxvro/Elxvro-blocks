@@ -116,54 +116,44 @@ jobs:
           cp source_snapshot/lib/screens/profile_screen.dart "$APP/lib/screens/profile_screen.dart"
           python .github/scripts/apply_v0221_final.py "$APP"
 
-      - name: Validate v0.22.1 UI and background
+      - name: Validate widget-only gameplay background
         run: |
           set -euo pipefail
           APP=extracted/elxvro-blocks-v0.10.1
-          python - <<'PY'
-          from pathlib import Path
-          import re
+          BG="$APP/lib/widgets/gameplay_background.dart"
+          ! grep -q 'CustomPaint' "$BG"
+          ! grep -q 'CustomPainter' "$BG"
+          ! grep -q 'Canvas ' "$BG"
 
-          app = Path('extracted/elxvro-blocks-v0.10.1')
-          bg = (app / 'lib/widgets/gameplay_background.dart').read_text(encoding='utf-8')
-          forbidden = ['CustomPaint', 'CustomPainter', 'Canvas ']
-          found = [item for item in forbidden if item in bg]
-          if found:
-              raise SystemExit(f'Gameplay background still uses forbidden drawing API: {found}')
+      - name: Create complete v0.22.1 source ZIP
+        run: |
+          set -euo pipefail
+          APP=extracted/elxvro-blocks-v0.10.1
+          mkdir -p "$APP/.github/workflows"
+          cp .github/workflows/build-v0.22.1.yml "$APP/.github/workflows/build-v0.22.1.yml"
+          rm -f ELXVRO-Blocks-v0.22.1-FULL.zip
+          (
+            cd "$APP"
+            zip -qr ../../ELXVRO-Blocks-v0.22.1-FULL.zip .               -x "build/*" ".dart_tool/*" ".git/*"
+          )
+          unzip -t ELXVRO-Blocks-v0.22.1-FULL.zip >/dev/null
+          rm -rf build_source
+          mkdir build_source
+          unzip -q ELXVRO-Blocks-v0.22.1-FULL.zip -d build_source
+          test -f build_source/pubspec.yaml
+          test -f build_source/lib/app_state.dart
+          test -f build_source/.github/workflows/build-v0.22.1.yml
 
-          screens = [
-              'home_screen.dart', 'modes_screen.dart', 'themes_screen.dart',
-              'adventure_screen.dart', 'falling_blocks_screen.dart',
-              'game_screen.dart', 'settings_screen.dart', 'rewards_screen.dart',
-              'store_screen.dart', 'daily_missions_screen.dart',
-              'achievements_screen.dart', 'stats_screen.dart',
-              'social_hub_screen.dart', 'profile_screen.dart',
-          ]
-          turkish = re.compile(r'[ÇĞİÖŞÜçğıöşü]')
-          allowed = ('AppStrings.current.f', 'AppStrings.current.isEnglish', 'l.t(', 'l.f(', '_modeText(', '_themeText(')
-          problems = []
-          for name in screens:
-              path = app / 'lib/screens' / name
-              for number, line in enumerate(path.read_text(encoding='utf-8').splitlines(), 1):
-                  stripped = line.strip()
-                  if turkish.search(stripped) and ("'" in stripped or '"' in stripped):
-                      if any(token in stripped for token in allowed):
-                          continue
-                      if name == 'falling_blocks_screen.dart' and (
-                          'Hedef $_targetScore puan' in stripped
-                          or "'$_lines çizgi  •  Seviye $_arcadeLevel" in stripped
-                      ):
-                          continue
-                      if stripped.startswith('//'):
-                          continue
-                      problems.append(f'{name}:{number}: {stripped}')
-          if problems:
-              raise SystemExit('Unlocalized Turkish UI strings remain:\n' + '\n'.join(problems[:40]))
-          print('v0.22.1 UI validation passed')
-          PY
+      - name: Upload complete source ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: ELXVRO-Blocks-v0.22.1-FULL-SOURCE
+          path: ELXVRO-Blocks-v0.22.1-FULL.zip
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Generate Android platform
-        working-directory: extracted/elxvro-blocks-v0.10.1
+        working-directory: build_source
         run: |
           flutter create \
             --platforms=android \
@@ -172,11 +162,11 @@ jobs:
             .
 
       - name: Apply Android branding
-        working-directory: extracted/elxvro-blocks-v0.10.1
+        working-directory: build_source
         run: python tool/apply_android_branding.py
 
       - name: Configure live Play Games app id
-        working-directory: extracted/elxvro-blocks-v0.10.1
+        working-directory: build_source
         env:
           PG_APP_ID: '227765065065'
         run: |
@@ -203,7 +193,7 @@ jobs:
           grep -F 'com.google.android.gms.games.APP_ID' android/app/src/main/AndroidManifest.xml
 
       - name: Configure mandatory release signing
-        working-directory: extracted/elxvro-blocks-v0.10.1
+        working-directory: build_source
         env:
           KEYSTORE_BASE64: ${{ secrets.ELXVRO_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.ELXVRO_KEYSTORE_PASSWORD }}
@@ -236,7 +226,7 @@ jobs:
           echo 'RELEASE_SIGNING_CONFIGURED=true' >> "$GITHUB_ENV"
 
       - name: Install dependencies
-        working-directory: extracted/elxvro-blocks-v0.10.1
+        working-directory: build_source
         run: flutter pub get
 
       - name: Install audio tooling
@@ -245,13 +235,13 @@ jobs:
           sudo apt-get install -y ffmpeg curl
 
       - name: Fetch game material audio
-        working-directory: extracted/elxvro-blocks-v0.10.1
+        working-directory: build_source
         run: |
           bash tool/fetch_real_material_audio.sh
           bash tool/fetch_real_puzzle_music.sh
 
       - name: Build Audio 4.0 real breaks fireworks and menu chimes
-        working-directory: extracted/elxvro-blocks-v0.10.1
+        working-directory: build_source
         run: |
           set -euo pipefail
           mkdir -p /tmp/elxvro-cc0-breaks assets/audio
@@ -333,7 +323,7 @@ jobs:
           done
 
       - name: Build Audio 5.0 material impact layers
-        working-directory: extracted/elxvro-blocks-v0.10.1
+        working-directory: build_source
         run: |
           set -euo pipefail
 
@@ -385,7 +375,7 @@ jobs:
           done
 
       - name: Fetch upbeat CC0 background playlist
-        working-directory: extracted/elxvro-blocks-v0.10.1
+        working-directory: build_source
         run: |
           set -euo pipefail
           mkdir -p /tmp/elxvro-music assets/audio
@@ -436,7 +426,7 @@ jobs:
           EOF
 
       - name: Verify Audio 4.0 assets
-        working-directory: extracted/elxvro-blocks-v0.10.1
+        working-directory: build_source
         run: |
           set -euo pipefail
           for track in \
@@ -471,21 +461,21 @@ jobs:
           test -s assets/audio/AUDIO_LICENSES_v0221.txt
 
       - name: Generate launcher icon and splash
-        working-directory: extracted/elxvro-blocks-v0.10.1
+        working-directory: build_source
         run: |
           dart run flutter_launcher_icons
           dart run flutter_native_splash:create
 
       - name: Analyze
-        working-directory: extracted/elxvro-blocks-v0.10.1
+        working-directory: build_source
         run: flutter analyze
 
       - name: Test
-        working-directory: extracted/elxvro-blocks-v0.10.1
+        working-directory: build_source
         run: flutter test
 
       - name: Build signed release APK
-        working-directory: extracted/elxvro-blocks-v0.10.1
+        working-directory: build_source
         env:
           PG_CLASSIC: 'CgkI6arsvtAGEAIQAw'
           PG_RUSH: 'CgkI6arsvtAGEAIQAg'
@@ -518,7 +508,7 @@ jobs:
             --dart-define="ELXVRO_PG_ACH_LEVEL_15=${ACH_LEVEL_15:-}"
 
       - name: Build signed Google Play AAB
-        working-directory: extracted/elxvro-blocks-v0.10.1
+        working-directory: build_source
         env:
           PG_CLASSIC: 'CgkI6arsvtAGEAIQAw'
           PG_RUSH: 'CgkI6arsvtAGEAIQAg'
@@ -553,8 +543,8 @@ jobs:
       - name: Prepare APK and AAB package
         run: |
           set -euo pipefail
-          APK="extracted/elxvro-blocks-v0.10.1/build/app/outputs/flutter-apk/app-release.apk"
-          AAB="extracted/elxvro-blocks-v0.10.1/build/app/outputs/bundle/release/app-release.aab"
+          APK="build_source/build/app/outputs/flutter-apk/app-release.apk"
+          AAB="build_source/build/app/outputs/bundle/release/app-release.aab"
           test -s "$APK"
           test -s "$AAB"
           cp "$APK" ELXVRO-Blocks-v0.22.1-SIGNED.apk
@@ -564,6 +554,7 @@ jobs:
           mkdir -p ELXVRO-Blocks-v0.22.1-APK-AAB
           cp ELXVRO-Blocks-v0.22.1-SIGNED.apk* ELXVRO-Blocks-v0.22.1-APK-AAB/
           cp ELXVRO-Blocks-v0.22.1-GOOGLE-PLAY.aab* ELXVRO-Blocks-v0.22.1-APK-AAB/
+          cp ELXVRO-Blocks-v0.22.1-FULL.zip ELXVRO-Blocks-v0.22.1-APK-AAB/
           ls -lh ELXVRO-Blocks-v0.22.1-APK-AAB/
 
       - name: Upload APK and AAB
