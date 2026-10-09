@@ -68,11 +68,11 @@ class SocialHubScreen extends StatelessWidget {
                       children: <Widget>[
                         _PlayerCard(appState: appState),
                         const SizedBox(height: 14),
-                        const _SectionTitle(AppStrings.current.f('KİŞİSEL REKORLAR','PERSONAL BESTS')),
+                        _SectionTitle(AppStrings.current.f('KİŞİSEL REKORLAR','PERSONAL BESTS')),
                         const SizedBox(height: 10),
                         _RecordGrid(appState: appState),
                         const SizedBox(height: 18),
-                        const _SectionTitle(AppStrings.current.f('BU HAFTA','THIS WEEK')),
+                        _SectionTitle(AppStrings.current.f('BU HAFTA','THIS WEEK')),
                         const SizedBox(height: 10),
                         _WeeklyCard(appState: appState),
                         const SizedBox(height: 18),
@@ -81,7 +81,7 @@ class SocialHubScreen extends StatelessWidget {
                         _ConnectionCard(service: socialService),
                         const SizedBox(height: 12),
                         Text(
-                          'Play Console yapılandırıldığında bu ekran global sıralama ve başarımları aynı kayıt mimarisi üzerinden gösterecek. Şimdilik hiçbir çevrimiçi sıralama taklit edilmez.',
+                          AppStrings.current.f('Play Console yapılandırıldığında bu ekran global sıralama ve başarımları aynı kayıt mimarisi üzerinden gösterecek. Şimdilik hiçbir çevrimiçi sıralama taklit edilmez.','Global leaderboards and achievements will appear here after Play Console setup.'),
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.38),
                             fontSize: 10,
@@ -156,7 +156,7 @@ class _PlayerCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'SEVİYE ${appState.playerLevel}  •  ${appState.xp} XP',
+                  AppStrings.current.f('SEVİYE ${appState.playerLevel}  •  ${appState.xp} XP','LEVEL ${appState.playerLevel}  •  ${appState.xp} XP'),
                   style: const TextStyle(
                     color: Color(0xFFFFD98B),
                     fontSize: 10,
@@ -315,7 +315,7 @@ class _WeeklyCard extends StatelessWidget {
                       if (!context.mounted || !claimed) return;
                       unawaited(AudioService.instance.playReward());
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('+250 coin haftalık ödül alındı.')),
+                        SnackBar(content: Text(AppStrings.current.f('+250 coin haftalık ödül alındı.','+250 weekly coins claimed.'))),
                       );
                     }
                   : null,
