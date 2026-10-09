@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../l10n/app_strings.dart';
 import '../models/game_theme.dart';
 import '../widgets/coin_badge.dart';
 import '../widgets/premium_background.dart';
@@ -17,7 +18,7 @@ class ProfileScreen extends StatelessWidget {
       builder: (dialogContext) {
         return AlertDialog(
           backgroundColor: const Color(0xFF12100E),
-          title: const Text('OYUNCU ADI'),
+          title: Text(AppStrings.current.f('OYUNCU ADI','PLAYER NAME')),
           content: TextField(
             controller: controller,
             autofocus: true,
@@ -32,11 +33,11 @@ class ProfileScreen extends StatelessWidget {
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('İPTAL'),
+              child: Text(AppStrings.current.f('İPTAL','CANCEL')),
             ),
             FilledButton(
               onPressed: () => Navigator.of(dialogContext).pop(controller.text),
-              child: const Text('KAYDET'),
+              child: Text(AppStrings.current.f('KAYDET','SAVE')),
             ),
           ],
         );
@@ -75,9 +76,9 @@ class ProfileScreen extends StatelessWidget {
                           onPressed: () => Navigator.of(context).pop(),
                           icon: const Icon(Icons.arrow_back_rounded),
                         ),
-                        const Expanded(
+                        Expanded(
                           child: Text(
-                            'PROFİL',
+                            AppStrings.current.f('PROFİL','PROFILE'),
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Color(0xFFFFD98B),
@@ -153,7 +154,7 @@ class ProfileScreen extends StatelessWidget {
                                   ),
                                   const SizedBox(width: 4),
                                   IconButton(
-                                    tooltip: 'Oyuncu adını değiştir',
+                                    tooltip: AppStrings.current.f('Oyuncu adını değiştir','Change player name'),
                                     visualDensity: VisualDensity.compact,
                                     onPressed: () => _editName(context),
                                     icon: const Icon(
@@ -204,7 +205,7 @@ class ProfileScreen extends StatelessWidget {
                             Expanded(
                               child: _ProfileStat(
                                 icon: Icons.emoji_events_rounded,
-                                label: 'EN İYİ',
+                                label: AppStrings.current.f('EN İYİ','BEST'),
                                 value: '${appState.bestScore}',
                               ),
                             ),
@@ -239,7 +240,7 @@ class ProfileScreen extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 18),
-                        const Text(
+                        Text(
                           'SEVİYE ÖDÜLLERİ',
                           style: TextStyle(
                             color: Color(0xFFFFD98B),
