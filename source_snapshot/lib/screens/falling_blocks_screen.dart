@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app_state.dart';
+import '../l10n/app_strings.dart';
 import '../models/adventure_level.dart';
 import '../models/game_theme.dart';
 import '../services/audio_service.dart';
@@ -424,10 +425,10 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
           title: Text(
             _isAdventure
-                ? success
-                    ? 'BÖLÜM TAMAMLANDI'
-                    : 'BÖLÜM BAŞARISIZ'
-                : 'DÜŞEN BLOKLAR',
+                ? (success
+                    ? AppStrings.current.f('BÖLÜM TAMAMLANDI', 'LEVEL COMPLETE')
+                    : AppStrings.current.f('BÖLÜM BAŞARISIZ', 'LEVEL FAILED'))
+                : AppStrings.current.f('DÜŞEN BLOKLAR', 'FALLING BLOCKS'),
             textAlign: TextAlign.center,
             style: TextStyle(
               color: success ? _palette.first : const Color(0xFFFFD98B),
@@ -446,17 +447,21 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const Text(
-                'SKOR',
-                style: TextStyle(color: Colors.white38, fontSize: 10),
+              Text(
+                AppStrings.current.f('SKOR', 'SCORE'),
+                style: const TextStyle(color: Colors.white38, fontSize: 10),
               ),
               const SizedBox(height: 14),
               Text(
                 _isAdventure
-                    ? 'Hedef $_targetScore puan  •  $_lines çizgi'
-                        '${earned > 0 ? '  •  +$earned coin' : ''}'
-                    : '$_lines çizgi  •  Seviye $_arcadeLevel\n'
-                        'En iyi: ${widget.appState.fallingBlocksBestScore}',
+                    ? AppStrings.current.f(
+                        "Hedef $_targetScore puan  •  $_lines çizgi${earned > 0 ? '  •  +$earned coin' : ''}",
+                        "Target $_targetScore score  •  $_lines lines${earned > 0 ? '  •  +$earned coin' : ''}",
+                      )
+                    : AppStrings.current.f(
+                        '$_lines çizgi  •  Seviye $_arcadeLevel\nEn iyi: ${widget.appState.fallingBlocksBestScore}',
+                        '$_lines lines  •  Level $_arcadeLevel\nBest: ${widget.appState.fallingBlocksBestScore}',
+                      ),
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.white60, height: 1.5),
               ),
@@ -469,7 +474,11 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
                 Navigator.of(dialogContext).pop();
                 Navigator.of(context).pop();
               },
-              child: Text(_isAdventure ? 'BÖLÜMLER' : 'MODLAR'),
+              child: Text(
+                _isAdventure
+                    ? AppStrings.current.f('BÖLÜMLER', 'LEVELS')
+                    : AppStrings.current.f('MODLAR', 'MODES'),
+              ),
             ),
             FilledButton(
               onPressed: () {
@@ -492,7 +501,11 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
                 backgroundColor: _palette.first,
                 foregroundColor: const Color(0xFF071014),
               ),
-              child: Text(canGoNext ? 'SONRAKİ' : 'TEKRAR OYNA'),
+              child: Text(
+                canGoNext
+                    ? AppStrings.current.f('SONRAKİ', 'NEXT')
+                    : AppStrings.current.f('TEKRAR OYNA', 'PLAY AGAIN'),
+              ),
             ),
           ],
         );
@@ -558,8 +571,11 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
             children: <Widget>[
               _Header(
                 title: _isAdventure
-                    ? 'MACERA • BÖLÜM ${widget.adventureLevel!.number}'
-                    : 'DÜŞEN BLOKLAR',
+                    ? AppStrings.current.f(
+                        'MACERA • BÖLÜM ${widget.adventureLevel!.number}',
+                        'ADVENTURE • LEVEL ${widget.adventureLevel!.number}',
+                      )
+                    : AppStrings.current.f('DÜŞEN BLOKLAR', 'FALLING BLOCKS'),
                 score: _score,
                 lines: _lines,
                 targetScore: _targetScore,
@@ -702,7 +718,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
                 Padding(
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Text(
-                    'DURAKLATILDI',
+                    AppStrings.current.f('DURAKLATILDI', 'PAUSED'),
                     style: TextStyle(
                       color: levelAccent,
                       fontWeight: FontWeight.w900,
@@ -713,7 +729,10 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
               Padding(
                 padding: const EdgeInsets.fromLTRB(14, 4, 14, 6),
                 child: Text(
-                  'Sağa/sola sürükle • Aşağı kaydır',
+                  AppStrings.current.f(
+                    'Sağa/sola sürükle • Aşağı kaydır',
+                    'Drag left/right • Swipe down',
+                  ),
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.42),
                     fontSize: 10,
@@ -782,8 +801,14 @@ class _Header extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   targetScore > 0
-                      ? 'SKOR $score/$targetScore  •  ÇİZGİ $lines  •  ZORLUK $level'
-                      : 'SKOR $score  •  ÇİZGİ $lines  •  HIZ $level',
+                      ? AppStrings.current.f(
+                          'SKOR $score/$targetScore  •  ÇİZGİ $lines  •  ZORLUK $level',
+                          'SCORE $score/$targetScore  •  LINES $lines  •  DIFFICULTY $level',
+                        )
+                      : AppStrings.current.f(
+                          'SKOR $score  •  ÇİZGİ $lines  •  HIZ $level',
+                          'SCORE $score  •  LINES $lines  •  SPEED $level',
+                        ),
                   style: const TextStyle(
                     color: Colors.white54,
                     fontSize: 8,
@@ -864,10 +889,14 @@ class _Controls extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
       child: Row(
         children: <Widget>[
-          button(Icons.rotate_right_rounded, 'DÖNDÜR', onRotate),
+          button(
+            Icons.rotate_right_rounded,
+            AppStrings.current.f('DÖNDÜR', 'ROTATE'),
+            onRotate,
+          ),
           button(
             Icons.vertical_align_bottom_rounded,
-            'HIZLI İNDİR',
+            AppStrings.current.f('HIZLI İNDİR', 'HARD DROP'),
             onDrop,
             emphasized: true,
           ),
