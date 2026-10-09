@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../l10n/app_strings.dart';
 import '../models/game_theme.dart';
 import '../services/audio_service.dart';
 import '../widgets/coin_badge.dart';
@@ -43,12 +44,12 @@ class RewardsScreen extends StatelessWidget {
                           icon: const Icon(Icons.arrow_back_rounded),
                         ),
                         const SizedBox(width: 4),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
                               Text(
-                                'GÜNLÜK ÖDÜL',
+                                AppStrings.current.f('GÜNLÜK ÖDÜL','DAILY REWARD'),
                                 style: TextStyle(
                                   color: Color(0xFFFFD99A),
                                   fontSize: 21,
@@ -58,7 +59,7 @@ class RewardsScreen extends StatelessWidget {
                               ),
                               SizedBox(height: 2),
                               Text(
-                                'Her gün gel, seriyi büyüt',
+                                AppStrings.current.f('Her gün gel, seriyi büyüt','Return every day and grow your streak'),
                                 style: TextStyle(
                                   color: Colors.white54,
                                   fontSize: 12,
@@ -94,7 +95,7 @@ class RewardsScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 10),
                               Text(
-                                '${appState.loginStreak} GÜNLÜK SERİ',
+                                AppStrings.current.f('${appState.loginStreak} GÜNLÜK SERİ','${appState.loginStreak} DAY STREAK'),
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w900,
@@ -105,8 +106,8 @@ class RewardsScreen extends StatelessWidget {
                               const SizedBox(height: 6),
                               Text(
                                 appState.dailyRewardAvailable
-                                    ? 'Bugünün ödülü hazır.'
-                                    : 'Bugünün ödülünü aldın. Yarın tekrar gel.',
+                                    ? AppStrings.current.f('Bugünün ödülü hazır.','Daily reward is ready.')
+                                    : AppStrings.current.f('Bugünün ödülünü aldın. Yarın tekrar gel.','Daily reward claimed. Return tomorrow.'),
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
                                   color: Colors.white54,
@@ -154,7 +155,7 @@ class RewardsScreen extends StatelessWidget {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: <Widget>[
                                   Text(
-                                    '$day. GÜN',
+                                    AppStrings.current.f('$day. GÜN','DAY $day'),
                                     style: TextStyle(
                                       color: isCurrent
                                           ? const Color(0xFFFFD98B)
@@ -202,7 +203,7 @@ class RewardsScreen extends StatelessWidget {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                          '+$amount coin hesabına eklendi.',
+                                          AppStrings.current.f('+$amount coin hesabına eklendi.','+$amount coins added.'),
                                         ),
                                       ),
                                     );
@@ -212,7 +213,7 @@ class RewardsScreen extends StatelessWidget {
                             label: Text(
                               appState.dailyRewardAvailable
                                   ? '+${appState.dailyRewardAmount} COIN AL'
-                                  : 'BUGÜN ALINDI',
+                                  : AppStrings.current.f('BUGÜN ALINDI','CLAIMED TODAY'),
                               style: const TextStyle(
                                 fontWeight: FontWeight.w900,
                                 letterSpacing: 0.8,
