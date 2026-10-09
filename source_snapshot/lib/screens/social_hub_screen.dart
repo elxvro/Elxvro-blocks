@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../l10n/app_strings.dart';
 import '../models/game_theme.dart';
 import '../services/audio_service.dart';
 import '../services/social_service.dart';
@@ -46,9 +47,9 @@ class SocialHubScreen extends StatelessWidget {
                           onPressed: () => Navigator.of(context).pop(),
                           icon: const Icon(Icons.arrow_back_rounded),
                         ),
-                        const Expanded(
+                        Expanded(
                           child: Text(
-                            'LİDERLİK MERKEZİ',
+                            AppStrings.current.f('LİDERLİK MERKEZİ','LEADERBOARD HUB'),
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Color(0xFFFFD98B),
@@ -67,11 +68,11 @@ class SocialHubScreen extends StatelessWidget {
                       children: <Widget>[
                         _PlayerCard(appState: appState),
                         const SizedBox(height: 14),
-                        const _SectionTitle('KİŞİSEL REKORLAR'),
+                        const _SectionTitle(AppStrings.current.f('KİŞİSEL REKORLAR','PERSONAL BESTS')),
                         const SizedBox(height: 10),
                         _RecordGrid(appState: appState),
                         const SizedBox(height: 18),
-                        const _SectionTitle('BU HAFTA'),
+                        const _SectionTitle(AppStrings.current.f('BU HAFTA','THIS WEEK')),
                         const SizedBox(height: 10),
                         _WeeklyCard(appState: appState),
                         const SizedBox(height: 18),
@@ -180,12 +181,12 @@ class _RecordGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final records = <({IconData icon, String label, int score})>[
-      (icon: Icons.grid_view_rounded, label: 'KLASİK', score: appState.bestScore),
-      (icon: Icons.timer_outlined, label: '2 DAKİKA', score: appState.timedBestScore),
-      (icon: Icons.flag_outlined, label: 'HEDEF', score: appState.targetBestScore),
-      (icon: Icons.today_outlined, label: 'GÜNLÜK', score: appState.dailyChallengeBestScore),
+      (icon: Icons.grid_view_rounded, label: AppStrings.current.f('KLASİK','CLASSIC'), score: appState.bestScore),
+      (icon: Icons.timer_outlined, label: AppStrings.current.f('2 DAKİKA','2 MINUTES'), score: appState.timedBestScore),
+      (icon: Icons.flag_outlined, label: AppStrings.current.f('HEDEF','TARGET'), score: appState.targetBestScore),
+      (icon: Icons.today_outlined, label: AppStrings.current.f('GÜNLÜK','DAILY'), score: appState.dailyChallengeBestScore),
       (icon: Icons.spa_outlined, label: 'ZEN', score: appState.zenBestScore),
-      (icon: Icons.whatshot_outlined, label: 'ZOR', score: appState.hardBestScore),
+      (icon: Icons.whatshot_outlined, label: AppStrings.current.f('ZOR','HARD'), score: appState.hardBestScore),
     ];
 
     return GridView.builder(
@@ -264,7 +265,7 @@ class _WeeklyCard extends StatelessWidget {
             children: <Widget>[
               const Icon(Icons.calendar_view_week_rounded, color: Color(0xFFFFCF7A)),
               const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'HAFTALIK HEDEF',
                   style: TextStyle(
@@ -301,7 +302,7 @@ class _WeeklyCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(child: _MiniStat(label: 'EN İYİ', value: '${appState.weeklyBestScore}')),
               const SizedBox(width: 8),
-              const Expanded(child: _MiniStat(label: 'ÖDÜL', value: '250 C')),
+              Expanded(child: _MiniStat(label: 'ÖDÜL', value: '250 C')),
             ],
           ),
           const SizedBox(height: 14),
@@ -407,7 +408,7 @@ class _ConnectionCard extends StatelessWidget {
                 child: OutlinedButton.icon(
                   onPressed: null,
                   icon: const Icon(Icons.cloud_outlined),
-                  label: const Text('PLAY CONSOLE SONRASI AKTİF'),
+                  label: Text('PLAY CONSOLE SONRASI AKTİF'),
                 ),
               ),
             ],
