@@ -29,6 +29,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -53,12 +55,14 @@ jobs:
           unzip -q elxvro-blocks-v0.10.1.zip -d extracted
           test -d extracted/elxvro-blocks-v0.10.1
 
-      - name: Restore current source and tests
+      - name: Restore stable v0.22 source and current tests
         run: |
           set -euo pipefail
           APP=extracted/elxvro-blocks-v0.10.1
           rm -rf "$APP/lib"
-          cp -a source_snapshot/lib "$APP/lib"
+          mkdir -p /tmp/elxvro-v022-base
+          git archive origin/release-v0.22.0 source_snapshot/lib | tar -x -C /tmp/elxvro-v022-base
+          cp -a /tmp/elxvro-v022-base/source_snapshot/lib "$APP/lib"
           cp source_snapshot/pubspec.yaml "$APP/pubspec.yaml"
           if [ -d source_snapshot/test ]; then
             mkdir -p "$APP/test"
