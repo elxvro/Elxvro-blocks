@@ -155,4 +155,32 @@ for rel in [
     text = text.replace('const SnackBar(', 'SnackBar(')
     p.write_text(text, encoding='utf-8')
 
+
+# Final 7 Turkish UI strings found by validation.
+patch('lib/screens/modes_screen.dart', [
+    ("_Badge(label: 'ÖDÜL HAZIR', accent: accent)",
+     "_Badge(label: AppStrings.current.f('ÖDÜL HAZIR', 'REWARD READY'), accent: accent)"),
+])
+
+patch('lib/screens/themes_screen.dart', [
+    ("'Bu tema için Macera’da $adventureRequirement bölüm tamamla.'",
+     "AppStrings.current.f('Bu tema için Macera’da $adventureRequirement bölüm tamamla.', 'Complete $adventureRequirement Adventure levels to unlock this theme.')"),
+])
+
+patch('lib/screens/falling_blocks_screen.dart', [
+    (": 'DÜŞEN BLOKLAR',",
+     ": AppStrings.current.f('DÜŞEN BLOKLAR', 'FALLING BLOCKS'),"),
+])
+
+patch('lib/screens/game_screen.dart', [
+    ("text: 'Tahtayı tamamen boşaltırsan +1000 skor, +100 coin ve +75 XP kazanırsın.'",
+     "text: AppStrings.current.f('Tahtayı tamamen boşaltırsan +1000 skor, +100 coin ve +75 XP kazanırsın.', 'Clear the entire board to earn +1000 score, +100 coins and +75 XP.')"),
+    ("title = widget.mode == GameMode.comboRush ? 'COMBO RUSH BİTTİ' : reason;",
+     "title = widget.mode == GameMode.comboRush ? AppStrings.current.f('COMBO RUSH BİTTİ', 'COMBO RUSH OVER') : reason;"),
+    ("if (combo >= 5) return 'MEGA SERİ x$combo';",
+     "if (combo >= 5) return AppStrings.current.f('MEGA SERİ x$combo', 'MEGA STREAK x$combo');"),
+    ("return 'SERİ x$combo';",
+     "return AppStrings.current.f('SERİ x$combo', 'STREAK x$combo');"),
+])
+
 print('v0.22.1 final localization patch applied')
