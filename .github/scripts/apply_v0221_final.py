@@ -258,4 +258,47 @@ for rel in ['lib/screens/game_screen.dart', 'lib/screens/falling_blocks_screen.d
     text = re.sub(r'\bconst\s+((?:[A-Z]|_[A-Z])[A-Za-z0-9_]*(?:<[^>]+>)?)\s*\(', r'\1(', text)
     p.write_text(text, encoding='utf-8')
 
+
+# Rebuild Falling Blocks end-dialog title and result text as complete valid Dart blocks.
+falling = ROOT / 'lib/screens/falling_blocks_screen.dart'
+text = falling.read_text(encoding='utf-8')
+
+title_pattern = re.compile(
+    r"title:\s*Text\(\s*_isAdventure\s*\?\s*success\s*\?.*?:\s*AppStrings\.current\.f\('DÜŞEN BLOKLAR', 'FALLING BLOCKS'\),\s*textAlign:",
+    re.S,
+)
+title_replacement = """title: Text(
+            _isAdventure
+                ? (success
+                    ? AppStrings.current.f('BÖLÜM TAMAMLANDI', 'LEVEL COMPLETE')
+                    : AppStrings.current.f('BÖLÜM BAŞARISIZ', 'LEVEL FAILED'))
+                : AppStrings.current.f('DÜŞEN BLOKLAR', 'FALLING BLOCKS'),
+            textAlign:"""
+text, title_count = title_pattern.subn(lambda m: title_replacement, text, count=1)
+if title_count != 1:
+    raise SystemExit(f'falling title repair expected 1 match, found {title_count}')
+
+result_pattern = re.compile(
+    r"Text\(\s*_isAdventure.*?\s*textAlign:\s*TextAlign\.center,\s*style:\s*TextStyle\(color:\s*Colors\.white60,\s*height:\s*1\.5\),\s*\)",
+    re.S,
+)
+result_replacement = """Text(
+                _isAdventure
+                    ? AppStrings.current.f(
+                        "Hedef $_targetScore puan  •  $_lines çizgi${earned > 0 ? '  •  +$earned coin' : ''}",
+                        "Target $_targetScore score  •  $_lines lines${earned > 0 ? '  •  +$earned coin' : ''}",
+                      )
+                    : AppStrings.current.f(
+                        "$_lines çizgi  •  Seviye $_arcadeLevel\\nEn iyi: ${widget.appState.fallingBlocksBestScore}",
+                        "$_lines lines  •  Level $_arcadeLevel\\nBest: ${widget.appState.fallingBlocksBestScore}",
+                      ),
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white60, height: 1.5),
+              )"""
+text, result_count = result_pattern.subn(lambda m: result_replacement, text, count=1)
+if result_count != 1:
+    raise SystemExit(f'falling result block repair expected 1 match, found {result_count}')
+
+falling.write_text(text, encoding='utf-8')
+
 print('v0.22.1 final localization patch applied')
