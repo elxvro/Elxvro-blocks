@@ -142,7 +142,7 @@ class HomeScreen extends StatelessWidget {
                               child: _HomeTile(
                                 icon: Icons.card_giftcard_rounded,
                                 label: AppStrings.current.f('GÜNLÜK ÖDÜL','DAILY REWARD'),
-                                badge: appState.dailyRewardAvailable ? 'HAZIR' : '${appState.loginStreak}. GÜN',
+                                badge: appState.dailyRewardAvailable ? AppStrings.current.f('HAZIR','READY') : AppStrings.current.f('${appState.loginStreak}. GÜN','DAY ${appState.loginStreak}'),
                                 emphasized: appState.dailyRewardAvailable,
                                 onTap: () {
                                   Navigator.of(context).push(
@@ -242,7 +242,7 @@ class HomeScreen extends StatelessWidget {
                           child: _HomeTile(
                             icon: Icons.leaderboard_rounded,
                             label: AppStrings.current.f('LİDERLİK MERKEZİ','LEADERBOARD HUB'),
-                            badge: appState.weeklyRewardAvailable ? 'ÖDÜL HAZIR' : 'HAFTALIK',
+                            badge: appState.weeklyRewardAvailable ? AppStrings.current.f('ÖDÜL HAZIR','REWARD READY') : AppStrings.current.f('HAFTALIK','WEEKLY'),
                             emphasized: appState.weeklyRewardAvailable,
                             onTap: () {
                               Navigator.of(context).push(
@@ -351,7 +351,7 @@ class _LevelStrip extends StatelessWidget {
                 Row(
                   children: <Widget>[
                     Text(
-                      'SEVİYE ${appState.playerLevel}',
+                      AppStrings.current.f('SEVİYE ${appState.playerLevel}','LEVEL ${appState.playerLevel}'),
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 10,
