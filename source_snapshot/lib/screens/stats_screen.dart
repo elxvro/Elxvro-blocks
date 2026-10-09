@@ -19,12 +19,12 @@ class StatsScreen extends StatelessWidget {
 
     final stats = <_StatData>[
       _StatData(
-        title: 'Oyuncu Seviyesi',
+        title: AppStrings.current.f('Oyuncu Seviyesi','Player Level'),
         value: 'LV ${appState.playerLevel}',
         icon: Icons.workspace_premium_rounded,
       ),
       _StatData(
-        title: 'Toplam XP',
+        title: AppStrings.current.f('Toplam XP','Total XP'),
         value: '${appState.xp}',
         icon: Icons.trending_up_rounded,
       ),
@@ -44,7 +44,7 @@ class StatsScreen extends StatelessWidget {
         icon: Icons.sports_esports_rounded,
       ),
       _StatData(
-        title: 'Maksimum Combo',
+        title: AppStrings.current.f('Maksimum Combo','Max Combo'),
         value: 'x${appState.maxCombo}',
         icon: Icons.bolt_rounded,
       ),
@@ -54,12 +54,12 @@ class StatsScreen extends StatelessWidget {
         icon: Icons.stars_rounded,
       ),
       _StatData(
-        title: 'Temizlenen Çizgi',
+        title: AppStrings.current.f('Temizlenen Çizgi','Lines Cleared'),
         value: '${appState.totalLines}',
         icon: Icons.auto_awesome_rounded,
       ),
       _StatData(
-        title: 'Yerleştirilen Parça',
+        title: AppStrings.current.f('Yerleştirilen Parça','Pieces Placed'),
         value: '${appState.totalBlocks}',
         icon: Icons.grid_view_rounded,
       ),
