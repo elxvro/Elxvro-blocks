@@ -190,7 +190,7 @@ class HomeScreen extends StatelessWidget {
                             Expanded(
                               child: _HomeTile(
                                 icon: Icons.task_alt_rounded,
-                                label: 'GÖREVLER',
+                                label: AppStrings.current.f('GÖREVLER','MISSIONS'),
                                 badge: '${appState.completedDailyMissions}/3',
                                 onTap: () {
                                   Navigator.of(context).push(
@@ -209,7 +209,7 @@ class HomeScreen extends StatelessWidget {
                             Expanded(
                               child: _HomeTile(
                                 icon: Icons.emoji_events_outlined,
-                                label: 'BAŞARIMLAR',
+                                label: AppStrings.current.f('BAŞARIMLAR','ACHIEVEMENTS'),
                                 badge: '${appState.unlockedAchievements}/10',
                                 onTap: () {
                                   Navigator.of(context).push(
@@ -224,7 +224,7 @@ class HomeScreen extends StatelessWidget {
                             Expanded(
                               child: _HomeTile(
                                 icon: Icons.bar_chart_rounded,
-                                label: 'İSTATİSTİK',
+                                label: AppStrings.current.f('İSTATİSTİK','STATISTICS'),
                                 onTap: () {
                                   Navigator.of(context).push(
                                     MaterialPageRoute<void>(
@@ -241,7 +241,7 @@ class HomeScreen extends StatelessWidget {
                           width: double.infinity,
                           child: _HomeTile(
                             icon: Icons.leaderboard_rounded,
-                            label: 'LİDERLİK MERKEZİ',
+                            label: AppStrings.current.f('LİDERLİK MERKEZİ','LEADERBOARD HUB'),
                             badge: appState.weeklyRewardAvailable ? 'ÖDÜL HAZIR' : 'HAFTALIK',
                             emphasized: appState.weeklyRewardAvailable,
                             onTap: () {
@@ -258,7 +258,7 @@ class HomeScreen extends StatelessWidget {
                           width: double.infinity,
                           child: _HomeTile(
                             icon: Icons.person_outline_rounded,
-                            label: 'PROFİL & SEVİYE',
+                            label: AppStrings.current.f('PROFİL & SEVİYE','PROFILE & LEVEL'),
                             badge: 'LV ${appState.playerLevel}',
                             emphasized: true,
                             onTap: () {
