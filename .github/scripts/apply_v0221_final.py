@@ -221,11 +221,12 @@ patch('lib/screens/falling_blocks_screen.dart', [
     ),
 ])
 
-# Dynamic localization calls must not live inside const expressions.
+# Only widget constructor const markers are removed where localization is dynamic.
 for rel in ['lib/screens/game_screen.dart', 'lib/screens/falling_blocks_screen.dart']:
     p = ROOT / rel
     text = p.read_text(encoding='utf-8')
-    text = text.replace('const ', '')
+    text = text.replace('const Text(AppStrings.current.f(', 'Text(AppStrings.current.f(')
+    text = text.replace('const SnackBar(content: Text(AppStrings.current.f(', 'SnackBar(content: Text(AppStrings.current.f(')
     p.write_text(text, encoding='utf-8')
 
 print('v0.22.1 final localization patch applied')
