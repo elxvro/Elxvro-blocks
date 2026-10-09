@@ -256,7 +256,7 @@ class ProfileScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          'Her 5 seviyede coin + 2 özel blok kazanırsın. Seviye 5, 10, 15, 20 ve 25 ilerlemelerinde premium temalar da otomatik açılır.',
+                          AppStrings.current.f('Her 5 seviyede coin + 2 özel blok kazanırsın. Seviye 5, 10, 15, 20 ve 25 ilerlemelerinde premium temalar da otomatik açılır.','Every 5 levels you earn coins and 2 special blocks. Premium themes unlock at levels 5, 10, 15, 20 and 25.'),
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.45),
                             fontSize: 10,
