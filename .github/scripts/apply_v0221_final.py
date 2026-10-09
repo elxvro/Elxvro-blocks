@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from pathlib import Path
+import re
 import sys
 
 ROOT = Path(sys.argv[1]) if len(sys.argv) > 1 else Path('.')
@@ -227,6 +228,34 @@ for rel in ['lib/screens/game_screen.dart', 'lib/screens/falling_blocks_screen.d
     text = p.read_text(encoding='utf-8')
     text = text.replace('const Text(AppStrings.current.f(', 'Text(AppStrings.current.f(')
     text = text.replace('const SnackBar(content: Text(AppStrings.current.f(', 'SnackBar(content: Text(AppStrings.current.f(')
+    p.write_text(text, encoding='utf-8')
+
+
+# Final syntax repair: replace the Falling Blocks result text expression as one valid Dart expression.
+falling = ROOT / 'lib/screens/falling_blocks_screen.dart'
+text = falling.read_text(encoding='utf-8')
+pattern = re.compile(r"Text\(\n\s*_isAdventure.*?\n\s*textAlign:", re.S)
+replacement = """Text(
+                _isAdventure
+                    ? AppStrings.current.f(
+                        'Hedef $_targetScore puan  •  $_lines çizgi${earned > 0 ? '  •  +$earned coin' : ''}',
+                        'Target $_targetScore score  •  $_lines lines${earned > 0 ? '  •  +$earned coin' : ''}',
+                      )
+                    : AppStrings.current.f(
+                        '$_lines çizgi  •  Seviye $_arcadeLevel\\nEn iyi: ${widget.appState.fallingBlocksBestScore}',
+                        '$_lines lines  •  Level $_arcadeLevel\\nBest: ${widget.appState.fallingBlocksBestScore}',
+                      ),
+                textAlign:"""
+text, count = pattern.subn(replacement, text, count=1)
+if count != 1:
+    raise SystemExit(f'falling result text repair expected 1 match, found {count}')
+falling.write_text(text, encoding='utf-8')
+
+# Remove const only from constructor calls (never from variable declarations).
+for rel in ['lib/screens/game_screen.dart', 'lib/screens/falling_blocks_screen.dart']:
+    p = ROOT / rel
+    text = p.read_text(encoding='utf-8')
+    text = re.sub(r'\bconst\s+((?:[A-Z]|_[A-Z])[A-Za-z0-9_]*(?:<[^>]+>)?)\s*\(', r'\1(', text)
     p.write_text(text, encoding='utf-8')
 
 print('v0.22.1 final localization patch applied')
