@@ -167,7 +167,7 @@ class ProfileScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                'SEVİYE ${appState.playerLevel}',
+                                AppStrings.current.f('SEVİYE ${appState.playerLevel}','LEVEL ${appState.playerLevel}'),
                                 style: const TextStyle(
                                   color: Color(0xFFFFD98B),
                                   fontSize: 11,
@@ -382,7 +382,7 @@ class _MilestoneCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  'SEVİYE $level ÖDÜLÜ',
+                  AppStrings.current.f('SEVİYE $level ÖDÜLÜ','LEVEL $level REWARD'),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
@@ -391,7 +391,7 @@ class _MilestoneCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '+$coinReward coin  •  +2 özel blok  •  $themeName',
+                  AppStrings.current.f('+$coinReward coin  •  +2 özel blok  •  $themeName','+$coinReward coins  •  +2 special blocks  •  $themeName'),
                   style: const TextStyle(
                     color: Colors.white54,
                     fontSize: 9,
