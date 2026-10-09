@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../l10n/app_strings.dart';
 import '../models/game_theme.dart';
 import '../services/audio_service.dart';
 import '../widgets/coin_badge.dart';
@@ -76,7 +77,7 @@ class DailyMissionsScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
                               Text(
-                                'GÜNLÜK GÖREVLER',
+                                AppStrings.current.f('GÜNLÜK GÖREVLER', 'DAILY MISSIONS'),
                                 style: TextStyle(
                                   color: Color(0xFFFFD99A),
                                   fontSize: 20,
