@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../l10n/app_strings.dart';
 import '../models/game_theme.dart';
 import '../services/audio_service.dart';
 import '../widgets/coin_badge.dart';
@@ -13,17 +14,17 @@ class AchievementsScreen extends StatelessWidget {
 
   final AppState appState;
 
-  static const List<_AchievementData> _items = <_AchievementData>[
-    _AchievementData(id: 'first_game', title: 'İlk Adım', subtitle: 'İlk oyununu tamamla', reward: 100, icon: Icons.flag_rounded),
-    _AchievementData(id: 'score_1000', title: 'Isınma Turu', subtitle: 'Tek oyunda 1.000 puana ulaş', reward: 125, icon: Icons.local_fire_department_rounded),
-    _AchievementData(id: 'combo_3', title: 'Combo Ustası', subtitle: 'x3 combo yap', reward: 150, icon: Icons.bolt_rounded),
-    _AchievementData(id: 'lines_25', title: 'Tahta Temizleyici', subtitle: 'Toplam 25 satır veya sütun temizle', reward: 200, icon: Icons.auto_awesome_rounded),
-    _AchievementData(id: 'games_10', title: 'Deneyimli', subtitle: '10 oyun tamamla', reward: 250, icon: Icons.sports_esports_rounded),
-    _AchievementData(id: 'blocks_250', title: 'Blok Koleksiyoncusu', subtitle: '250 parça yerleştir', reward: 300, icon: Icons.grid_view_rounded),
-    _AchievementData(id: 'score_10000', title: 'Efsane', subtitle: 'Tek oyunda 10.000 puana ulaş', reward: 500, icon: Icons.workspace_premium_rounded),
-    _AchievementData(id: 'level_5', title: 'Yükseliş', subtitle: 'Seviye 5 ol', reward: 250, icon: Icons.trending_up_rounded),
-    _AchievementData(id: 'perfect_3', title: 'Kusursuz', subtitle: 'Toplam 3 Perfect Clear yap', reward: 350, icon: Icons.diamond_outlined),
-    _AchievementData(id: 'level_15', title: 'ELXVRO Ustası', subtitle: 'Seviye 15 ol', reward: 650, icon: Icons.military_tech_rounded),
+  static final List<_AchievementData> _items = <_AchievementData>[
+    _AchievementData(id: 'first_game', title: AppStrings.current.f('İlk Adım','First Step'), subtitle: AppStrings.current.f('İlk oyununu tamamla','Complete your first game'), reward: 100, icon: Icons.flag_rounded),
+    _AchievementData(id: 'score_1000', title: AppStrings.current.f('Isınma Turu','Warm Up'), subtitle: AppStrings.current.f('Tek oyunda 1.000 puana ulaş','Reach 1000 points in one game'), reward: 125, icon: Icons.local_fire_department_rounded),
+    _AchievementData(id: 'combo_3', title: AppStrings.current.f('Combo Ustası','Combo Master'), subtitle: 'x3 combo yap', reward: 150, icon: Icons.bolt_rounded),
+    _AchievementData(id: 'lines_25', title: AppStrings.current.f('Tahta Temizleyici','Board Cleaner'), subtitle: AppStrings.current.f('Toplam 25 satır veya sütun temizle','Clear 25 rows or columns in total'), reward: 200, icon: Icons.auto_awesome_rounded),
+    _AchievementData(id: 'games_10', title: AppStrings.current.f('Deneyimli','Experienced'), subtitle: AppStrings.current.f('10 oyun tamamla','Complete 10 games'), reward: 250, icon: Icons.sports_esports_rounded),
+    _AchievementData(id: 'blocks_250', title: AppStrings.current.f('Blok Koleksiyoncusu','Block Collector'), subtitle: AppStrings.current.f('250 parça yerleştir','Place 250 pieces'), reward: 300, icon: Icons.grid_view_rounded),
+    _AchievementData(id: 'score_10000', title: AppStrings.current.f('Efsane','Legend'), subtitle: AppStrings.current.f('Tek oyunda 10.000 puana ulaş','Reach 10000 points in one game'), reward: 500, icon: Icons.workspace_premium_rounded),
+    _AchievementData(id: 'level_5', title: AppStrings.current.f('Yükseliş','Rising Star'), subtitle: AppStrings.current.f('Seviye 5 ol','Reach level 5'), reward: 250, icon: Icons.trending_up_rounded),
+    _AchievementData(id: 'perfect_3', title: AppStrings.current.f('Kusursuz','Flawless'), subtitle: AppStrings.current.f('Toplam 3 Perfect Clear yap','Complete 3 Perfect Clears'), reward: 350, icon: Icons.diamond_outlined),
+    _AchievementData(id: 'level_15', title: AppStrings.current.f('ELXVRO Ustası','ELXVRO Master'), subtitle: AppStrings.current.f('Seviye 15 ol','Reach level 15'), reward: 650, icon: Icons.military_tech_rounded),
   ];
 
   @override
@@ -58,8 +59,8 @@ class AchievementsScreen extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
-                              const Text(
-                                'BAŞARIMLAR',
+                              Text(
+                                AppStrings.current.f('BAŞARIMLAR','ACHIEVEMENTS'),
                                 style: TextStyle(
                                   color: Color(0xFFFFD99A),
                                   fontSize: 21,
@@ -69,7 +70,7 @@ class AchievementsScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                '${appState.unlockedAchievements}/${_items.length} açıldı',
+                                AppStrings.current.f('${appState.unlockedAchievements}/${_items.length} açıldı','${appState.unlockedAchievements}/${_items.length} unlocked'),
                                 style: const TextStyle(color: Colors.white54, fontSize: 12),
                               ),
                             ],
@@ -101,7 +102,7 @@ class AchievementsScreen extends StatelessWidget {
                             if (!context.mounted || !success) return;
                             unawaited(AudioService.instance.playReward());
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('+${item.reward} coin kazandın.')),
+                              SnackBar(content: Text(AppStrings.current.f('+${item.reward} coin kazandın.','+${item.reward} coins earned.'))),
                             );
                           },
                         );

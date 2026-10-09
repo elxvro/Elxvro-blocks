@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../l10n/app_strings.dart';
 import '../models/game_theme.dart';
 import '../widgets/premium_background.dart';
 
@@ -18,12 +19,12 @@ class StatsScreen extends StatelessWidget {
 
     final stats = <_StatData>[
       _StatData(
-        title: 'Oyuncu Seviyesi',
+        title: AppStrings.current.f('Oyuncu Seviyesi','Player Level'),
         value: 'LV ${appState.playerLevel}',
         icon: Icons.workspace_premium_rounded,
       ),
       _StatData(
-        title: 'Toplam XP',
+        title: AppStrings.current.f('Toplam XP','Total XP'),
         value: '${appState.xp}',
         icon: Icons.trending_up_rounded,
       ),
@@ -33,32 +34,32 @@ class StatsScreen extends StatelessWidget {
         icon: Icons.auto_awesome_rounded,
       ),
       _StatData(
-        title: 'En Yüksek Skor',
+        title: AppStrings.current.f('En Yüksek Skor','Best Score'),
         value: '${appState.bestScore}',
         icon: Icons.emoji_events_rounded,
       ),
       _StatData(
-        title: 'Oynanan Oyun',
+        title: AppStrings.current.f('Oynanan Oyun','Games Played'),
         value: '${appState.gamesPlayed}',
         icon: Icons.sports_esports_rounded,
       ),
       _StatData(
-        title: 'Maksimum Combo',
+        title: AppStrings.current.f('Maksimum Combo','Max Combo'),
         value: 'x${appState.maxCombo}',
         icon: Icons.bolt_rounded,
       ),
       _StatData(
-        title: 'Toplam Puan',
+        title: AppStrings.current.f('Toplam Puan','Total Score'),
         value: '${appState.totalScore}',
         icon: Icons.stars_rounded,
       ),
       _StatData(
-        title: 'Temizlenen Çizgi',
+        title: AppStrings.current.f('Temizlenen Çizgi','Lines Cleared'),
         value: '${appState.totalLines}',
         icon: Icons.auto_awesome_rounded,
       ),
       _StatData(
-        title: 'Yerleştirilen Parça',
+        title: AppStrings.current.f('Yerleştirilen Parça','Pieces Placed'),
         value: '${appState.totalBlocks}',
         icon: Icons.grid_view_rounded,
       ),
@@ -73,7 +74,7 @@ class StatsScreen extends StatelessWidget {
         icon: Icons.flag_rounded,
       ),
       _StatData(
-        title: 'Günlük Rekor',
+        title: AppStrings.current.f('Günlük Rekor','Daily Best'),
         value: '${appState.dailyChallengeBestScore}',
         icon: Icons.local_fire_department_rounded,
       ),
@@ -112,7 +113,7 @@ class StatsScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(
-                            'İSTATİSTİKLER',
+                            AppStrings.current.f('İSTATİSTİKLER','STATISTICS'),
                             style: TextStyle(
                               color: selectedTheme.blockAccent,
                               fontSize: 21,
@@ -121,7 +122,7 @@ class StatsScreen extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 2),
-                          const Text(
+                          Text(
                             'ELXVRO Blocks kariyerin',
                             style: TextStyle(color: Colors.white54, fontSize: 12),
                           ),

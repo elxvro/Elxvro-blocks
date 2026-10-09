@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../l10n/app_strings.dart';
 import '../models/game_theme.dart';
 import '../widgets/coin_badge.dart';
 import '../widgets/premium_background.dart';
@@ -17,7 +18,7 @@ class ProfileScreen extends StatelessWidget {
       builder: (dialogContext) {
         return AlertDialog(
           backgroundColor: const Color(0xFF12100E),
-          title: const Text('OYUNCU ADI'),
+          title: Text(AppStrings.current.f('OYUNCU ADI','PLAYER NAME')),
           content: TextField(
             controller: controller,
             autofocus: true,
@@ -32,11 +33,11 @@ class ProfileScreen extends StatelessWidget {
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('İPTAL'),
+              child: Text(AppStrings.current.f('İPTAL','CANCEL')),
             ),
             FilledButton(
               onPressed: () => Navigator.of(dialogContext).pop(controller.text),
-              child: const Text('KAYDET'),
+              child: Text(AppStrings.current.f('KAYDET','SAVE')),
             ),
           ],
         );
@@ -75,9 +76,9 @@ class ProfileScreen extends StatelessWidget {
                           onPressed: () => Navigator.of(context).pop(),
                           icon: const Icon(Icons.arrow_back_rounded),
                         ),
-                        const Expanded(
+                        Expanded(
                           child: Text(
-                            'PROFİL',
+                            AppStrings.current.f('PROFİL','PROFILE'),
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Color(0xFFFFD98B),
@@ -153,7 +154,7 @@ class ProfileScreen extends StatelessWidget {
                                   ),
                                   const SizedBox(width: 4),
                                   IconButton(
-                                    tooltip: 'Oyuncu adını değiştir',
+                                    tooltip: AppStrings.current.f('Oyuncu adını değiştir','Change player name'),
                                     visualDensity: VisualDensity.compact,
                                     onPressed: () => _editName(context),
                                     icon: const Icon(
@@ -166,7 +167,7 @@ class ProfileScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                'SEVİYE ${appState.playerLevel}',
+                                AppStrings.current.f('SEVİYE ${appState.playerLevel}','LEVEL ${appState.playerLevel}'),
                                 style: const TextStyle(
                                   color: Color(0xFFFFD98B),
                                   fontSize: 11,
@@ -204,7 +205,7 @@ class ProfileScreen extends StatelessWidget {
                             Expanded(
                               child: _ProfileStat(
                                 icon: Icons.emoji_events_rounded,
-                                label: 'EN İYİ',
+                                label: AppStrings.current.f('EN İYİ','BEST'),
                                 value: '${appState.bestScore}',
                               ),
                             ),
@@ -239,8 +240,8 @@ class ProfileScreen extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 18),
-                        const Text(
-                          'SEVİYE ÖDÜLLERİ',
+                        Text(
+                          AppStrings.current.f('SEVİYE ÖDÜLLERİ','LEVEL REWARDS'),
                           style: TextStyle(
                             color: Color(0xFFFFD98B),
                             fontSize: 12,
@@ -255,7 +256,7 @@ class ProfileScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          'Her 5 seviyede coin + 2 özel blok kazanırsın. Seviye 5, 10, 15, 20 ve 25 ilerlemelerinde premium temalar da otomatik açılır.',
+                          AppStrings.current.f('Her 5 seviyede coin + 2 özel blok kazanırsın. Seviye 5, 10, 15, 20 ve 25 ilerlemelerinde premium temalar da otomatik açılır.','Every 5 levels you earn coins and 2 special blocks. Premium themes unlock at levels 5, 10, 15, 20 and 25.'),
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.45),
                             fontSize: 10,
@@ -340,10 +341,10 @@ class _MilestoneCard extends StatelessWidget {
     final themeName = switch (level) {
       5 => 'GECE TEMASI',
       10 => 'MERMER TEMASI',
-      15 => 'ATEŞ TEMASI',
-      20 => 'DOĞA TEMASI',
+      15 => AppStrings.current.f('ATEŞ TEMASI','FIRE THEME'),
+      20 => AppStrings.current.f('DOĞA TEMASI','NATURE THEME'),
       25 => 'AURORA TEMASI',
-      _ => 'PREMIUM ÖDÜL',
+      _ => AppStrings.current.f('PREMIUM ÖDÜL','PREMIUM REWARD'),
     };
     final coinReward = 200 + level * 10;
 
@@ -381,7 +382,7 @@ class _MilestoneCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  'SEVİYE $level ÖDÜLÜ',
+                  AppStrings.current.f('SEVİYE $level ÖDÜLÜ','LEVEL $level REWARD'),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
@@ -390,7 +391,7 @@ class _MilestoneCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '+$coinReward coin  •  +2 özel blok  •  $themeName',
+                  AppStrings.current.f('+$coinReward coin  •  +2 özel blok  •  $themeName','+$coinReward coins  •  +2 special blocks  •  $themeName'),
                   style: const TextStyle(
                     color: Colors.white54,
                     fontSize: 9,

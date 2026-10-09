@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'l10n/app_strings.dart';
+
 class AppState extends ChangeNotifier {
   static const String _bestScoreKey = 'best_score';
   static const String _themeKey = 'theme_id';
@@ -284,6 +286,7 @@ class AppState extends ChangeNotifier {
       performanceMode = prefs.getBool(_performanceModeKey) ?? false;
       final savedLanguage = prefs.getString(_languageCodeKey) ?? 'tr';
       languageCode = savedLanguage == 'en' ? 'en' : 'tr';
+      AppStrings.setCurrentLanguage(languageCode);
       xp = prefs.getInt(_xpKey) ?? 0;
       perfectClears = prefs.getInt(_perfectClearsKey) ?? 0;
       tutorialCompleted = prefs.getBool(_tutorialCompletedKey) ?? false;
@@ -546,6 +549,7 @@ class AppState extends ChangeNotifier {
     final normalized = code == 'en' ? 'en' : 'tr';
     if (languageCode == normalized) return;
     languageCode = normalized;
+    AppStrings.setCurrentLanguage(languageCode);
     notifyListeners();
     try {
       final prefs = await SharedPreferences.getInstance();

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../l10n/app_strings.dart';
 import '../models/adventure_level.dart';
 import '../models/game_theme.dart';
 import '../widgets/coin_badge.dart';
@@ -74,9 +75,9 @@ class AdventureScreen extends StatelessWidget {
                             children: <Widget>[
                               Icon(Icons.map_rounded, color: accent),
                               const SizedBox(width: 10),
-                              const Expanded(
+                              Expanded(
                                 child: Text(
-                                  '60 BÖLÜMLÜK YOLCULUK',
+                                  AppStrings.current.f('60 BÖLÜMLÜK YOLCULUK','60 LEVEL JOURNEY'),
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w900,
@@ -105,7 +106,7 @@ class AdventureScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Her bölümde hedef puan yükselir, düşüş hızlanır, başlangıç alanı zorlaşır ve renk paleti değişir.',
+                            AppStrings.current.f('Her bölümde hedef puan yükselir, düşüş hızlanır, başlangıç alanı zorlaşır ve renk paleti değişir.','Each level raises the target score, increases speed and difficulty, and changes the color palette.'),
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.52),
                               fontSize: 10,
@@ -235,7 +236,7 @@ class _AdventureLevelCard extends StatelessWidget {
               ),
               const SizedBox(height: 3),
               Text(
-                'BÖLÜM ${level.chapter} • ${level.difficultyLabel}',
+                AppStrings.current.f('BÖLÜM ${level.chapter} • ${level.difficultyLabel}','LEVEL ${level.chapter} • ${level.difficultyLabel}'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -255,7 +256,7 @@ class _AdventureLevelCard extends StatelessWidget {
                 ),
               ),
               Text(
-                'PUAN',
+                AppStrings.current.f('PUAN','SCORE'),
                 style: TextStyle(
                   color: unlocked ? Colors.white38 : Colors.white.withValues(alpha: 0.18),
                   fontSize: 8,

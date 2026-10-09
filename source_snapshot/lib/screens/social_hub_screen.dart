@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../l10n/app_strings.dart';
 import '../models/game_theme.dart';
 import '../services/audio_service.dart';
 import '../services/social_service.dart';
@@ -46,9 +47,9 @@ class SocialHubScreen extends StatelessWidget {
                           onPressed: () => Navigator.of(context).pop(),
                           icon: const Icon(Icons.arrow_back_rounded),
                         ),
-                        const Expanded(
+                        Expanded(
                           child: Text(
-                            'LİDERLİK MERKEZİ',
+                            AppStrings.current.f('LİDERLİK MERKEZİ','LEADERBOARD HUB'),
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Color(0xFFFFD98B),
@@ -67,11 +68,11 @@ class SocialHubScreen extends StatelessWidget {
                       children: <Widget>[
                         _PlayerCard(appState: appState),
                         const SizedBox(height: 14),
-                        const _SectionTitle('KİŞİSEL REKORLAR'),
+                        _SectionTitle(AppStrings.current.f('KİŞİSEL REKORLAR','PERSONAL BESTS')),
                         const SizedBox(height: 10),
                         _RecordGrid(appState: appState),
                         const SizedBox(height: 18),
-                        const _SectionTitle('BU HAFTA'),
+                        _SectionTitle(AppStrings.current.f('BU HAFTA','THIS WEEK')),
                         const SizedBox(height: 10),
                         _WeeklyCard(appState: appState),
                         const SizedBox(height: 18),
@@ -80,7 +81,7 @@ class SocialHubScreen extends StatelessWidget {
                         _ConnectionCard(service: socialService),
                         const SizedBox(height: 12),
                         Text(
-                          'Play Console yapılandırıldığında bu ekran global sıralama ve başarımları aynı kayıt mimarisi üzerinden gösterecek. Şimdilik hiçbir çevrimiçi sıralama taklit edilmez.',
+                          AppStrings.current.f('Play Console yapılandırıldığında bu ekran global sıralama ve başarımları aynı kayıt mimarisi üzerinden gösterecek. Şimdilik hiçbir çevrimiçi sıralama taklit edilmez.','Global leaderboards and achievements will appear here after Play Console setup.'),
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.38),
                             fontSize: 10,
@@ -155,7 +156,7 @@ class _PlayerCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'SEVİYE ${appState.playerLevel}  •  ${appState.xp} XP',
+                  AppStrings.current.f('SEVİYE ${appState.playerLevel}  •  ${appState.xp} XP','LEVEL ${appState.playerLevel}  •  ${appState.xp} XP'),
                   style: const TextStyle(
                     color: Color(0xFFFFD98B),
                     fontSize: 10,
@@ -180,12 +181,12 @@ class _RecordGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final records = <({IconData icon, String label, int score})>[
-      (icon: Icons.grid_view_rounded, label: 'KLASİK', score: appState.bestScore),
-      (icon: Icons.timer_outlined, label: '2 DAKİKA', score: appState.timedBestScore),
-      (icon: Icons.flag_outlined, label: 'HEDEF', score: appState.targetBestScore),
-      (icon: Icons.today_outlined, label: 'GÜNLÜK', score: appState.dailyChallengeBestScore),
+      (icon: Icons.grid_view_rounded, label: AppStrings.current.f('KLASİK','CLASSIC'), score: appState.bestScore),
+      (icon: Icons.timer_outlined, label: AppStrings.current.f('2 DAKİKA','2 MINUTES'), score: appState.timedBestScore),
+      (icon: Icons.flag_outlined, label: AppStrings.current.f('HEDEF','TARGET'), score: appState.targetBestScore),
+      (icon: Icons.today_outlined, label: AppStrings.current.f('GÜNLÜK','DAILY'), score: appState.dailyChallengeBestScore),
       (icon: Icons.spa_outlined, label: 'ZEN', score: appState.zenBestScore),
-      (icon: Icons.whatshot_outlined, label: 'ZOR', score: appState.hardBestScore),
+      (icon: Icons.whatshot_outlined, label: AppStrings.current.f('ZOR','HARD'), score: appState.hardBestScore),
     ];
 
     return GridView.builder(
@@ -264,9 +265,9 @@ class _WeeklyCard extends StatelessWidget {
             children: <Widget>[
               const Icon(Icons.calendar_view_week_rounded, color: Color(0xFFFFCF7A)),
               const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'HAFTALIK HEDEF',
+                  AppStrings.current.f('HAFTALIK HEDEF','WEEKLY TARGET'),
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w900,
@@ -297,11 +298,11 @@ class _WeeklyCard extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: <Widget>[
-              Expanded(child: _MiniStat(label: 'OYUN', value: '${appState.weeklyGames}')),
+              Expanded(child: _MiniStat(label: AppStrings.current.f('OYUN','GAMES'), value: '${appState.weeklyGames}')),
               const SizedBox(width: 8),
-              Expanded(child: _MiniStat(label: 'EN İYİ', value: '${appState.weeklyBestScore}')),
+              Expanded(child: _MiniStat(label: AppStrings.current.f('EN İYİ','BEST'), value: '${appState.weeklyBestScore}')),
               const SizedBox(width: 8),
-              const Expanded(child: _MiniStat(label: 'ÖDÜL', value: '250 C')),
+              Expanded(child: _MiniStat(label: AppStrings.current.f('ÖDÜL','REWARD'), value: '250 C')),
             ],
           ),
           const SizedBox(height: 14),
@@ -314,7 +315,7 @@ class _WeeklyCard extends StatelessWidget {
                       if (!context.mounted || !claimed) return;
                       unawaited(AudioService.instance.playReward());
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('+250 coin haftalık ödül alındı.')),
+                        SnackBar(content: Text(AppStrings.current.f('+250 coin haftalık ödül alındı.','+250 weekly coins claimed.'))),
                       );
                     }
                   : null,
@@ -328,7 +329,7 @@ class _WeeklyCard extends StatelessWidget {
                     ? 'BU HAFTA ALINDI'
                     : completed
                         ? '250 COIN AL'
-                        : 'HEDEFİ TAMAMLA',
+                        : AppStrings.current.f('HEDEFİ TAMAMLA','COMPLETE TARGET'),
               ),
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFFC7863C),
@@ -386,7 +387,7 @@ class _ConnectionCard extends StatelessWidget {
                       color: Colors.white.withValues(alpha: 0.06),
                     ),
                     child: Text(
-                      info?.connected == true ? 'BAĞLI' : 'ÇEVRİMDIŞI',
+                      info?.connected == true ? AppStrings.current.f('BAĞLI','CONNECTED') : AppStrings.current.f('ÇEVRİMDIŞI','OFFLINE'),
                       style: const TextStyle(
                         color: Color(0xFFFFD98B),
                         fontSize: 8,
@@ -398,7 +399,7 @@ class _ConnectionCard extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                info?.message ?? 'Bağlantı durumu kontrol ediliyor...',
+                info?.message ?? AppStrings.current.f('Bağlantı durumu kontrol ediliyor...','Checking connection status...'),
                 style: const TextStyle(color: Colors.white54, fontSize: 11, height: 1.4),
               ),
               const SizedBox(height: 14),
@@ -407,7 +408,7 @@ class _ConnectionCard extends StatelessWidget {
                 child: OutlinedButton.icon(
                   onPressed: null,
                   icon: const Icon(Icons.cloud_outlined),
-                  label: const Text('PLAY CONSOLE SONRASI AKTİF'),
+                  label: Text(AppStrings.current.f('PLAY CONSOLE SONRASI AKTİF','ACTIVE AFTER PLAY CONSOLE')),
                 ),
               ),
             ],

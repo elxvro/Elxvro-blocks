@@ -3,6 +3,13 @@ class AppStrings {
 
   final String languageCode;
 
+  static String _currentLanguageCode = 'tr';
+  static AppStrings get current => AppStrings(_currentLanguageCode);
+
+  static void setCurrentLanguage(String code) {
+    _currentLanguageCode = code == 'en' ? 'en' : 'tr';
+  }
+
   bool get isEnglish => languageCode == 'en';
 
   String f(String tr, String en) => isEnglish ? en : tr;
