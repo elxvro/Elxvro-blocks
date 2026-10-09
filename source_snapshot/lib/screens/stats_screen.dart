@@ -74,7 +74,7 @@ class StatsScreen extends StatelessWidget {
         icon: Icons.flag_rounded,
       ),
       _StatData(
-        title: 'Günlük Rekor',
+        title: AppStrings.current.f('Günlük Rekor','Daily Best'),
         value: '${appState.dailyChallengeBestScore}',
         icon: Icons.local_fire_department_rounded,
       ),
