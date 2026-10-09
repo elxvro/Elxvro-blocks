@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../l10n/app_strings.dart';
 import '../models/game_mode.dart';
 import '../models/game_theme.dart';
 import '../widgets/coin_badge.dart';
@@ -91,7 +92,7 @@ class ModesScreen extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 4, 24, 14),
                 child: Text(
-                  'Macera, günlük challenge, Klasik, Zen ve Zor mod ile farklı hedeflerde ilerle.',
+                  AppStrings.current.f('Macera, günlük challenge, Klasik, Zen ve Zor mod ile farklı hedeflerde ilerle.','Choose Adventure, Daily Challenge, Classic, Zen or Hard mode.'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.52),
@@ -110,9 +111,9 @@ class ModesScreen extends StatelessWidget {
                       return _ModeCard(
                         icon: Icons.map_rounded,
                         title: 'MACERA',
-                        subtitle: '60 bölüm • kalıcı ilerleme',
+                        subtitle: AppStrings.current.f('60 bölüm • kalıcı ilerleme','60 levels • saved progress'),
                         description:
-                            'Bölümleri sırayla aç, hız ve zor görevleri tamamla, ilk bitirişte coin kazan.',
+                            AppStrings.current.f('Bölümleri sırayla aç, hız ve zor görevleri tamamla, ilk bitirişte coin kazan.','Unlock levels in order, complete harder challenges and earn coins on first completion.'),
                         best: appState.adventureCompletedCount,
                         bestLabel: 'TAMAMLANAN',
                         reward: 0,
@@ -248,7 +249,7 @@ class _ModeCard extends StatelessWidget {
                           ),
                         ),
                         if (rewardReady)
-                          _Badge(label: 'ÖDÜL HAZIR', accent: accent),
+                          _Badge(label: AppStrings.current.f('ÖDÜL HAZIR','REWARD READY'), accent: accent),
                       ],
                     ),
                     const SizedBox(height: 2),
