@@ -114,7 +114,7 @@ class ThemesScreen extends StatelessWidget {
                               SnackBar(
                                 content: Text(
                                   ok
-                                      ? '${theme.name} teması açıldı.'
+                                      ? (AppStrings.current.isEnglish ? 'Theme unlocked.' : '${theme.name} teması açıldı.')
                                       : 'Yeterli coin yok.',
                                 ),
                               ),
