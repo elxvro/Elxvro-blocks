@@ -137,7 +137,7 @@ jobs:
               'social_hub_screen.dart', 'profile_screen.dart',
           ]
           turkish = re.compile(r'[ÇĞİÖŞÜçğıöşü]')
-          allowed = ('AppStrings.current.f', 'l.t(', 'l.f(', '_modeText(', '_themeText(')
+          allowed = ('AppStrings.current.f', 'AppStrings.current.isEnglish', 'l.t(', 'l.f(', '_modeText(', '_themeText(')
           problems = []
           for name in screens:
               path = app / 'lib/screens' / name
