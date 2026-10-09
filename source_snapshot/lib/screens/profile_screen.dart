@@ -241,7 +241,7 @@ class ProfileScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 18),
                         Text(
-                          'SEVİYE ÖDÜLLERİ',
+                          AppStrings.current.f('SEVİYE ÖDÜLLERİ','LEVEL REWARDS'),
                           style: TextStyle(
                             color: Color(0xFFFFD98B),
                             fontSize: 12,
@@ -341,10 +341,10 @@ class _MilestoneCard extends StatelessWidget {
     final themeName = switch (level) {
       5 => 'GECE TEMASI',
       10 => 'MERMER TEMASI',
-      15 => 'ATEŞ TEMASI',
-      20 => 'DOĞA TEMASI',
+      15 => AppStrings.current.f('ATEŞ TEMASI','FIRE THEME'),
+      20 => AppStrings.current.f('DOĞA TEMASI','NATURE THEME'),
       25 => 'AURORA TEMASI',
-      _ => 'PREMIUM ÖDÜL',
+      _ => AppStrings.current.f('PREMIUM ÖDÜL','PREMIUM REWARD'),
     };
     final coinReward = 200 + level * 10;
 
