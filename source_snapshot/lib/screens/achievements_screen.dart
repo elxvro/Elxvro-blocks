@@ -14,7 +14,7 @@ class AchievementsScreen extends StatelessWidget {
 
   final AppState appState;
 
-  static const List<_AchievementData> _items = <_AchievementData>[
+  static final List<_AchievementData> _items = <_AchievementData>[
     _AchievementData(id: 'first_game', title: AppStrings.current.f('İlk Adım','First Step'), subtitle: AppStrings.current.f('İlk oyununu tamamla','Complete your first game'), reward: 100, icon: Icons.flag_rounded),
     _AchievementData(id: 'score_1000', title: AppStrings.current.f('Isınma Turu','Warm Up'), subtitle: AppStrings.current.f('Tek oyunda 1.000 puana ulaş','Reach 1000 points in one game'), reward: 125, icon: Icons.local_fire_department_rounded),
     _AchievementData(id: 'combo_3', title: AppStrings.current.f('Combo Ustası','Combo Master'), subtitle: 'x3 combo yap', reward: 150, icon: Icons.bolt_rounded),
