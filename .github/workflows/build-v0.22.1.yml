@@ -115,6 +115,7 @@ jobs:
           cp source_snapshot/lib/screens/social_hub_screen.dart "$APP/lib/screens/social_hub_screen.dart"
           cp source_snapshot/lib/screens/profile_screen.dart "$APP/lib/screens/profile_screen.dart"
           python .github/scripts/apply_v0221_final.py "$APP"
+          cp source_snapshot/lib/screens/falling_blocks_screen.dart "$APP/lib/screens/falling_blocks_screen.dart"
 
       - name: Validate widget-only gameplay background
         run: |
