@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../l10n/app_strings.dart';
 import '../models/game_theme.dart';
 import '../services/audio_service.dart';
 import '../widgets/coin_badge.dart';
@@ -58,7 +59,7 @@ class HomeScreen extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 2),
-                        const Text(
+                        Text(
                           'ELXVRO',
                           style: TextStyle(
                             fontSize: 38,
@@ -94,7 +95,7 @@ class HomeScreen extends StatelessWidget {
                         const SizedBox(height: 14),
                         if (appState.bestScore > 0)
                           Text(
-                            'EN YÜKSEK  ${appState.bestScore}',
+                            AppStrings.current.f('EN YÜKSEK  ${appState.bestScore}','BEST  ${appState.bestScore}'),
                             style: const TextStyle(
                               color: Color(0xFFFFD98B),
                               fontSize: 12,
@@ -123,7 +124,7 @@ class HomeScreen extends StatelessWidget {
                           child: _HomeTile(
                             icon: Icons.sports_esports_rounded,
                             label: 'MODLAR',
-                            badge: 'YENİ',
+                            badge: AppStrings.current.f('YENİ','NEW'),
                             emphasized: true,
                             onTap: () {
                               Navigator.of(context).push(
@@ -140,7 +141,7 @@ class HomeScreen extends StatelessWidget {
                             Expanded(
                               child: _HomeTile(
                                 icon: Icons.card_giftcard_rounded,
-                                label: 'GÜNLÜK ÖDÜL',
+                                label: AppStrings.current.f('GÜNLÜK ÖDÜL','DAILY REWARD'),
                                 badge: appState.dailyRewardAvailable ? 'HAZIR' : '${appState.loginStreak}. GÜN',
                                 emphasized: appState.dailyRewardAvailable,
                                 onTap: () {
@@ -156,7 +157,7 @@ class HomeScreen extends StatelessWidget {
                             Expanded(
                               child: _HomeTile(
                                 icon: Icons.storefront_rounded,
-                                label: 'MAĞAZA',
+                                label: AppStrings.current.f('MAĞAZA','STORE'),
                                 badge: '${appState.coins} C',
                                 onTap: () {
                                   Navigator.of(context).push(
