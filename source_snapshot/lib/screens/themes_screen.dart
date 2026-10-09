@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../l10n/app_strings.dart';
 import '../models/block_piece.dart';
 import '../models/game_theme.dart';
 import '../services/audio_service.dart';
@@ -44,7 +45,7 @@ class ThemesScreen extends StatelessWidget {
                           icon: const Icon(Icons.arrow_back_rounded),
                         ),
                         const SizedBox(width: 4),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
@@ -59,7 +60,7 @@ class ThemesScreen extends StatelessWidget {
                               ),
                               SizedBox(height: 2),
                               Text(
-                                'Coin ile aç, kalıcı olarak kullan',
+                                AppStrings.current.f('Coin ile aç, kalıcı olarak kullan','Unlock with coins and keep permanently'),
                                 style: TextStyle(color: Colors.white54, fontSize: 12),
                               ),
                             ],
@@ -186,8 +187,8 @@ class _ThemeLivePreview extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 10),
-                const Text(
-                  'CANLI ÖNİZLEME',
+                Text(
+                  AppStrings.current.f('CANLI ÖNİZLEME','LIVE PREVIEW'),
                   style: TextStyle(
                     color: Colors.white30,
                     fontSize: 8,
