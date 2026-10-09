@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../l10n/app_strings.dart';
 import '../models/game_theme.dart';
 import '../widgets/premium_background.dart';
 
@@ -33,12 +34,12 @@ class StatsScreen extends StatelessWidget {
         icon: Icons.auto_awesome_rounded,
       ),
       _StatData(
-        title: 'En Yüksek Skor',
+        title: AppStrings.current.f('En Yüksek Skor','Best Score'),
         value: '${appState.bestScore}',
         icon: Icons.emoji_events_rounded,
       ),
       _StatData(
-        title: 'Oynanan Oyun',
+        title: AppStrings.current.f('Oynanan Oyun','Games Played'),
         value: '${appState.gamesPlayed}',
         icon: Icons.sports_esports_rounded,
       ),
@@ -48,7 +49,7 @@ class StatsScreen extends StatelessWidget {
         icon: Icons.bolt_rounded,
       ),
       _StatData(
-        title: 'Toplam Puan',
+        title: AppStrings.current.f('Toplam Puan','Total Score'),
         value: '${appState.totalScore}',
         icon: Icons.stars_rounded,
       ),
@@ -112,7 +113,7 @@ class StatsScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(
-                            'İSTATİSTİKLER',
+                            AppStrings.current.f('İSTATİSTİKLER','STATISTICS'),
                             style: TextStyle(
                               color: selectedTheme.blockAccent,
                               fontSize: 21,
@@ -121,7 +122,7 @@ class StatsScreen extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 2),
-                          const Text(
+                          Text(
                             'ELXVRO Blocks kariyerin',
                             style: TextStyle(color: Colors.white54, fontSize: 12),
                           ),
