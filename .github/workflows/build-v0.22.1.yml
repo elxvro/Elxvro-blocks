@@ -14,7 +14,7 @@ on:
       - ".github/scripts/apply_v020.py"
       - ".github/scripts/apply_v021.py"
       - ".github/scripts/apply_v022.py"
-      - ".github/scripts/apply_v0221.py"
+      - ".github/scripts/apply_v0221_final.py"
       - ".github/workflows/build-v0.22.1.yml"
   workflow_dispatch:
 
@@ -96,8 +96,22 @@ jobs:
       - name: Apply v0.22 Languages and Themed Gameplay
         run: python .github/scripts/apply_v022.py extracted/elxvro-blocks-v0.10.1
 
-      - name: Apply v0.22.1 Full English and Widget Background
-        run: python .github/scripts/apply_v0221.py extracted/elxvro-blocks-v0.10.1
+      - name: Apply v0.22.1 canonical fixes
+        run: |
+          set -euo pipefail
+          APP=extracted/elxvro-blocks-v0.10.1
+          cp source_snapshot/lib/app_state.dart "$APP/lib/app_state.dart"
+          mkdir -p "$APP/lib/l10n" "$APP/lib/widgets"
+          cp source_snapshot/lib/l10n/app_strings.dart "$APP/lib/l10n/app_strings.dart"
+          cp source_snapshot/lib/widgets/gameplay_background.dart "$APP/lib/widgets/gameplay_background.dart"
+          cp source_snapshot/lib/screens/rewards_screen.dart "$APP/lib/screens/rewards_screen.dart"
+          cp source_snapshot/lib/screens/store_screen.dart "$APP/lib/screens/store_screen.dart"
+          cp source_snapshot/lib/screens/daily_missions_screen.dart "$APP/lib/screens/daily_missions_screen.dart"
+          cp source_snapshot/lib/screens/achievements_screen.dart "$APP/lib/screens/achievements_screen.dart"
+          cp source_snapshot/lib/screens/stats_screen.dart "$APP/lib/screens/stats_screen.dart"
+          cp source_snapshot/lib/screens/social_hub_screen.dart "$APP/lib/screens/social_hub_screen.dart"
+          cp source_snapshot/lib/screens/profile_screen.dart "$APP/lib/screens/profile_screen.dart"
+          python .github/scripts/apply_v0221_final.py "$APP"
 
       - name: Generate Android platform
         working-directory: extracted/elxvro-blocks-v0.10.1
