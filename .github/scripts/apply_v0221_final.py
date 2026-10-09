@@ -183,4 +183,49 @@ patch('lib/screens/game_screen.dart', [
      "return AppStrings.current.f('SERİ x$combo', 'STREAK x$combo');"),
 ])
 
+
+# Preserve cumulative AppState features added by older patches while syncing language globally.
+app_state = ROOT / 'lib/app_state.dart'
+text = app_state.read_text(encoding='utf-8')
+if "import 'l10n/app_strings.dart';" not in text:
+    text = text.replace(
+        "import 'package:shared_preferences/shared_preferences.dart';\n",
+        "import 'package:shared_preferences/shared_preferences.dart';\n\nimport 'l10n/app_strings.dart';\n",
+        1,
+    )
+text = text.replace(
+    "      languageCode = savedLanguage == 'en' ? 'en' : 'tr';",
+    "      languageCode = savedLanguage == 'en' ? 'en' : 'tr';\n      AppStrings.setCurrentLanguage(languageCode);",
+)
+text = text.replace(
+    "    languageCode = normalized;\n    notifyListeners();",
+    "    languageCode = normalized;\n    AppStrings.setCurrentLanguage(languageCode);\n    notifyListeners();",
+)
+app_state.write_text(text, encoding='utf-8')
+
+# Repair Falling Blocks ternaries where localized function calls broke adjacent string concatenation.
+patch('lib/screens/falling_blocks_screen.dart', [
+    (
+        "AppStrings.current.f('Hedef $_targetScore puan  •  $_lines çizgi', 'Target $_targetScore score  •  $_lines lines')\n"
+        "                        '${earned > 0 ? '  •  +$earned coin' : ''}'",
+        "AppStrings.current.f("
+        "'Hedef $_targetScore puan  •  $_lines çizgi${earned > 0 ? '  •  +$earned coin' : ''}', "
+        "'Target $_targetScore score  •  $_lines lines${earned > 0 ? '  •  +$earned coin' : ''}')",
+    ),
+    (
+        "AppStrings.current.f('$_lines çizgi  •  Seviye $_arcadeLevel\\n', '$_lines lines  •  Level $_arcadeLevel\\n')\n"
+        "                        'En iyi: ${widget.appState.fallingBlocksBestScore}'",
+        "AppStrings.current.f("
+        "'$_lines çizgi  •  Seviye $_arcadeLevel\\nEn iyi: ${widget.appState.fallingBlocksBestScore}', "
+        "'$_lines lines  •  Level $_arcadeLevel\\nBest: ${widget.appState.fallingBlocksBestScore}')",
+    ),
+])
+
+# Dynamic localization calls must not live inside const expressions.
+for rel in ['lib/screens/game_screen.dart', 'lib/screens/falling_blocks_screen.dart']:
+    p = ROOT / rel
+    text = p.read_text(encoding='utf-8')
+    text = text.replace('const ', '')
+    p.write_text(text, encoding='utf-8')
+
 print('v0.22.1 final localization patch applied')
