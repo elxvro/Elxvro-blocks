@@ -113,6 +113,47 @@ jobs:
           cp source_snapshot/lib/screens/profile_screen.dart "$APP/lib/screens/profile_screen.dart"
           python .github/scripts/apply_v0221_final.py "$APP"
 
+      - name: Validate v0.22.1 UI and background
+        run: |
+          set -euo pipefail
+          APP=extracted/elxvro-blocks-v0.10.1
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          app = Path('extracted/elxvro-blocks-v0.10.1')
+          bg = (app / 'lib/widgets/gameplay_background.dart').read_text(encoding='utf-8')
+          forbidden = ['CustomPaint', 'CustomPainter', 'Canvas ']
+          found = [item for item in forbidden if item in bg]
+          if found:
+              raise SystemExit(f'Gameplay background still uses forbidden drawing API: {found}')
+
+          screens = [
+              'home_screen.dart', 'modes_screen.dart', 'themes_screen.dart',
+              'adventure_screen.dart', 'falling_blocks_screen.dart',
+              'game_screen.dart', 'settings_screen.dart', 'rewards_screen.dart',
+              'store_screen.dart', 'daily_missions_screen.dart',
+              'achievements_screen.dart', 'stats_screen.dart',
+              'social_hub_screen.dart', 'profile_screen.dart',
+          ]
+          turkish = re.compile(r'[ÇĞİÖŞÜçğıöşü]')
+          allowed = ('AppStrings.current.f', 'l.t(', 'l.f(', '_modeText(', '_themeText(')
+          problems = []
+          for name in screens:
+              path = app / 'lib/screens' / name
+              for number, line in enumerate(path.read_text(encoding='utf-8').splitlines(), 1):
+                  stripped = line.strip()
+                  if turkish.search(stripped) and ("'" in stripped or '"' in stripped):
+                      if any(token in stripped for token in allowed):
+                          continue
+                      if stripped.startswith('//'):
+                          continue
+                      problems.append(f'{name}:{number}: {stripped}')
+          if problems:
+              raise SystemExit('Unlocalized Turkish UI strings remain:\n' + '\n'.join(problems[:40]))
+          print('v0.22.1 UI validation passed')
+          PY
+
       - name: Generate Android platform
         working-directory: extracted/elxvro-blocks-v0.10.1
         run: |
