@@ -104,7 +104,6 @@ jobs:
         run: |
           set -euo pipefail
           APP=extracted/elxvro-blocks-v0.10.1
-          cp source_snapshot/lib/app_state.dart "$APP/lib/app_state.dart"
           mkdir -p "$APP/lib/l10n" "$APP/lib/widgets"
           cp source_snapshot/lib/l10n/app_strings.dart "$APP/lib/l10n/app_strings.dart"
           cp source_snapshot/lib/widgets/gameplay_background.dart "$APP/lib/widgets/gameplay_background.dart"
