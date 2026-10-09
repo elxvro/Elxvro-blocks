@@ -10,7 +10,7 @@ import '../models/adventure_level.dart';
 import '../models/game_theme.dart';
 import '../services/audio_service.dart';
 import '../services/play_games_service.dart';
-import '../widgets/premium_background.dart';
+import '../widgets/gameplay_background.dart';
 import '../widgets/themed_block_tile.dart';
 
 class FallingBlocksScreen extends StatefulWidget {
@@ -561,11 +561,8 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
     final levelAccent = _palette.first;
 
     return Scaffold(
-      body: PremiumBackground(
-        top: _theme.backgroundTop,
-        bottom: _theme.backgroundBottom,
-        material: _theme.material,
-        accent: _theme.blockAccent,
+      body: GameplayBackground(
+        theme: _theme,
         child: SafeArea(
           child: Column(
             children: <Widget>[
@@ -603,10 +600,10 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final widthByScreen = constraints.maxWidth - 16;
-                    final widthByHeight = constraints.maxHeight / 2;
+                    final widthByScreen = constraints.maxWidth - 6;
+                    final widthByHeight = (constraints.maxHeight + 18) / 2;
                     final boardWidth =
-                        min(widthByScreen, widthByHeight).clamp(220.0, 420.0);
+                        min(widthByScreen, widthByHeight).clamp(228.0, 448.0);
                     final cell = boardWidth / _cols;
                     final boardHeight = cell * _rows;
 

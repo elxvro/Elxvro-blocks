@@ -11,8 +11,7 @@ void main() {
     expect(source, contains('DecoratedBox'));
   });
 
-  test('v0.22.1 localization patch covers secondary screens', () {
-    final patch = File('../../.github/scripts/apply_v0221.py').readAsStringSync();
+  test('v0.22.1 final source localizes secondary screens', () {
     for (final screen in <String>[
       'rewards_screen.dart',
       'store_screen.dart',
@@ -22,10 +21,14 @@ void main() {
       'social_hub_screen.dart',
       'profile_screen.dart',
     ]) {
-      expect(patch, contains(screen));
+      final source = File('lib/screens/$screen').readAsStringSync();
+      expect(
+        source.contains('AppStrings.current') ||
+            source.contains('AppStrings(') ||
+            source.contains('.f('),
+        isTrue,
+        reason: '$screen must use runtime localization',
+      );
     }
-    expect(patch, contains('NEW PERSONAL BEST'));
-    expect(patch, contains('DAILY MISSIONS'));
-    expect(patch, contains('LEADERBOARD HUB'));
   });
 }

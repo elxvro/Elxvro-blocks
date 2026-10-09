@@ -35,11 +35,17 @@ void main() {
     expect(const AppStrings('en').t('falling.rotate'), 'ROTATE');
   });
 
-  test('v0.22 build patch enlarges both gameplay boards', () {
-    final patch = File('../../.github/scripts/apply_v022.py').readAsStringSync();
-    expect(patch, contains('constraints.maxWidth - 12'));
-    expect(patch, contains('clamp(228.0, 448.0)'));
-    expect(patch, contains('GameplayBackground'));
+  test('v0.22 final source enlarges both gameplay boards', () {
+    final game = File('lib/screens/game_screen.dart').readAsStringSync();
+    final falling = File('lib/screens/falling_blocks_screen.dart').readAsStringSync();
+
+    expect(game, contains('constraints.maxWidth - 12'));
+    expect(game, contains('min(456.0, heightLimited)'));
+    expect(game, contains('GameplayBackground('));
+
+    expect(falling, contains('constraints.maxWidth - 6'));
+    expect(falling, contains('clamp(228.0, 448.0)'));
+    expect(falling, contains('GameplayBackground('));
   });
 
   testWidgets('gameplay background renders for themed gameplay', (tester) async {
