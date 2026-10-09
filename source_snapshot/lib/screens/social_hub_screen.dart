@@ -267,7 +267,7 @@ class _WeeklyCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'HAFTALIK HEDEF',
+                  AppStrings.current.f('HAFTALIK HEDEF','WEEKLY TARGET'),
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w900,
@@ -298,11 +298,11 @@ class _WeeklyCard extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: <Widget>[
-              Expanded(child: _MiniStat(label: 'OYUN', value: '${appState.weeklyGames}')),
+              Expanded(child: _MiniStat(label: AppStrings.current.f('OYUN','GAMES'), value: '${appState.weeklyGames}')),
               const SizedBox(width: 8),
-              Expanded(child: _MiniStat(label: 'EN İYİ', value: '${appState.weeklyBestScore}')),
+              Expanded(child: _MiniStat(label: AppStrings.current.f('EN İYİ','BEST'), value: '${appState.weeklyBestScore}')),
               const SizedBox(width: 8),
-              Expanded(child: _MiniStat(label: 'ÖDÜL', value: '250 C')),
+              Expanded(child: _MiniStat(label: AppStrings.current.f('ÖDÜL','REWARD'), value: '250 C')),
             ],
           ),
           const SizedBox(height: 14),
@@ -329,7 +329,7 @@ class _WeeklyCard extends StatelessWidget {
                     ? 'BU HAFTA ALINDI'
                     : completed
                         ? '250 COIN AL'
-                        : 'HEDEFİ TAMAMLA',
+                        : AppStrings.current.f('HEDEFİ TAMAMLA','COMPLETE TARGET'),
               ),
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFFC7863C),
@@ -387,7 +387,7 @@ class _ConnectionCard extends StatelessWidget {
                       color: Colors.white.withValues(alpha: 0.06),
                     ),
                     child: Text(
-                      info?.connected == true ? 'BAĞLI' : 'ÇEVRİMDIŞI',
+                      info?.connected == true ? AppStrings.current.f('BAĞLI','CONNECTED') : AppStrings.current.f('ÇEVRİMDIŞI','OFFLINE'),
                       style: const TextStyle(
                         color: Color(0xFFFFD98B),
                         fontSize: 8,
@@ -399,7 +399,7 @@ class _ConnectionCard extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                info?.message ?? 'Bağlantı durumu kontrol ediliyor...',
+                info?.message ?? AppStrings.current.f('Bağlantı durumu kontrol ediliyor...','Checking connection status...'),
                 style: const TextStyle(color: Colors.white54, fontSize: 11, height: 1.4),
               ),
               const SizedBox(height: 14),
@@ -408,7 +408,7 @@ class _ConnectionCard extends StatelessWidget {
                 child: OutlinedButton.icon(
                   onPressed: null,
                   icon: const Icon(Icons.cloud_outlined),
-                  label: Text('PLAY CONSOLE SONRASI AKTİF'),
+                  label: Text(AppStrings.current.f('PLAY CONSOLE SONRASI AKTİF','ACTIVE AFTER PLAY CONSOLE')),
                 ),
               ),
             ],
