@@ -27,7 +27,7 @@ class DailyMissionsScreen extends StatelessWidget {
         final missions = <_MissionData>[
           _MissionData(
             id: 'daily_game',
-            title: 'Bugünün Oyunu',
+            title: AppStrings.current.f('Bugünün Oyunu', 'Daily Game'),
             subtitle: '1 oyun tamamla',
             current: appState.dailyGames,
             target: 1,
