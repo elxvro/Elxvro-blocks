@@ -28,7 +28,7 @@ class DailyMissionsScreen extends StatelessWidget {
           _MissionData(
             id: 'daily_game',
             title: AppStrings.current.f('Bugünün Oyunu', 'Daily Game'),
-            subtitle: '1 oyun tamamla',
+            subtitle: AppStrings.current.f('1 oyun tamamla', 'Complete 1 game'),
             current: appState.dailyGames,
             target: 1,
             reward: 50,
@@ -36,8 +36,8 @@ class DailyMissionsScreen extends StatelessWidget {
           ),
           _MissionData(
             id: 'daily_lines',
-            title: 'Temizlik Serisi',
-            subtitle: '8 satır veya sütun temizle',
+            title: AppStrings.current.f('Temizlik Serisi', 'Clear Streak'),
+            subtitle: AppStrings.current.f('8 satır veya sütun temizle', 'Clear 8 rows or columns'),
             current: appState.dailyLines,
             target: 8,
             reward: 100,
@@ -45,8 +45,8 @@ class DailyMissionsScreen extends StatelessWidget {
           ),
           _MissionData(
             id: 'daily_score',
-            title: 'Skor Avcısı',
-            subtitle: 'Tek oyunda 2.500 puan yap',
+            title: AppStrings.current.f('Skor Avcısı', 'Score Hunter'),
+            subtitle: AppStrings.current.f('Tek oyunda 2.500 puan yap', 'Score 2500 points in one game'),
             current: appState.dailyBestScore,
             target: 2500,
             reward: 150,
@@ -72,7 +72,7 @@ class DailyMissionsScreen extends StatelessWidget {
                           icon: const Icon(Icons.arrow_back_rounded),
                         ),
                         const SizedBox(width: 4),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
@@ -87,7 +87,7 @@ class DailyMissionsScreen extends StatelessWidget {
                               ),
                               SizedBox(height: 2),
                               Text(
-                                'Tamamla, coin ödülünü al',
+                                AppStrings.current.f('Tamamla, coin ödülünü al', 'Complete missions and claim coin rewards'),
                                 style: TextStyle(color: Colors.white54, fontSize: 12),
                               ),
                             ],
@@ -116,7 +116,7 @@ class DailyMissionsScreen extends StatelessWidget {
                           if (!context.mounted || !success) return;
                           unawaited(AudioService.instance.playReward());
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('+${mission.reward} coin kazandın.')),
+                            SnackBar(content: Text(AppStrings.current.f('+${mission.reward} coin kazandın.', '+${mission.reward} coins earned.'))),
                           );
                         },
                       ),
@@ -244,7 +244,7 @@ class _MissionCard extends StatelessWidget {
                     disabledBackgroundColor: Colors.white.withValues(alpha: 0.07),
                   ),
                   child: Text(
-                    claimed ? 'ALINDI' : completed ? 'AL' : 'DEVAM',
+                    claimed ? AppStrings.current.f('ALINDI', 'CLAIMED') : completed ? AppStrings.current.f('AL', 'CLAIM') : AppStrings.current.f('DEVAM', 'GO'),
                     style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 11),
                   ),
                 ),
