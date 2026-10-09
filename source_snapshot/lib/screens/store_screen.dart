@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../l10n/app_strings.dart';
 import '../models/game_theme.dart';
 import '../services/audio_service.dart';
 import '../widgets/coin_badge.dart';
@@ -40,12 +41,12 @@ class StoreScreen extends StatelessWidget {
                           icon: const Icon(Icons.arrow_back_rounded),
                         ),
                         const SizedBox(width: 4),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
                               Text(
-                                'MAĞAZA',
+                                AppStrings.current.f('MAĞAZA','STORE'),
                                 style: TextStyle(
                                   color: Color(0xFFFFD99A),
                                   fontSize: 21,
@@ -55,7 +56,7 @@ class StoreScreen extends StatelessWidget {
                               ),
                               SizedBox(height: 2),
                               Text(
-                                'Coinlerini güçlere dönüştür',
+                                AppStrings.current.f('Coinlerini güçlere dönüştür','Turn coins into power ups'),
                                 style: TextStyle(
                                   color: Colors.white54,
                                   fontSize: 12,
@@ -76,24 +77,24 @@ class StoreScreen extends StatelessWidget {
                         const SizedBox(height: 14),
                         _StoreCard(
                           icon: Icons.undo_rounded,
-                          title: 'Geri Al Paketi',
-                          subtitle: '3 ekstra geri al hakkı',
+                          title: AppStrings.current.f('Geri Al Paketi','Undo Pack'),
+                          subtitle: AppStrings.current.f('3 ekstra geri al hakkı','3 extra undo uses'),
                           price: 120,
                           onBuy: appState.buyUndoPack,
                         ),
                         const SizedBox(height: 10),
                         _StoreCard(
                           icon: Icons.autorenew_rounded,
-                          title: 'Yenile Paketi',
-                          subtitle: '3 ekstra blok yenileme hakkı',
+                          title: AppStrings.current.f('Yenile Paketi','Refresh Pack'),
+                          subtitle: AppStrings.current.f('3 ekstra blok yenileme hakkı','3 extra piece refreshes'),
                           price: 120,
                           onBuy: appState.buyRefreshPack,
                         ),
                         const SizedBox(height: 10),
                         _StoreCard(
                           icon: Icons.auto_awesome_rounded,
-                          title: 'Özel Blok Paketi',
-                          subtitle: '3 kez anında özel blok üret',
+                          title: AppStrings.current.f('Özel Blok Paketi','Special Block Pack'),
+                          subtitle: AppStrings.current.f('3 kez anında özel blok üret','Create special blocks 3 times'),
                           price: 180,
                           onBuy: appState.buySpecialPack,
                         ),
@@ -101,14 +102,14 @@ class StoreScreen extends StatelessWidget {
                         _StoreCard(
                           icon: Icons.workspace_premium_rounded,
                           title: 'Power Bundle',
-                          subtitle: '5 geri al + 5 yenile + 2 özel blok',
+                          subtitle: AppStrings.current.f('5 geri al + 5 yenile + 2 özel blok','5 undo + 5 refresh + 2 special blocks'),
                           price: 300,
                           highlighted: true,
                           onBuy: appState.buyPowerBundle,
                         ),
                         const SizedBox(height: 18),
                         Text(
-                          'Coinler yalnızca oyun içi ilerleme ile kazanılır. Bu sürümde gerçek para ile satın alma yoktur.',
+                          AppStrings.current.f('Coinler yalnızca oyun içi ilerleme ile kazanılır. Bu sürümde gerçek para ile satın alma yoktur.','Coins are earned only through gameplay. No real money purchases in this version.'),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.32),
@@ -146,9 +147,9 @@ class _InventoryPanel extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: <Widget>[
-          _Stock(icon: Icons.undo_rounded, label: 'GERİ AL', value: appState.undoInventory),
-          _Stock(icon: Icons.autorenew_rounded, label: 'YENİLE', value: appState.refreshInventory),
-          _Stock(icon: Icons.auto_awesome_rounded, label: 'ÖZEL', value: appState.specialInventory),
+          _Stock(icon: Icons.undo_rounded, label: AppStrings.current.f('GERİ AL','UNDO'), value: appState.undoInventory),
+          _Stock(icon: Icons.autorenew_rounded, label: AppStrings.current.f('YENİLE','REFRESH'), value: appState.refreshInventory),
+          _Stock(icon: Icons.auto_awesome_rounded, label: AppStrings.current.f('ÖZEL','SPECIAL'), value: appState.specialInventory),
         ],
       ),
     );
@@ -266,8 +267,8 @@ class _StoreCard extends StatelessWidget {
                 SnackBar(
                   content: Text(
                     bought
-                        ? 'Satın alındı.'
-                        : 'Yeterli coin yok.',
+                        ? AppStrings.current.f('Satın alındı.','Purchased.')
+                        : AppStrings.current.f('Yeterli coin yok.','Not enough coins.'),
                   ),
                 ),
               );
