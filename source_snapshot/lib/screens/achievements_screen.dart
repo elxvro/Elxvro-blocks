@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../l10n/app_strings.dart';
 import '../models/game_theme.dart';
 import '../services/audio_service.dart';
 import '../widgets/coin_badge.dart';
@@ -14,10 +15,10 @@ class AchievementsScreen extends StatelessWidget {
   final AppState appState;
 
   static const List<_AchievementData> _items = <_AchievementData>[
-    _AchievementData(id: 'first_game', title: 'İlk Adım', subtitle: 'İlk oyununu tamamla', reward: 100, icon: Icons.flag_rounded),
-    _AchievementData(id: 'score_1000', title: 'Isınma Turu', subtitle: 'Tek oyunda 1.000 puana ulaş', reward: 125, icon: Icons.local_fire_department_rounded),
-    _AchievementData(id: 'combo_3', title: 'Combo Ustası', subtitle: 'x3 combo yap', reward: 150, icon: Icons.bolt_rounded),
-    _AchievementData(id: 'lines_25', title: 'Tahta Temizleyici', subtitle: 'Toplam 25 satır veya sütun temizle', reward: 200, icon: Icons.auto_awesome_rounded),
+    _AchievementData(id: 'first_game', title: AppStrings.current.f('İlk Adım','First Step'), subtitle: AppStrings.current.f('İlk oyununu tamamla','Complete your first game'), reward: 100, icon: Icons.flag_rounded),
+    _AchievementData(id: 'score_1000', title: AppStrings.current.f('Isınma Turu','Warm Up'), subtitle: AppStrings.current.f('Tek oyunda 1.000 puana ulaş','Reach 1000 points in one game'), reward: 125, icon: Icons.local_fire_department_rounded),
+    _AchievementData(id: 'combo_3', title: AppStrings.current.f('Combo Ustası','Combo Master'), subtitle: 'x3 combo yap', reward: 150, icon: Icons.bolt_rounded),
+    _AchievementData(id: 'lines_25', title: AppStrings.current.f('Tahta Temizleyici','Board Cleaner'), subtitle: AppStrings.current.f('Toplam 25 satır veya sütun temizle','Clear 25 rows or columns in total'), reward: 200, icon: Icons.auto_awesome_rounded),
     _AchievementData(id: 'games_10', title: 'Deneyimli', subtitle: '10 oyun tamamla', reward: 250, icon: Icons.sports_esports_rounded),
     _AchievementData(id: 'blocks_250', title: 'Blok Koleksiyoncusu', subtitle: '250 parça yerleştir', reward: 300, icon: Icons.grid_view_rounded),
     _AchievementData(id: 'score_10000', title: 'Efsane', subtitle: 'Tek oyunda 10.000 puana ulaş', reward: 500, icon: Icons.workspace_premium_rounded),
@@ -58,8 +59,8 @@ class AchievementsScreen extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
-                              const Text(
-                                'BAŞARIMLAR',
+                              Text(
+                                AppStrings.current.f('BAŞARIMLAR','ACHIEVEMENTS'),
                                 style: TextStyle(
                                   color: Color(0xFFFFD99A),
                                   fontSize: 21,
