@@ -1,0 +1,2 @@
+ELXVRO Blocks v0.23.0 full ZIP build trigger
+source-sha: 136ba8afba98e95ea1143065d649bad0b7f48518
