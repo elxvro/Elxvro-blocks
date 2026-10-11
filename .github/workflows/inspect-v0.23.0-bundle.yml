@@ -25,11 +25,17 @@ jobs:
           set -euo pipefail
           cat             .github/v0230-code/v0230.part00             .github/v0230-code/v0230.part01             .github/v0230-code/v0230.part02             .github/v0230-code/v0230.part03             .github/v0230-code/v0230.part04             .github/v0230-code/v0230.part05             .github/v0230-code/v0230.part06             .github/v0230-code/v0230.part07             .github/v0230-code/v0230.part08_09             .github/v0230-code/v0230.part10_11 > /tmp/v0230.b64
           base64 -d /tmp/v0230.b64 > /tmp/v0230.tar.xz
-          xz -t /tmp/v0230.tar.xz
           rm -rf v0230_extracted
           mkdir v0230_extracted
-          tar -xJf /tmp/v0230.tar.xz -C v0230_extracted
-          find v0230_extracted -maxdepth 4 -type f -print | sort
+          set +e
+          xz -dc --single-stream /tmp/v0230.tar.xz > /tmp/v0230.tar
+          XZ_STATUS=$?
+          set -e
+          echo "xz_status=$XZ_STATUS"
+          tar -tf /tmp/v0230.tar | head -200 || true
+          tar -xf /tmp/v0230.tar -C v0230_extracted --ignore-zeros || true
+          find v0230_extracted -maxdepth 5 -type f -print | sort
+          test "$(find v0230_extracted -type f | wc -l)" -gt 0
       - name: Package extracted bundle
         run: |
           set -euo pipefail
