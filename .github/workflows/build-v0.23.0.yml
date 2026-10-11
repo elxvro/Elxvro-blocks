@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: elxvro-blocks-v0230-${{ github.ref }}
@@ -38,21 +39,21 @@ jobs:
           cache: true
 
       - name: Reconstruct v0.23.0 full source
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          test -f elxvro-blocks-v0.10.1.zip
-          rm -rf extracted /tmp/v0221-ref
-          mkdir -p extracted /tmp/v0221-ref
-          unzip -q elxvro-blocks-v0.10.1.zip -d extracted
-          APP=extracted/elxvro-blocks-v0.10.1
-          test -d "$APP"
+          rm -rf extracted /tmp/v0221-artifact /tmp/v0230_delta.tar.xz /tmp/v0230.b64
+          mkdir -p extracted /tmp/v0221-artifact
 
-          git fetch origin release-v0.22.1 --depth=1
-          git archive FETCH_HEAD source_snapshot | tar -x -C /tmp/v0221-ref
-          rm -rf "$APP/lib" "$APP/test"
-          cp -a /tmp/v0221-ref/source_snapshot/lib "$APP/lib"
-          cp /tmp/v0221-ref/source_snapshot/pubspec.yaml "$APP/pubspec.yaml"
-          cp -a /tmp/v0221-ref/source_snapshot/test "$APP/test"
+          gh run download 37881009674             --repo "${{ github.repository }}"             --name ELXVRO-Blocks-v0.22.1-FULL-SOURCE             --dir /tmp/v0221-artifact
+
+          BASE_ZIP=/tmp/v0221-artifact/ELXVRO-Blocks-v0.22.1-FULL.zip
+          test -s "$BASE_ZIP"
+          unzip -q "$BASE_ZIP" -d extracted
+          APP=extracted
+          test -f "$APP/pubspec.yaml"
+          test -f "$APP/lib/screens/adventure_screen.dart"
 
           cat             .github/v0230-delta/part00             .github/v0230-delta/part01             .github/v0230-delta/part02             .github/v0230-delta/part03             .github/v0230-delta/part04             .github/v0230-delta/part05             .github/v0230-delta/part06 > /tmp/v0230.b64
           base64 -d /tmp/v0230.b64 > /tmp/v0230_delta.tar.xz
@@ -62,12 +63,12 @@ jobs:
           grep -F "version: 0.23.0+47" "$APP/pubspec.yaml"
           grep -F "CgkI6arsvtAGEAIQAw" "$APP/lib/services/play_games_ids.dart"
           grep -F "CgkI6arsvtAGEAIQAg" "$APP/lib/services/play_games_ids.dart"
-          grep -F "CgkI6arsvtAGEAIQBA" "$APP/lib/services/play_games_service.dart" "$APP/lib/screens/falling_blocks_screen.dart" || true
+          grep -R -F "CgkI6arsvtAGEAIQBA" "$APP/lib" >/dev/null
 
       - name: Validate 10-language source
         run: |
           set -euo pipefail
-          APP=extracted/elxvro-blocks-v0.10.1
+          APP=extracted
           python "$APP/tool/validate_localization.py" "$APP"
           grep -F "const <String>['tr', 'en', 'de', 'fr', 'es', 'pt', 'it', 'ru', 'ar', 'zh']" "$APP/lib/l10n/app_strings.dart" || true
           BG="$APP/lib/widgets/gameplay_background.dart"
@@ -78,7 +79,7 @@ jobs:
       - name: Create complete v0.23.0 source ZIP
         run: |
           set -euo pipefail
-          APP=extracted/elxvro-blocks-v0.10.1
+          APP=extracted
           mkdir -p "$APP/.github/workflows"
           cp .github/workflows/build-v0.23.0.yml "$APP/.github/workflows/build-v0.23.0.yml"
           rm -f ELXVRO-Blocks-v0.23.0-FULL.zip
