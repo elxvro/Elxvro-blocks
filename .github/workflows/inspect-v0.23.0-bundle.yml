@@ -1,0 +1,42 @@
+name: Inspect ELXVRO Blocks v0.23.0 bundle
+
+on:
+  push:
+    branches:
+      - work-v0.23.0
+    paths:
+      - ".github/workflows/inspect-v0.23.0-bundle.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inspect-v0230-bundle
+  cancel-in-progress: true
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reconstruct staged bundle
+        run: |
+          set -euo pipefail
+          cat             .github/v0230-code/v0230.part00             .github/v0230-code/v0230.part01             .github/v0230-code/v0230.part02             .github/v0230-code/v0230.part03             .github/v0230-code/v0230.part04             .github/v0230-code/v0230.part05             .github/v0230-code/v0230.part06             .github/v0230-code/v0230.part07             .github/v0230-code/v0230.part08_09             .github/v0230-code/v0230.part10_11 > /tmp/v0230.b64
+          base64 -d /tmp/v0230.b64 > /tmp/v0230.tar.xz
+          xz -t /tmp/v0230.tar.xz
+          rm -rf v0230_extracted
+          mkdir v0230_extracted
+          tar -xJf /tmp/v0230.tar.xz -C v0230_extracted
+          find v0230_extracted -maxdepth 4 -type f -print | sort
+      - name: Package extracted bundle
+        run: |
+          set -euo pipefail
+          cd v0230_extracted
+          zip -qr ../ELXVRO-Blocks-v0.23.0-STAGED-BUNDLE.zip .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ELXVRO-Blocks-v0.23.0-STAGED-BUNDLE
+          path: ELXVRO-Blocks-v0.23.0-STAGED-BUNDLE.zip
+          retention-days: 2
