@@ -85,7 +85,8 @@ jobs:
           rm -f ELXVRO-Blocks-v0.23.0-FULL.zip
           (
             cd "$APP"
-            zip -qr ../../ELXVRO-Blocks-v0.23.0-FULL.zip .               -x "build/*" ".dart_tool/*" ".git/*"
+            zip -qr ../ELXVRO-Blocks-v0.23.0-FULL.zip . \
+              -x "build/*" ".dart_tool/*" ".git/*"
           )
           unzip -t ELXVRO-Blocks-v0.23.0-FULL.zip >/dev/null
           rm -rf build_source
