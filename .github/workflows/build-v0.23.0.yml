@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: elxvro-blocks-v0230-${{ github.ref }}
@@ -40,26 +41,22 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Extract original ELXVRO Blocks
+      - name: Restore successful v0.22.1 full source ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          test -f elxvro-blocks-v0.10.1.zip
-          unzip -t elxvro-blocks-v0.10.1.zip
-          rm -rf extracted
-          mkdir extracted
-          unzip -q elxvro-blocks-v0.10.1.zip -d extracted
-          test -d extracted/elxvro-blocks-v0.10.1
-
-      - name: Restore canonical v0.22.1 source
-        run: |
-          set -euo pipefail
+          ARTIFACT_ID=11594630473
+          curl -fsSL             -H "Authorization: Bearer $GH_TOKEN"             -H "Accept: application/vnd.github+json"             -H "X-GitHub-Api-Version: 2022-11-28"             "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip"             -o /tmp/v0221-full-source-artifact.zip
+          rm -rf /tmp/v0221-artifact extracted
+          mkdir -p /tmp/v0221-artifact extracted/elxvro-blocks-v0.10.1
+          unzip -q /tmp/v0221-full-source-artifact.zip -d /tmp/v0221-artifact
+          BASE_ZIP="$(find /tmp/v0221-artifact -type f -name 'ELXVRO-Blocks-v0.22.1-FULL.zip' -print -quit)"
+          test -n "$BASE_ZIP"
+          unzip -t "$BASE_ZIP" >/dev/null
+          unzip -q "$BASE_ZIP" -d extracted/elxvro-blocks-v0.10.1
           APP=extracted/elxvro-blocks-v0.10.1
-          rm -rf "$APP/lib" "$APP/test"
-          mkdir -p /tmp/elxvro-v0221
-          git archive origin/release-v0.22.1 source_snapshot | tar -x -C /tmp/elxvro-v0221
-          cp -a /tmp/elxvro-v0221/source_snapshot/lib "$APP/lib"
-          cp -a /tmp/elxvro-v0221/source_snapshot/test "$APP/test"
-          cp /tmp/elxvro-v0221/source_snapshot/pubspec.yaml "$APP/pubspec.yaml"
+          grep -F 'version: 0.22.1+46' "$APP/pubspec.yaml"
           grep -F "defaultValue: 'CgkI6arsvtAGEAIQAw'" "$APP/lib/services/play_games_ids.dart"
           grep -F "defaultValue: 'CgkI6arsvtAGEAIQAg'" "$APP/lib/services/play_games_ids.dart"
           grep -F "defaultValue: 'CgkI6arsvtAGEAIQBA'" "$APP/lib/services/play_games_ids.dart"
