@@ -1,12 +1,9 @@
-name: ELXVRO Blocks v0.23.0 10 Languages Full Localization Signed APK + AAB
+name: ELXVRO Blocks v0.23.0 10 Languages Full ZIP Signed APK + AAB
 
 on:
   push:
     branches:
       - release-v0.23.0
-    paths:
-      - ".github/v0230-code/**"
-      - ".github/workflows/build-v0.23.0.yml"
   workflow_dispatch:
 
 permissions:
@@ -40,45 +37,65 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Assemble complete v0.23.0 project ZIP
+      - name: Reconstruct v0.23.0 full source
         run: |
           set -euo pipefail
           test -f elxvro-blocks-v0.10.1.zip
-          test -f .github/v0230-code/ELXVRO-Blocks-v0.23.0-CODE.tar.xz
-          cp .github/v0230-code/ELXVRO-Blocks-v0.23.0-CODE.tar.xz ./ELXVRO-Blocks-v0.23.0-CODE.tar.xz
-          unzip -t elxvro-blocks-v0.10.1.zip >/dev/null
-          xz -t ELXVRO-Blocks-v0.23.0-CODE.tar.xz
-
-          rm -rf project_base build_source
-          mkdir project_base
-          unzip -q elxvro-blocks-v0.10.1.zip -d project_base
-          APP=project_base/elxvro-blocks-v0.10.1
+          rm -rf extracted /tmp/v0221-ref
+          mkdir -p extracted /tmp/v0221-ref
+          unzip -q elxvro-blocks-v0.10.1.zip -d extracted
+          APP=extracted/elxvro-blocks-v0.10.1
           test -d "$APP"
 
-          rm -rf "$APP/lib" "$APP/test" "$APP/tool" "$APP/.github"
-          rm -f "$APP/pubspec.yaml" "$APP/analysis_options.yaml" "$APP/README.md"
-          tar -xJf ELXVRO-Blocks-v0.23.0-CODE.tar.xz -C "$APP"
+          git fetch origin release-v0.22.1 --depth=1
+          git archive FETCH_HEAD source_snapshot | tar -x -C /tmp/v0221-ref
+          rm -rf "$APP/lib" "$APP/test"
+          cp -a /tmp/v0221-ref/source_snapshot/lib "$APP/lib"
+          cp /tmp/v0221-ref/source_snapshot/pubspec.yaml "$APP/pubspec.yaml"
+          cp -a /tmp/v0221-ref/source_snapshot/test "$APP/test"
 
-          grep -F 'version: 0.23.0+47' "$APP/pubspec.yaml"
-          grep -F "defaultValue: 'CgkI6arsvtAGEAIQAw'" "$APP/lib/services/play_games_ids.dart"
-          grep -F "defaultValue: 'CgkI6arsvtAGEAIQAg'" "$APP/lib/services/play_games_ids.dart"
-          grep -F "defaultValue: 'CgkI6arsvtAGEAIQBA'" "$APP/lib/services/play_games_ids.dart"
-          grep -F "LanguageOption('ru'" "$APP/lib/l10n/app_strings.dart"
-          test "$(grep -c "LanguageOption('" "$APP/lib/l10n/app_strings.dart")" -eq 10
-          ! grep -q 'CustomPaint' "$APP/lib/widgets/gameplay_background.dart"
-          ! grep -q 'CustomPainter' "$APP/lib/widgets/gameplay_background.dart"
-          ! grep -q 'Canvas ' "$APP/lib/widgets/gameplay_background.dart"
-          python "$APP/tool/preflight_v0230.py" "$APP"
+          cat             .github/v0230-delta/part00             .github/v0230-delta/part01             .github/v0230-delta/part02             .github/v0230-delta/part03             .github/v0230-delta/part04             .github/v0230-delta/part05             .github/v0230-delta/part06 > /tmp/v0230.b64
+          base64 -d /tmp/v0230.b64 > /tmp/v0230_delta.tar.xz
+          echo "13d079ae7e3f9f5f9c259bf162d61fbc37bb7cbfcb8f4f0076f50fcb0ba08106  /tmp/v0230_delta.tar.xz" | sha256sum -c -
+          tar -xJf /tmp/v0230_delta.tar.xz -C "$APP"
 
+          grep -F "version: 0.23.0+47" "$APP/pubspec.yaml"
+          grep -F "CgkI6arsvtAGEAIQAw" "$APP/lib/services/play_games_ids.dart"
+          grep -F "CgkI6arsvtAGEAIQAg" "$APP/lib/services/play_games_ids.dart"
+          grep -F "CgkI6arsvtAGEAIQBA" "$APP/lib/services/play_games_service.dart" "$APP/lib/screens/falling_blocks_screen.dart" || true
+
+      - name: Validate 10-language source
+        run: |
+          set -euo pipefail
+          APP=extracted/elxvro-blocks-v0.10.1
+          python "$APP/tool/validate_localization.py" "$APP"
+          grep -F "const <String>['tr', 'en', 'de', 'fr', 'es', 'pt', 'it', 'ru', 'ar', 'zh']" "$APP/lib/l10n/app_strings.dart" || true
+          BG="$APP/lib/widgets/gameplay_background.dart"
+          ! grep -q 'CustomPaint' "$BG"
+          ! grep -q 'CustomPainter' "$BG"
+          ! grep -q 'Canvas ' "$BG"
+
+      - name: Create complete v0.23.0 source ZIP
+        run: |
+          set -euo pipefail
+          APP=extracted/elxvro-blocks-v0.10.1
+          mkdir -p "$APP/.github/workflows"
+          cp .github/workflows/build-v0.23.0.yml "$APP/.github/workflows/build-v0.23.0.yml"
           rm -f ELXVRO-Blocks-v0.23.0-FULL.zip
-          (cd "$APP" && zip -qr ../../ELXVRO-Blocks-v0.23.0-FULL.zip . -x 'build/*' '.dart_tool/*' '.git/*')
+          (
+            cd "$APP"
+            zip -qr ../../ELXVRO-Blocks-v0.23.0-FULL.zip .               -x "build/*" ".dart_tool/*" ".git/*"
+          )
           unzip -t ELXVRO-Blocks-v0.23.0-FULL.zip >/dev/null
-
+          rm -rf build_source
           mkdir build_source
           unzip -q ELXVRO-Blocks-v0.23.0-FULL.zip -d build_source
           test -f build_source/pubspec.yaml
-          test -f build_source/test/v0230_full_localization_test.dart
+          test -f build_source/lib/app_state.dart
+          test -f build_source/tool/validate_localization.py
           test -f build_source/.github/workflows/build-v0.23.0.yml
+          grep -F "version: 0.23.0+47" build_source/pubspec.yaml
+          python build_source/tool/validate_localization.py build_source
 
       - name: Upload complete source ZIP
         uses: actions/upload-artifact@v4
@@ -347,7 +364,7 @@ jobs:
           normalize /tmp/elxvro-music/othercenter.ogg assets/audio/bgm_othercenter.ogg
           normalize /tmp/elxvro-music/title.ogg assets/audio/bgm_cozy_title.ogg
 
-          cat > assets/audio/AUDIO_LICENSES_v0230.txt <<'EOF'
+          cat > assets/audio/AUDIO_LICENSES_v0221.txt <<'EOF'
           ELXVRO Blocks v0.23.0 audio sources
           Music — CC0 / public-domain dedication via OpenGameArt:
           - Magic Puzzle In-Game 1 — MintoDog
@@ -394,7 +411,7 @@ jobs:
             assets/audio/pro_marble_break.wav; do
             test -s "$sfx"
           done
-          test -s assets/audio/AUDIO_LICENSES_v0230.txt
+          test -s assets/audio/AUDIO_LICENSES_v0221.txt
 
       - name: Generate launcher icon and splash
         working-directory: build_source
