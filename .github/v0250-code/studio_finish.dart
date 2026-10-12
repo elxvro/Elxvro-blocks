@@ -109,8 +109,8 @@ class StudioFinish {
         ..cubicTo(w*.18,h*.14+dy,w*.22,h*.67+dy,w*.48,h*.42+dy)
         ..cubicTo(w*.75,h*.12+dy,w*.82,h*.63+dy,w*1.1,h*.34+dy);
       c.drawPath(path,Paint()..style=PaintingStyle.stroke
-        ..strokeWidth=math.max(.6,s.shortestSide*(i.isEven?.022:.012))
-        ..color=(i.isEven?accent:Colors.black).withValues(alpha:i.isEven?.35:.21));
+        ..strokeWidth=math.max(.6,s.shortestSide*(i.isEven ? .022 : .012))
+        ..color=(i.isEven?accent:Colors.black).withValues(alpha:i.isEven ? .35 : .21));
     }
   }
 
@@ -124,7 +124,7 @@ class StudioFinish {
       c.drawPath(path,Paint()..style=PaintingStyle.stroke
         ..strokeWidth=math.max(.45,s.shortestSide*.010)
         ..color=(i.isEven?const Color(0xFFFFD899):const Color(0xFF47210C))
-          .withValues(alpha:i.isEven?.22:.27));
+          .withValues(alpha:i.isEven ? .22 : .27));
     }
   }
 
