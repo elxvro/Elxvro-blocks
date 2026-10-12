@@ -87,6 +87,7 @@ jobs:
           test -f "$APP/lib/screens/tutorial_screen.dart"
           test -f "$APP/lib/screens/duel_screen.dart"
           test -f "$APP/lib/services/share_service.dart"
+          cp .github/v0240-code/real_material_audio_test.dart "$APP/test/real_material_audio_test.dart"
 
       - name: Validate v0.24.0 features and ten-language coverage
         run: |
