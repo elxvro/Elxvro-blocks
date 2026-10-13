@@ -31,7 +31,7 @@ class _MaterialFragmentFxState extends State<MaterialFragmentFx> with SingleTick
     ]));
   }));
   Widget _fragment(double w,double h,int i){
-    final lifetime=widget.trailing?(_controller.value+i/8)%1.0:(_controller.value-i*.053).clamp(0.0,1.0);
+    final lifetime=widget.trailing?(_controller.value+i/8)%1.0:(_controller.value-i*.053).clamp(0.0,1.0).toDouble();
     final opacity=widget.trailing?(math.sin(lifetime*math.pi)*.87).clamp(0.0,1.0):((1-lifetime)*.94).clamp(0.0,1.0);
     final angle=i*math.pi*.7;
     final dx=widget.trailing?w*(.08+((i*13)%60)/100)-lifetime*w*.55:w*.5+math.cos(angle)*lifetime*(w*.54+14);
