@@ -1,0 +1,546 @@
+diff --git a/V0282_SERVER_WALLET_INTEGRATION.md b/V0282_SERVER_WALLET_INTEGRATION.md
+new file mode 100644
+index 0000000..a11a7bb
+--- /dev/null
++++ b/V0282_SERVER_WALLET_INTEGRATION.md
+@@ -0,0 +1,42 @@
++# ELXVRO Blocks v0.28.2 — güvenli hesap ve cüzdan önizleme sürümü
++
++Sürüm: `0.28.2+56` / Android paket: `com.elxvro.elxvro_blocks`.
++
++## Değişiklikler
++
++- Oyuncunun açık isteğiyle Google Sign-In. Google **Web OAuth Client ID** APK'ya yalnızca public ID olarak derleme zamanında eklenir.
++- Google'ın imzalı `id_token` değerini `https://block.elxvro.com/wallet.php` endpoint'ine Authorization Bearer ile gönderir; sunucu Google JWK imzası, issuer, expiration, audience doğrular.
++- Sunucudaki **satın alınmış coin bakiyesi** ve destekçi durumu salt okunur görüntülenir. Oyuncu tarafından kazanılan mevcut yerel coinler aynen kalır.
++- Satın alma tokenlarının tekrar oynatılmaması için backend ledger, Google API state ve account binding gerekir.
++- Android release manifestine INTERNET izni eklenir.
++- Satın alma düğmeleri bilinçli olarak kilitlidir: `paidWalletSpendReady=false`, ayrıca `ELXVRO_BILLING_ENABLED` varsayılan `false`. Bu sürüm gerçek para tahsil etmez.
++
++## GitHub Actions yapılandırma (sadece PUBLIC kimlik)
++
++`Settings > Secrets and variables > Actions > Variables > New repository variable`
++
++Ad: `ELXVRO_GOOGLE_WEB_CLIENT_ID` — Değer: Google Cloud'da *ELXVRO Blocks Billing* Web OAuth Client ID. Sonunda `.apps.googleusercontent.com` bulunmalıdır. **Client secret girme.**
++
++Ad: `ELXVRO_BILLING_VERIFY_URL` — Değer: `https://block.elxvro.com/verify_purchase.php` (v0.28.2 bağlantı hazırlığı; ödeme kilitli).
++
++`ELXVRO_BILLING_ENABLED` **tanımlamayın / true yapmayın**. Bu sürümde ayrıca sabit kilit bulunur.
++
++Android Google OAuth kaydında `com.elxvro.elxvro_blocks` ve **APK'yı imzalayan sertifikanın SHA-1** bulunmalı. Play App Signing test sürümlerinde Google Play App Signing SHA-1 farklı olabilir; ilgili SHA-1 değerini de ayrıca Android OAuth istemcisine ekleyin.
++
++## Test
++
++1. v0.28.2 signed APK'yı yükle, Market > Coin satın al bölümüne git.
++2. Google ile bağlan düğmesine dokun. Hesap seçici açılmalı.
++3. Bağlandıktan sonra sunucudan satın alınmış coin bakiyesi 0 görünebilir. Yanında “test / henüz harcanamaz” notu bulunmalıdır.
++4. Lisans test hesabı ile bile **ödeme düğmelerine basılamamalı.**
++5. `wallet.php` dışında herhangi bir endpoint üzerinden telefon tek başına coin oluşturamaz.
++
++## Üretim öncesi açık işler
++
++- Sunucuda atomik `spend` / coin kullanım API'si ve hesabı güvenli biçimde eşitleyen oyun ekonomisi.
++- Google Play satın alma finalizasyonu (ack/consume) için retry işleyicisi, ödeme iptali/iade mutabakatı, test siparişleri.
++- Gerçek test alımları için ayrı açık onay ve yeni release; bu sürüm asla tahsilat yapmamalı.
++- Sunucudaki mevcut doğrulama endpoint'inde `payments_enabled=false` tutulmalıdır.
++- `GoogleSignInAccount.id`, sunucuda kimliği doğrulanan token içindeki `sub` ile aynı Google kullanıcı ID'sidir; Google Play Billing `PurchaseParam.applicationUserName` alanına SHA-256('elxvro.blocks|' + sub) hash'i geçirilir.
++
++**Gizli JSON, OAuth client secret veya HMAC secret kesinlikle APK/GitHub'a konmaz.**
+diff --git a/lib/screens/home_screen.dart b/lib/screens/home_screen.dart
+index 16b1caf..e7ecd60 100644
+--- a/lib/screens/home_screen.dart
++++ b/lib/screens/home_screen.dart
+@@ -313,7 +313,7 @@ class HomeScreen extends StatelessWidget {
+                           child: _HomeTile(
+                             icon: Icons.tune_rounded,
+                             label: l.t('home.settings'),
+-                            badge: 'v0.28.1',
++                            badge: 'v0.28.2',
+                             onTap: () {
+                               Navigator.of(context).push(
+                                 MaterialPageRoute<void>(
+diff --git a/lib/screens/settings_screen.dart b/lib/screens/settings_screen.dart
+index 1a055f0..626e7c1 100644
+--- a/lib/screens/settings_screen.dart
++++ b/lib/screens/settings_screen.dart
+@@ -193,7 +193,7 @@ class SettingsScreen extends StatelessWidget {
+                               ),
+                               SizedBox(height: 8),
+                               Text(
+-                                'v0.28.1  •  ${AppStrings.current.f('Sosyal + Öğretici', 'Social + Tutorial')}',
++                                'v0.28.2  •  ${AppStrings.current.f('Sosyal + Öğretici', 'Social + Tutorial')}',
+                                 style: TextStyle(color: Colors.white54),
+                               ),
+                               SizedBox(height: 6),
+diff --git a/lib/services/billing_account_service.dart b/lib/services/billing_account_service.dart
+new file mode 100644
+index 0000000..08139e4
+--- /dev/null
++++ b/lib/services/billing_account_service.dart
+@@ -0,0 +1,139 @@
++import 'dart:async';
++import 'dart:convert';
++
++import 'package:flutter/foundation.dart';
++import 'package:google_sign_in/google_sign_in.dart';
++import 'package:http/http.dart' as http;
++
++/// The backend validates every Google ID token. The phone is NOT trusted to
++/// authorize a wallet or mint any purchased coins.
++class BillingAccountService extends ChangeNotifier {
++  BillingAccountService._();
++  static final BillingAccountService instance = BillingAccountService._();
++
++  static const webClientId =
++      String.fromEnvironment('ELXVRO_GOOGLE_WEB_CLIENT_ID');
++  static const apiBase = 'https://block.elxvro.com';
++
++  GoogleSignIn? _google;
++  GoogleSignInAccount? _account;
++  String? _idToken;
++  bool busy = false;
++  bool walletVerified = false;
++  int purchasedCoinBalance = 0;
++  bool serverSupporter = false;
++  String? message;
++
++  bool get clientConfigured => webClientId.endsWith('.apps.googleusercontent.com');
++  bool get signedIn => _account != null && _idToken != null;
++  String? get accountEmail => _account?.email;
++  String? get googleUserId => _account?.id;
++
++  GoogleSignIn get _provider => _google ??= GoogleSignIn(
++    scopes: const <String>['email'],
++    serverClientId: webClientId,
++  );
++
++  /// Explicit sign-in; do not silently sign the user in when opening a game.
++  Future<void> signIn() async {
++    if (!clientConfigured) {
++      message = 'Google OAuth kimliği henüz APK içine tanımlanmadı.';
++      notifyListeners();
++      return;
++    }
++    busy = true;
++    message = null;
++    notifyListeners();
++    try {
++      final account = await _provider.signIn();
++      if (account == null) {
++        message = 'Google ile giriş iptal edildi.';
++        return;
++      }
++      final token = (await account.authentication).idToken;
++      if (token == null || token.isEmpty) {
++        message = 'Google kimlik jetonu alınamadı. OAuth Android SHA-1 ayarını kontrol edin.';
++        return;
++      }
++      _account = account;
++      _idToken = token;
++      await _refreshWallet();
++    } catch (_) {
++      message = 'Google giriş bağlantısı kurulamadı.';
++      walletVerified = false;
++    } finally {
++      busy = false;
++      notifyListeners();
++    }
++  }
++
++  Future<void> refreshWallet() async {
++    if (!signedIn) return;
++    busy = true;
++    notifyListeners();
++    try {
++      await _refreshWallet();
++    } finally {
++      busy = false;
++      notifyListeners();
++    }
++  }
++
++  Future<void> _refreshWallet() async {
++    walletVerified = false;
++    try {
++      final response = await http.get(
++        Uri.parse('$apiBase/wallet.php'),
++        headers: <String, String>{'Authorization': 'Bearer $_idToken'},
++      ).timeout(const Duration(seconds: 15));
++      if (response.statusCode != 200) {
++        message = response.statusCode == 401
++            ? 'Google kimlik oturumunun süresi doldu. Tekrar giriş yapın.'
++            : 'Sunucu cüzdanı açılamadı (${response.statusCode}).';
++        return;
++      }
++      final decoded = jsonDecode(response.body);
++      if (decoded is! Map<String, dynamic> ||
++          decoded['source'] != 'verified_purchases' ||
++          decoded['balance'] is! int || decoded['balance'] < 0 ||
++          decoded['supporter'] is! bool) {
++        message = 'Sunucudan geçersiz cüzdan yanıtı geldi.';
++        return;
++      }
++      purchasedCoinBalance = decoded['balance'] as int;
++      serverSupporter = decoded['supporter'] as bool;
++      walletVerified = true;
++      message = 'Google hesabı ve sunucu bağlantısı doğrulandı.';
++    } catch (_) {
++      message = 'Cüzdan bağlantısı kurulamadı. İnterneti kontrol edin.';
++    }
++  }
++
++  Future<String?> freshIdToken() async {
++    final user = _account;
++    if (user == null) return null;
++    try {
++      final token = (await user.authentication).idToken;
++      if (token == null || token.isEmpty) return null;
++      _idToken = token;
++      return token;
++    } catch (_) {
++      return null;
++    }
++  }
++
++  Future<void> signOut() async {
++    try {
++      await _google?.signOut();
++    } catch (_) {
++      // The local session is cleared even if Google cannot be contacted.
++    }
++    _account = null;
++    _idToken = null;
++    walletVerified = false;
++    purchasedCoinBalance = 0;
++    serverSupporter = false;
++    message = 'Çıkış yapıldı.';
++    notifyListeners();
++  }
++}
+diff --git a/lib/services/play_billing_service.dart b/lib/services/play_billing_service.dart
+index 4918423..d5403a2 100644
+--- a/lib/services/play_billing_service.dart
++++ b/lib/services/play_billing_service.dart
+@@ -2,11 +2,13 @@ import 'dart:async';
+ import 'dart:convert';
+ 
+ import 'package:flutter/foundation.dart';
++import 'package:crypto/crypto.dart';
+ import 'package:http/http.dart' as http;
+ import 'package:in_app_purchase/in_app_purchase.dart';
+ import 'package:in_app_purchase_android/in_app_purchase_android.dart';
+ 
+ import '../app_state.dart';
++import 'billing_account_service.dart';
+ 
+ class PlayProduct {
+   const PlayProduct(this.id, this.coins, this.isSupporter);
+@@ -38,6 +40,9 @@ class PlayBillingService extends ChangeNotifier {
+   // explicitly authorizes checkout in a new signed Play test build.
+   static const bool checkoutApproved =
+       bool.fromEnvironment('ELXVRO_BILLING_ENABLED', defaultValue: false);
++  // Safe v0.28.2 preview: the PHP ledger has no spend/consume API yet.
++  // Never release real-money coins that cannot be spent authoritatively.
++  static const bool paidWalletSpendReady = false;
+ 
+   final InAppPurchase _store = InAppPurchase.instance;
+   StreamSubscription<List<PurchaseDetails>>? _stream;
+@@ -51,7 +56,9 @@ class PlayBillingService extends ChangeNotifier {
+ 
+   bool get serverConfigured => verificationUrl.startsWith('https://') &&
+       (Uri.tryParse(verificationUrl)?.host.isNotEmpty ?? false);
+-  bool get canBuy => available && serverConfigured && checkoutApproved && !pending;
++  bool get canBuy => available && serverConfigured && checkoutApproved &&
++      paidWalletSpendReady && BillingAccountService.instance.walletVerified &&
++      BillingAccountService.instance.signedIn && !pending;
+ 
+   ProductDetails? productFor(String id) => _products[id];
+ 
+@@ -85,8 +92,8 @@ class PlayBillingService extends ChangeNotifier {
+       }
+       if (!serverConfigured) {
+         message = 'Ödeme doğrulama sunucusu henüz bağlanmadı.';
+-      } else if (!checkoutApproved) {
+-        message = 'Coin ürünleri hazırlanıyor. Test satın alımları henüz açık değil.';
++      } else if (!checkoutApproved || !paidWalletSpendReady) {
++        message = 'Sunucu cüzdanı test ediliyor. Satın alımlar kapalı.';
+       }
+     } catch (_) {
+       message = 'Google Play ürünleri yüklenemedi.';
+@@ -99,12 +106,21 @@ class PlayBillingService extends ChangeNotifier {
+   Future<void> buy(String id) async {
+     final product = PlayProduct.byId(id);
+     final details = productFor(id);
+-    if (!canBuy || product == null || details == null) return;
++    final account = BillingAccountService.instance;
++    if (!canBuy || product == null || details == null ||
++        account.googleUserId == null) return;
+     pending = true;
+     message = null;
+     notifyListeners();
+     try {
+-      final param = PurchaseParam(productDetails: details);
++      // Server requires an account-bound purchase on the Google Play record.
++      // Google verifies the real Google subject from the signed ID token.
++      final boundAccountId = sha256.convert(
++          utf8.encode('elxvro.blocks|${account.googleUserId}')).toString();
++      final param = PurchaseParam(
++        productDetails: details,
++        applicationUserName: boundAccountId,
++      );
+       final started = product.isSupporter
+           ? await _store.buyNonConsumable(purchaseParam: param)
+           : await _store.buyConsumable(
+@@ -151,8 +167,18 @@ class PlayBillingService extends ChangeNotifier {
+ 
+   Future<void> _deliver(PurchaseDetails item) async {
+     final product = PlayProduct.byId(item.productID);
+-    final app = _app;
+-    if (product == null || app == null || !serverConfigured) return;
++    if (product == null || _app == null || !canBuy) {
++      pending = false;
++      message = 'Satın alma işleme alınmadı: test sürümünde ödeme kapalı.';
++      return;
++    }
++    final account = BillingAccountService.instance;
++    final bearer = await account.freshIdToken();
++    if (bearer == null || !account.walletVerified) {
++      pending = false;
++      message = 'Ödeme için doğrulanmış Google hesabı gerekli.';
++      return;
++    }
+     final token = item.verificationData.serverVerificationData;
+     if (token.isEmpty) {
+       pending = false;
+@@ -163,7 +189,10 @@ class PlayBillingService extends ChangeNotifier {
+       // A "purchased" flag on the phone does NOT verify payment.
+       final response = await http.post(
+         Uri.parse(verificationUrl),
+-        headers: const {'Content-Type': 'application/json'},
++        headers: <String, String>{
++          'Content-Type': 'application/json',
++          'Authorization': 'Bearer $bearer',
++        },
+         body: jsonEncode(<String, String>{
+           'platform': 'google_play',
+           'productId': product.id,
+@@ -177,11 +206,12 @@ class PlayBillingService extends ChangeNotifier {
+           data['productId'] != product.id) {
+         throw const FormatException('unverified');
+       }
+-      await app.grantVerifiedPlayProduct(
+-        token: token,
+-        coinsToAdd: product.coins,
+-        supporter: product.isSupporter,
+-      );
++      // The server owns purchases. Never mint the same coins locally;
++      // a separate authenticated spend API is required before paid checkout.
++      await account.refreshWallet();
++      if (!account.walletVerified) {
++        throw const FormatException('wallet_refresh_failed');
++      }
+       if (product.isSupporter) {
+         if (item.pendingCompletePurchase) {
+           await _store.completePurchase(item);
+@@ -191,7 +221,7 @@ class PlayBillingService extends ChangeNotifier {
+         final android = _store
+             .getPlatformAddition<InAppPurchaseAndroidPlatformAddition>();
+         await android.consumePurchase(item);
+-        message = '+' + product.coins.toString() + ' coin eklendi.';
++        message = 'Satın alınan coinler sunucu cüzdanına kaydedildi.';
+       }
+     } catch (_) {
+       message = 'Ödeme doğrulanamadı. Hak tanımlanmadı; tekrar dene.';
+diff --git a/lib/widgets/coin_purchase_panel.dart b/lib/widgets/coin_purchase_panel.dart
+index ff3eec0..7d73f5b 100644
+--- a/lib/widgets/coin_purchase_panel.dart
++++ b/lib/widgets/coin_purchase_panel.dart
+@@ -2,6 +2,7 @@ import 'dart:async';
+ import 'package:flutter/material.dart';
+ import '../app_state.dart';
+ import '../services/play_billing_service.dart';
++import '../services/billing_account_service.dart';
+ 
+ /// The same gold/navy storefront as the existing gameplay economy.
+ class CoinPurchasePanel extends StatelessWidget {
+@@ -12,8 +13,45 @@ class CoinPurchasePanel extends StatelessWidget {
+   Widget build(BuildContext context) {
+     final billing = PlayBillingService.instance;
+     final isTr = appState.languageCode == 'tr';
+-    return AnimatedBuilder(animation: billing, builder: (context, _) {
++    final account = BillingAccountService.instance;
++    return AnimatedBuilder(animation: Listenable.merge(<Listenable>[billing, account]), builder: (context, _) {
+       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: <Widget>[
++        _heading(Icons.account_circle_rounded,
++            isTr ? 'GOOGLE HESABI' : 'GOOGLE ACCOUNT',
++            isTr ? 'Sunucu cüzdanı kontrolü' : 'Server wallet connection'),
++        const SizedBox(height: 10),
++        if (account.signedIn) ...<Widget>[
++          Text(account.accountEmail ?? '', style: const TextStyle(color: Colors.white70, fontSize: 12)),
++          const SizedBox(height: 4),
++          Text(
++            account.walletVerified
++              ? (isTr
++                  ? 'Sunucudaki satın alınmış coin: ${account.purchasedCoinBalance} (test / henüz harcanamaz)'
++                  : 'Server-purchased coins: ${account.purchasedCoinBalance} (preview / not spendable yet)')
++              : (isTr ? 'Cüzdan doğrulanamadı.' : 'Wallet not verified.'),
++            style: const TextStyle(color: Color(0xFFFFD98B), fontSize: 12)),
++          TextButton.icon(
++            onPressed: account.busy ? null : () => unawaited(account.refreshWallet()),
++            icon: const Icon(Icons.sync, size: 17),
++            label: Text(isTr ? 'Cüzdanı yenile' : 'Refresh wallet'),
++          ),
++          TextButton.icon(
++            onPressed: account.busy ? null : () => unawaited(account.signOut()),
++            icon: const Icon(Icons.logout, size: 17),
++            label: Text(isTr ? 'Çıkış yap' : 'Sign out'),
++          ),
++        ] else ...<Widget>[
++          FilledButton.icon(
++            onPressed: account.busy || !account.clientConfigured
++                ? null : () => unawaited(account.signIn()),
++            icon: const Icon(Icons.login_rounded),
++            label: Text(isTr ? 'Google ile bağlan' : 'Connect Google account'),
++          ),
++        ],
++        if (account.message != null)
++          Text(account.message!, textAlign: TextAlign.center,
++              style: const TextStyle(color: Colors.white60, fontSize: 11)),
++        const Divider(color: Colors.white12, height: 32),
+         _heading(Icons.toll_rounded, isTr ? 'COIN SATIN AL' : 'BUY COINS',
+             isTr ? 'Google Play ile güvenli ödeme' : 'Secure Google Play checkout'),
+         const SizedBox(height: 12),
+@@ -45,9 +83,9 @@ class CoinPurchasePanel extends StatelessWidget {
+         if (billing.message != null)
+           Text(billing.message!, textAlign: TextAlign.center,
+               style: const TextStyle(color: Colors.white70, fontSize: 12)),
+-        if (!billing.serverConfigured)
++        if (!billing.canBuy)
+           Text(isTr
+-                ? 'Ödeme doğrulama sunucusu ve Play ürünleri açılana kadar satın alma devre dışıdır.'
++                ? 'Ödeme altyapısı test aşamasında. Satın alımlar devre dışıdır.'
+                 : 'Purchases are disabled until server verification and Play products are active.',
+               textAlign: TextAlign.center,
+               style: const TextStyle(color: Colors.white54, fontSize: 11)),
+diff --git a/pubspec.yaml b/pubspec.yaml
+index 974fb53..aff5d33 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -1,7 +1,7 @@
+ name: elxvro_blocks
+ description: Premium block puzzle game for ELXVRO.
+ publish_to: 'none'
+-version: 0.28.1+55
++version: 0.28.2+56
+ 
+ environment:
+   sdk: '>=3.4.0 <4.0.0'
+@@ -17,6 +17,8 @@ dependencies:
+   in_app_purchase: ^3.3.1
+   in_app_purchase_android: ^0.5.0
+   http: ^1.6.0
++  google_sign_in: ^6.3.0
++  crypto: ^3.0.6
+ 
+ dev_dependencies:
+   flutter_test:
+diff --git a/test/real_material_audio_test.dart b/test/real_material_audio_test.dart
+index d4cadd9..240a197 100644
+--- a/test/real_material_audio_test.dart
++++ b/test/real_material_audio_test.dart
+@@ -7,6 +7,6 @@ void main() {
+     expect(File('tool/fetch_real_material_audio.sh').existsSync(), isTrue);
+     expect(File('REAL_AUDIO_CREDITS.md').existsSync(), isTrue);
+     final pubspec = File('pubspec.yaml').readAsStringSync();
+-    expect(pubspec, contains('version: 0.28.1+55'));
++    expect(pubspec, contains('version: 0.28.2+56'));
+   });
+ }
+diff --git a/test/v0240_features_test.dart b/test/v0240_features_test.dart
+index 4d97efa..234e7dd 100644
+--- a/test/v0240_features_test.dart
++++ b/test/v0240_features_test.dart
+@@ -38,7 +38,7 @@ void main() {
+         File('lib/screens/daily_missions_screen.dart').readAsStringSync();
+     final game = File('lib/screens/game_screen.dart').readAsStringSync();
+ 
+-    expect(pubspec, contains('version: 0.28.1+55'));
++    expect(pubspec, contains('version: 0.28.2+56'));
+     expect(pubspec, contains('share_plus: 10.1.4'));
+     expect(home, contains('TutorialScreen'));
+     expect(home, contains('ShareService.shareGame'));
+diff --git a/test/v0270_billing_contract_test.dart b/test/v0270_billing_contract_test.dart
+index dedaddb..780b351 100644
+--- a/test/v0270_billing_contract_test.dart
++++ b/test/v0270_billing_contract_test.dart
+@@ -12,7 +12,7 @@ void main() {
+   });
+   test('no charge without a trusted verification server', () {
+     final src = File('lib/services/play_billing_service.dart').readAsStringSync();
+-    expect(src, contains("if (!canBuy || product == null"));
++    expect(src, contains("if (product == null || _app == null || !canBuy"));
+     expect(src, contains("data['verified'] != true"));
+     expect(src, contains('consumePurchase(item)'));
+   });
+diff --git a/test/v0281_billing_release_gate_test.dart b/test/v0281_billing_release_gate_test.dart
+index 21a4544..2eed94a 100644
+--- a/test/v0281_billing_release_gate_test.dart
++++ b/test/v0281_billing_release_gate_test.dart
+@@ -11,7 +11,7 @@ void main() {
+   test('no checkout without explicit enable flag AND trusted verifier URL', () {
+     final source = File('lib/services/play_billing_service.dart').readAsStringSync();
+     expect(source, contains("bool.fromEnvironment('ELXVRO_BILLING_ENABLED'"));
+-    expect(source, contains('available && serverConfigured && checkoutApproved && !pending'));
++    expect(source, contains('paidWalletSpendReady && BillingAccountService.instance.walletVerified'));
+     expect(source, contains('ELXVRO_BILLING_VERIFY_URL'));
+     expect(source, contains("data['verified'] != true"));
+   });
+diff --git a/test/v0282_server_wallet_preview_test.dart b/test/v0282_server_wallet_preview_test.dart
+new file mode 100644
+index 0000000..d6b7c45
+--- /dev/null
++++ b/test/v0282_server_wallet_preview_test.dart
+@@ -0,0 +1,26 @@
++import 'dart:io';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:elxvro_blocks/services/billing_account_service.dart';
++import 'package:elxvro_blocks/services/play_billing_service.dart';
++
++void main() {
++  test('v0.28.2 cannot open checkout even if a CI payment flag is set', () {
++    expect(PlayBillingService.paidWalletSpendReady, isFalse);
++    expect(PlayBillingService.instance.canBuy, isFalse);
++  });
++
++  test('Only official HTTPS wallet endpoint is used', () {
++    expect(BillingAccountService.apiBase, 'https://block.elxvro.com');
++    final account = File('lib/services/billing_account_service.dart').readAsStringSync();
++    expect(account, contains('Authorization'));
++    expect(account, contains('wallet.php'));
++    expect(account, contains('verified_purchases'));
++  });
++
++  test('Payment must use a verified Google ID token, never local credits', () {
++    final billing = File('lib/services/play_billing_service.dart').readAsStringSync();
++    expect(billing, contains('applicationUserName: boundAccountId'));
++    expect(billing, contains("'Authorization': 'Bearer \$bearer'"));
++    expect(billing, isNot(contains('app.grantVerifiedPlayProduct(')));
++  });
++}
+diff --git a/tool/apply_android_branding.py b/tool/apply_android_branding.py
+index 5c3bd3b..8a78fa9 100644
+--- a/tool/apply_android_branding.py
++++ b/tool/apply_android_branding.py
+@@ -7,6 +7,12 @@ if not manifest.exists():
+ 
+ text = manifest.read_text(encoding='utf-8')
+ text = re.sub(r'android:label="[^"]*"', 'android:label="ELXVRO Blocks"', text, count=1)
++# Flutter's release manifest can omit INTERNET. The authenticated wallet and
++# Google Play Developer API proxy must work in the signed release APK/AAB.
++if 'android.permission.INTERNET' not in text:
++    text = text.replace('<application',
++                        '    <uses-permission android:name="android.permission.INTERNET"/>\n    <application',
++                        1)
+ 
+ # Keep the puzzle game portrait-first on Android. Add the attribute only when
+ # Flutter's generated activity does not already define an orientation.
