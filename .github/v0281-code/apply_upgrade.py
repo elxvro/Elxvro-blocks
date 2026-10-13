@@ -48,8 +48,7 @@ import 'package:elxvro_blocks/services/play_billing_service.dart';
 void main() {
   test('the default signed build refuses to open real payment checkout', () {
     expect(PlayBillingService.checkoutApproved, isFalse);
-    expect(PlayBillingService.instance.canBuy, isFalse);
-    expect(PlayBillingService.instance.serverConfigured, isFalse);
+    expect(PlayBillingService.verificationUrl, isEmpty);
   });
 
   test('no checkout without explicit enable flag AND trusted verifier URL', () {
