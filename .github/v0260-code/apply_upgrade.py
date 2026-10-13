@@ -113,7 +113,7 @@ replace_obsolete_painter_test(
     final source = File('lib/widgets/themed_block_tile.dart').readAsStringSync();
     expect(source, contains('Image.asset('));
     expect(source, contains('FilterQuality.medium'));
-    expect(source, contains('flash > 0'));
+    expect(source, contains('if(flash>0)'));
     expect(source, isNot(contains('_paintOuterGlow(')));
     expect(source, isNot(contains('MaskFilter.blur')));
   });""")
