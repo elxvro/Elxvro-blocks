@@ -37,7 +37,7 @@ class LocalizedShatterOverlay extends StatelessWidget {
         }
         final cw = w / boardSize;
         final ch = h / boardSize;
-        final t = Curves.easeOutCubic.transform(progress.clamp(0.0, 1.0));
+        final t = Curves.easeOutCubic.transform(progress.clamp(0.0, 1.0).toDouble());
         final alpha = math.pow(1 - progress, 1.15).toDouble().clamp(0.0, 1.0);
         final particlesPerCell = lowFx ? 1 : 2;
         return ClipRect(child: Stack(
