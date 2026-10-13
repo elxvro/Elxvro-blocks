@@ -61,10 +61,7 @@ jobs:
         run: |
           set -euo pipefail
           APP=extracted/elxvro-blocks
-          (
-            cd "$APP"
-            git apply "$GITHUB_WORKSPACE/.github/v0282-code/upgrade.patch"
-          )
+          git apply --verbose --directory="$APP" "$GITHUB_WORKSPACE/.github/v0282-code/upgrade.patch"
           grep -F 'version: 0.28.2+56' "$APP/pubspec.yaml"
           grep -F 'paidWalletSpendReady = false' "$APP/lib/services/play_billing_service.dart"
           test -s "$APP/lib/services/billing_account_service.dart"
