@@ -117,6 +117,13 @@ class PlayBillingService extends ChangeNotifier {
 
   Future<void> restore() => _store.restorePurchases();
 
+  @override
+  void dispose() {
+    unawaited(_stream?.cancel());
+    super.dispose();
+  }
+
+
   Future<void> _handlePurchases(List<PurchaseDetails> items) async {
     for (final item in items) {
       if (item.status == PurchaseStatus.pending) {
