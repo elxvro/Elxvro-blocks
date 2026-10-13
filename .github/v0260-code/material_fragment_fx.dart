@@ -36,7 +36,7 @@ class _MaterialFragmentFxState extends State<MaterialFragmentFx> with SingleTick
     final angle=i*math.pi*.7;
     final dx=widget.trailing?w*(.08+((i*13)%60)/100)-lifetime*w*.55:w*.5+math.cos(angle)*lifetime*(w*.54+14);
     final dy=widget.trailing?h*(.35+((i*11)%45)/100)+lifetime*lifetime*(h*.45+17):h*.5+math.sin(angle)*lifetime*(h*.48+17);
-    final side=math.max(5.0,math.min(15.0,math.min(w,h)*(widget.trailing?.21:.28)*(.8+(i%3)*.2)));
+    final side=math.max(5.0,math.min(15.0,math.min(w,h)*(widget.trailing ? .21 : .28)*(.8+(i%3)*.2)));
     return Positioned(left:dx-side/2,top:dy-side/2,width:side,height:side,
       child:Opacity(opacity:opacity.toDouble(),child:Transform.rotate(
         angle:(i%2==0?1:-1)*lifetime*(1.5+i*.2),
