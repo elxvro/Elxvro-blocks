@@ -188,6 +188,33 @@ patch("lib/screens/game_screen.dart",
       "_impactLevel = (impact + burst.shakeAmplitude * 2).round().clamp(1, 6);",
       "_impactLevel = (impact + burst.shakeAmplitude).round().clamp(1, 3);")
 
+# Remove obsolete whole-board glow/combos: besides suggesting false breaks,
+# they produce unused-element warnings under strict flutter analyze.
+screen = app / "lib/screens/game_screen.dart"
+text = screen.read_text(encoding="utf-8")
+for name, next_name in (
+    ("_ClearShockwavePainter", "_Material2DOverlayPainter"),
+    ("_Material2DOverlayPainter", "_LiveRecordOverlay"),
+    ("_Combo2DSplash", "_PerfectClearOverlay"),
+):
+    begin = text.index("class " + name + " ")
+    end = text.index("class " + next_name + " ", begin)
+    text = text[:begin] + text[end:]
+screen.write_text(text, encoding="utf-8")
+
+# Historical source-inspection tests must describe what the game now executes,
+# not require the deleted v0.10 board-wide visual components.
+patch("test/fx_2d_test.dart",
+"""    expect(game, contains('class _Material2DOverlayPainter'));
+    expect(game, contains('class _Combo2DSplash'));
+    expect(game, contains('class _ComboStarburstPainter'));""",
+"""    expect(game, contains('LocalizedShatterOverlay('));
+    expect(game, contains('cells: _flashCells,'));
+    expect(game, contains('MaterialFragmentFx('));""")
+patch("test/gameplay_rebuild_test.dart",
+    "expect(game, contains('class _ClearShockwavePainter'));",
+    "expect(game, contains('LocalizedShatterOverlay('));")
+
 (app / 'lib/widgets/localized_shatter_overlay.dart').write_text(
     (Path(__file__).parent / 'localized_shatter_overlay.dart').read_text(encoding='utf-8'),
     encoding='utf-8')
