@@ -166,6 +166,10 @@ patch('lib/screens/game_screen.dart',"vx: particle.vx * 0.042,",
       "vx: particle.vx * 0.072,")
 patch('lib/screens/game_screen.dart',"vy: particle.vy * 0.042,",
       "vy: particle.vy * 0.072,")
+patch('test/v021_experience_test.dart',
+      "expect(source, contains('_ghostCells'));",
+      "expect(source, isNot(contains('_ghostCells')));\n    expect(source, contains('FallingImpactOverlay('));")
+
 # Prevent shadow presence even in landing guides: no ghost computation remains.
 (root/'test/v0280_falling_impact_test.dart').write_text("""import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
