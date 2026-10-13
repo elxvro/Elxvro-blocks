@@ -113,10 +113,10 @@ CRITICAL SERVER RESPONSIBILITIES:
 
 GITHUB ACTIONS BUILD-TIME VARIABLES:
   vars.ELXVRO_BILLING_VERIFY_URL = https://YOUR-DOMAIN/verify_purchase
-  vars.ELXVRO_BILLING_ENABLED = false   (default, safe)
+  No enabled variable: regular push builds ALWAYS keep paid checkout OFF.
 ONLY after license-tester payments, security and wallet integration pass:
-  vars.ELXVRO_BILLING_ENABLED = true
-Then run workflow build-v0.28.1.yml from branch work-v0.28.1.
+  Manually dispatch build-v0.28.1.yml, choose enable_paid_checkout=true
+  after the owner explicitly approves. Default is false.
 Both the APK and AAB embed the same build settings.
 Without a URL and enabled=true, buy buttons remain disabled.
 
