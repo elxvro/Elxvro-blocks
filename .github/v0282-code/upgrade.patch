@@ -509,7 +509,7 @@ index 0000000..d6b7c45
 +void main() {
 +  test('v0.28.2 cannot open checkout even if a CI payment flag is set', () {
 +    expect(PlayBillingService.paidWalletSpendReady, isFalse);
-+    expect(PlayBillingService.instance.canBuy, isFalse);
++    expect(PlayBillingService.checkoutApproved, isFalse);
 +  });
 +
 +  test('Only official HTTPS wallet endpoint is used', () {
