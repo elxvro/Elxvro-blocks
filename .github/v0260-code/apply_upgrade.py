@@ -80,10 +80,42 @@ void main() {
     for (final material in ThemeMaterial.values) {
       expect(File(ThemedBlockTile.artworkPath(material)).existsSync(), isTrue);
       for (var i = 0; i < 5; i++) {
-        expect(File('assets/images/material_shards/\${material.name}_$i.webp').existsSync(), isTrue);
+        expect(File('assets/images/material_shards/${material.name}_$i.webp').existsSync(), isTrue);
       }
     }
   });
 }
 """, encoding="utf-8")
+
+def replace_obsolete_painter_test(path, old_title, new_test):
+    file = app / path
+    source = file.read_text(encoding="utf-8")
+    head = "  test('" + old_title + "', () {"
+    start = source.index(head)
+    end = source.index("\n  });", start) + len("\n  });")
+    file.write_text(source[:start] + new_test + source[end:], encoding="utf-8")
+
+replace_obsolete_painter_test(
+    "test/performance_budget_test.dart",
+    "regular tile outer glow avoids per-tile blur filters",
+    """  test('cached image-backed block faces avoid expensive per-tile blur', () {
+    final source = File('lib/widgets/themed_block_tile.dart').readAsStringSync();
+    expect(source, contains('Image.asset('));
+    expect(source, contains('assets/images/material_tiles/'));
+    expect(source, isNot(contains('CustomPaint(')));
+    expect(source, isNot(contains('MaskFilter.blur')));
+  });""")
+
+replace_obsolete_painter_test(
+    "test/max_impact_test.dart",
+    "MAX IMPACT block painter keeps stronger surface light without halo blur",
+    """  test('MAX IMPACT uses real bitmap material faces with a cheap flash', () {
+    final source = File('lib/widgets/themed_block_tile.dart').readAsStringSync();
+    expect(source, contains('Image.asset('));
+    expect(source, contains('FilterQuality.medium'));
+    expect(source, contains('flash > 0'));
+    expect(source, isNot(contains('_paintOuterGlow(')));
+    expect(source, isNot(contains('MaskFilter.blur')));
+  });""")
+
 print("v0.26.0 image surface + drag fragment/placement burst wired")
