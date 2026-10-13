@@ -47,7 +47,7 @@ void main() {
       final sprite = await rootBundle.load(ThemedBlockTile.artworkPath(material));
       expect(sprite.lengthInBytes, greaterThan(500));
       for (var i = 0; i < 5; i++) {
-        final shard = await rootBundle.load('assets/images/material_shards/\${material.name}_\$i.webp');
+        final shard = await rootBundle.load('assets/images/material_shards/${material.name}_$i.webp');
         expect(shard.lengthInBytes, greaterThan(100));
       }
     }
