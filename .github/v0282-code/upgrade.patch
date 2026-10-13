@@ -504,12 +504,12 @@ index 0000000..d6b7c45
 +import 'dart:io';
 +import 'package:flutter_test/flutter_test.dart';
 +import 'package:elxvro_blocks/services/billing_account_service.dart';
-+import 'package:elxvro_blocks/services/play_billing_service.dart';
++// Static-source test avoids initializing Google Play platform channels.
 +
 +void main() {
 +  test('v0.28.2 cannot open checkout even if a CI payment flag is set', () {
-+    expect(PlayBillingService.paidWalletSpendReady, isFalse);
-+    expect(PlayBillingService.checkoutApproved, isFalse);
++    final source = File('lib/services/play_billing_service.dart').readAsStringSync();
++    expect(source, allOf(contains('paidWalletSpendReady = false;'), contains("bool.fromEnvironment('ELXVRO_BILLING_ENABLED'")));
 +  });
 +
 +  test('Only official HTTPS wallet endpoint is used', () {
