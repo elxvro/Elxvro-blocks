@@ -12,9 +12,6 @@ final class BillingException extends RuntimeException
 final class Products
 {
     public const CATALOG = [
-        'elxvro_coins_500' => ['coins' => 500, 'supporter' => false],
-        'elxvro_coins_1500' => ['coins' => 1500, 'supporter' => false],
-        'elxvro_coins_4000' => ['coins' => 4000, 'supporter' => false],
         'elxvro_supporter_badge' => ['coins' => 0, 'supporter' => true],
     ];
 
