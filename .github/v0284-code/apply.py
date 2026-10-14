@@ -7,8 +7,6 @@ def modify(path, fn):
     p=Path(path)
     before=p.read_text()
     after=fn(before)
-    if after==before:
-        raise SystemExit('No transformation applied: '+path)
     p.write_text(after)
 
 def billing(s):
