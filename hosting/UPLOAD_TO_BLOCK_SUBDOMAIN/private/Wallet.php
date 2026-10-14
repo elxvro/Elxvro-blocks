@@ -11,13 +11,24 @@ final class Wallet {
     public function __construct(private PDO $db,private array $config) {}
     private function query(string $sql,array $args=[]): PDOStatement {$s=$this->db->prepare($sql);$s->execute($args);return $s;}
     private function lock(string $sub): void {
-        $this->query('INSERT IGNORE INTO player_wallets (google_sub) VALUES (?)',[$sub]);
+        // Duplicate-key UPDATE takes an exclusive lock; INSERT IGNORE would
+        // take shared locks that can deadlock when both requests upgrade them.
+        $this->query('INSERT INTO player_wallets (google_sub) VALUES (?) ON DUPLICATE KEY UPDATE google_sub=VALUES(google_sub)',[$sub]);
         $this->query('SELECT google_sub FROM player_wallets WHERE google_sub=? FOR UPDATE',[$sub]);
         $this->query('INSERT IGNORE INTO billing_accounts (google_sub) VALUES (?)',[$sub]);
     }
     private function transaction(callable $f): mixed {
-        $this->db->beginTransaction();
-        try {$r=$f();$this->db->commit();return $r;}catch(Throwable $e){if($this->db->inTransaction())$this->db->rollBack();throw $e;}
+        // Retry only a fully rolled-back database transaction. Callbacks have
+        // no external effects; purchase tokens and operation IDs remain stable.
+        for($attempt=0;;$attempt++){
+            $this->db->beginTransaction();
+            try {$r=$f();$this->db->commit();return $r;}
+            catch(Throwable $e){
+                if($this->db->inTransaction())$this->db->rollBack();
+                if($e instanceof PDOException && $e->getCode()==='40001' && $attempt<3){usleep(random_int(10000,50000));continue;}
+                throw $e;
+            }
+        }
     }
     public function tokenId(string $token): string {
         $key=$this->config['purchase_token_hmac_secret']??'';
