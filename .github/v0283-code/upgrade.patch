@@ -787,6 +787,31 @@ index aff5d33..92bdd45 100644
  
  environment:
    sdk: '>=3.4.0 <4.0.0'
+diff --git a/test/real_material_audio_test.dart b/test/real_material_audio_test.dart
+index 240a197..5dbd7fd 100644
+--- a/test/real_material_audio_test.dart
++++ b/test/real_material_audio_test.dart
+@@ -7,6 +7,6 @@ void main() {
+     expect(File('tool/fetch_real_material_audio.sh').existsSync(), isTrue);
+     expect(File('REAL_AUDIO_CREDITS.md').existsSync(), isTrue);
+     final pubspec = File('pubspec.yaml').readAsStringSync();
+-    expect(pubspec, contains('version: 0.28.2+56'));
++    expect(pubspec, contains('version: 0.28.3+57'));
+   });
+ }
+diff --git a/test/v0240_features_test.dart b/test/v0240_features_test.dart
+index 234e7dd..63848ed 100644
+--- a/test/v0240_features_test.dart
++++ b/test/v0240_features_test.dart
+@@ -38,7 +38,7 @@ void main() {
+         File('lib/screens/daily_missions_screen.dart').readAsStringSync();
+     final game = File('lib/screens/game_screen.dart').readAsStringSync();
+ 
+-    expect(pubspec, contains('version: 0.28.2+56'));
++    expect(pubspec, contains('version: 0.28.3+57'));
+     expect(pubspec, contains('share_plus: 10.1.4'));
+     expect(home, contains('TutorialScreen'));
+     expect(home, contains('ShareService.shareGame'));
 diff --git a/test/v0270_billing_contract_test.dart b/test/v0270_billing_contract_test.dart
 index 780b351..7540b8e 100644
 --- a/test/v0270_billing_contract_test.dart
