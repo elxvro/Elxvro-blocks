@@ -1,4 +1,4 @@
-name: ELXVRO Blocks v0.28.3 Google Play Signed APK AAB
+name: ELXVRO Blocks v0.28.4 Google Play Signed APK AAB
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
       - work-v0.28.3
     paths:
       - ".github/v0283-code/**"
+      - ".github/v0284-code/**"
       - "hosting/**"
       - ".github/workflows/build-v0.28.3.yml"
   workflow_dispatch:
@@ -91,6 +92,17 @@ jobs:
           git apply --directory="$APP" .github/v0283-code/upgrade.patch
           grep -F 'version: 0.28.3+57' "$APP/pubspec.yaml"
 
+      - name: Apply v0.28.4 supporter-only migration
+        run: |
+          set -euo pipefail
+          cd extracted/elxvro-blocks
+          python ../../.github/v0284-code/apply.py
+          grep -F 'version: 0.28.4+58' pubspec.yaml
+          ! grep -q "PlayProduct('elxvro_coins_" lib/services/play_billing_service.dart
+          grep -F "PlayProduct('elxvro_supporter_badge'" lib/services/play_billing_service.dart
+          ! grep -q 'COIN SATIN AL' lib/widgets/coin_purchase_panel.dart
+          ! grep -q "BillingAccountService.instance.transact(" lib/app_state.dart
+
       - name: Recheck widget-only gameplay background
         run: |
           set -euo pipefail
@@ -109,16 +121,17 @@ jobs:
           cp -R hosting "$APP/hosting"
           cp -R .github/v0282-code "$APP/.github/"
           cp -R .github/v0283-code "$APP/.github/"
-          (cd hosting && zip -qr ../ELXVRO-Blocks-v0.28.3-HOSTING.zip .)
-          rm -f ELXVRO-Blocks-v0.28.3-FULL-SOURCE.zip
+          cp -R .github/v0284-code "$APP/.github/"
+          (cd hosting && zip -qr ../ELXVRO-Blocks-v0.28.4-HOSTING.zip .)
+          rm -f ELXVRO-Blocks-v0.28.4-FULL-SOURCE.zip
           (
             cd "$APP"
-            zip -qr ../../ELXVRO-Blocks-v0.28.3-FULL-SOURCE.zip .               -x "build/*" ".dart_tool/*" ".git/*"
+            zip -qr ../../ELXVRO-Blocks-v0.28.4-FULL-SOURCE.zip .               -x "build/*" ".dart_tool/*" ".git/*"
           )
-          unzip -t ELXVRO-Blocks-v0.28.3-FULL-SOURCE.zip >/dev/null
+          unzip -t ELXVRO-Blocks-v0.28.4-FULL-SOURCE.zip >/dev/null
           rm -rf build_source
           mkdir build_source
-          unzip -q ELXVRO-Blocks-v0.28.3-FULL-SOURCE.zip -d build_source
+          unzip -q ELXVRO-Blocks-v0.28.4-FULL-SOURCE.zip -d build_source
           test -f build_source/pubspec.yaml
           test -f build_source/lib/app_state.dart
           test -f build_source/.github/workflows/build-v0.28.3.yml
@@ -126,8 +139,8 @@ jobs:
       - name: Upload complete source ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: ELXVRO-Blocks-v0.28.3-FULL-SOURCE
-          path: ELXVRO-Blocks-v0.28.3-FULL-SOURCE.zip
+          name: ELXVRO-Blocks-v0.28.4-FULL-SOURCE
+          path: ELXVRO-Blocks-v0.28.4-FULL-SOURCE.zip
           if-no-files-found: error
           retention-days: 14
 
@@ -391,7 +404,7 @@ jobs:
           normalize /tmp/elxvro-music/title.ogg assets/audio/bgm_cozy_title.ogg
 
           cat > assets/audio/AUDIO_LICENSES_v0230.txt <<'EOF'
-          ELXVRO Blocks v0.28.3 audio sources
+          ELXVRO Blocks v0.28.4 audio sources
           Music — CC0 / public-domain dedication via OpenGameArt:
           - Magic Puzzle In-Game 1 — MintoDog
           - Cozy Puzzle In-Game 1 — MintoDog
@@ -595,22 +608,22 @@ jobs:
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -1)
           "$APKSIGNER" verify --verbose "$APK"
           jarsigner -verify "$AAB"
-          cp "$APK" ELXVRO-Blocks-v0.28.3-SIGNED.apk
-          cp "$AAB" ELXVRO-Blocks-v0.28.3-GOOGLE-PLAY.aab
-          sha256sum ELXVRO-Blocks-v0.28.3-SIGNED.apk > ELXVRO-Blocks-v0.28.3-SIGNED.apk.sha256
-          sha256sum ELXVRO-Blocks-v0.28.3-GOOGLE-PLAY.aab > ELXVRO-Blocks-v0.28.3-GOOGLE-PLAY.aab.sha256
-          mkdir -p ELXVRO-Blocks-v0.28.3-APK-AAB
-          cp ELXVRO-Blocks-v0.28.3-SIGNED.apk* ELXVRO-Blocks-v0.28.3-APK-AAB/
-          cp ELXVRO-Blocks-v0.28.3-GOOGLE-PLAY.aab* ELXVRO-Blocks-v0.28.3-APK-AAB/
-          cp ELXVRO-Blocks-v0.28.3-FULL-SOURCE.zip ELXVRO-Blocks-v0.28.3-APK-AAB/
-          cp ELXVRO-Blocks-v0.28.3-HOSTING.zip ELXVRO-Blocks-v0.28.3-APK-AAB/
-          ls -lh ELXVRO-Blocks-v0.28.3-APK-AAB/
+          cp "$APK" ELXVRO-Blocks-v0.28.4-SIGNED.apk
+          cp "$AAB" ELXVRO-Blocks-v0.28.4-GOOGLE-PLAY.aab
+          sha256sum ELXVRO-Blocks-v0.28.4-SIGNED.apk > ELXVRO-Blocks-v0.28.4-SIGNED.apk.sha256
+          sha256sum ELXVRO-Blocks-v0.28.4-GOOGLE-PLAY.aab > ELXVRO-Blocks-v0.28.4-GOOGLE-PLAY.aab.sha256
+          mkdir -p ELXVRO-Blocks-v0.28.4-APK-AAB
+          cp ELXVRO-Blocks-v0.28.4-SIGNED.apk* ELXVRO-Blocks-v0.28.4-APK-AAB/
+          cp ELXVRO-Blocks-v0.28.4-GOOGLE-PLAY.aab* ELXVRO-Blocks-v0.28.4-APK-AAB/
+          cp ELXVRO-Blocks-v0.28.4-FULL-SOURCE.zip ELXVRO-Blocks-v0.28.4-APK-AAB/
+          cp ELXVRO-Blocks-v0.28.4-HOSTING.zip ELXVRO-Blocks-v0.28.4-APK-AAB/
+          ls -lh ELXVRO-Blocks-v0.28.4-APK-AAB/
 
       - name: Upload APK and AAB
         uses: actions/upload-artifact@v4
         with:
-          name: ELXVRO-Blocks-v0.28.3-APK-AAB
-          path: ELXVRO-Blocks-v0.28.3-APK-AAB/
+          name: ELXVRO-Blocks-v0.28.4-APK-AAB
+          path: ELXVRO-Blocks-v0.28.4-APK-AAB/
           if-no-files-found: error
           retention-days: 14
 # Google OAuth Client ID eklendikten sonra yeniden derleme
