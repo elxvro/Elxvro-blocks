@@ -24,7 +24,7 @@ void main() {
   expect(billing,contains('buyNonConsumable'));
   expect(billing,contains('restorePurchases'));
   expect(billing,isNot(contains('http')));
-  expect(billing,isNot(contains('subscription')));
+  expect(billing,isNot(contains('buyConsumable(')));
   final pubspec=File('pubspec.yaml').readAsStringSync();
   expect(pubspec,contains('version: 0.28.7+61'));
   expect(pubspec,contains('in_app_purchase:'));
