@@ -52,7 +52,7 @@ for t in ['test/real_material_audio_test.dart','test/v0240_features_test.dart']:
     q=root/t
     if q.exists(): q.write_text(q.read_text().replace('version: 0.28.5+59','version: 0.28.6+60'))
 # Billing tests asserting a paid product are obsolete.
-for t in ['test/v0270_billing_contract_test.dart','test/v0281_billing_release_gate_test.dart']:
+for t in ['test/v0270_billing_contract_test.dart','test/v0281_billing_release_gate_test.dart','test/v0282_server_wallet_preview_test.dart','test/v0283_wallet_test.dart']:
     q=root/t
     if q.exists(): q.unlink()
 print('Payment storefront removed; purchases forcibly disabled, product catalog empty.')
