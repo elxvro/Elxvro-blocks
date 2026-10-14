@@ -23,32 +23,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  billing-tests:
-    runs-on: ubuntu-latest
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: test-only
-          MYSQL_DATABASE: billing_test
-        ports: ['3306:3306']
-        options: >-
-          --health-cmd="mysqladmin ping -ptest-only"
-          --health-interval=5s --health-timeout=5s --health-retries=15
-    steps:
-      - uses: actions/checkout@v4
-      - name: PHP rules and MySQL ledger tests
-        env:
-          TEST_DSN: 'mysql:host=127.0.0.1;port=3306;dbname=billing_test;charset=utf8mb4'
-          TEST_DB_USER: root
-          TEST_DB_PASSWORD: test-only
-        run: |
-          find hosting -name '*.php' -exec php -l {} \;
-          php hosting/tests/test_rules.php
-          php hosting/tests/test_policy.php
-          php hosting/tests/test_ledger.php
   build:
-    needs: billing-tests
     runs-on: ubuntu-latest
     timeout-minutes: 40
 
@@ -116,14 +91,16 @@ jobs:
           git apply --directory="$APP" .github/v0285-code/upgrade.patch
           grep -F 'version: 0.28.5+59' "$APP/pubspec.yaml"
 
-      - name: Remove payment storefront and product catalog
+      - name: Remove all Google Play payments and supporter components
         run: |
           set -euo pipefail
           cd extracted/elxvro-blocks
-          python ../../.github/v0286-code/remove_payments.py
+          python ../../.github/v0286-code/remove_all_payments.py
           grep -F 'version: 0.28.6+60' pubspec.yaml
-          ! grep -q 'elxvro_supporter_badge' lib/services/play_billing_service.dart
-          ! grep -q 'buyNonConsumable' lib/widgets/coin_purchase_panel.dart
+          test ! -e lib/services/play_billing_service.dart
+          test ! -e lib/services/billing_account_service.dart
+          ! grep -q 'in_app_purchase:' pubspec.yaml
+          ! grep -q 'google_sign_in:' pubspec.yaml
 
       - name: Recheck widget-only gameplay background
         run: |
@@ -140,13 +117,11 @@ jobs:
           APP=extracted/elxvro-blocks
           mkdir -p "$APP/.github/workflows"
           cp .github/workflows/build-v0.28.6.yml "$APP/.github/workflows/build-v0.28.6.yml"
-          cp -R hosting "$APP/hosting"
           cp -R .github/v0282-code "$APP/.github/"
           cp -R .github/v0283-code "$APP/.github/"
           cp -R .github/v0284-code "$APP/.github/"
           cp -R .github/v0285-code "$APP/.github/"
           cp -R .github/v0286-code "$APP/.github/"
-          (cd hosting && zip -qr ../ELXVRO-Blocks-v0.28.6-HOSTING.zip .)
           rm -f ELXVRO-Blocks-v0.28.6-FULL-SOURCE.zip
           (
             cd "$APP"
@@ -490,53 +465,19 @@ jobs:
         working-directory: build_source
         run: flutter test
 
-      - name: Verify disabled billing integration contract
+      - name: Verify free-only application
         working-directory: build_source
         run: |
           set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          billing = Path('lib/services/play_billing_service.dart').read_text()
-          account = Path('lib/services/billing_account_service.dart').read_text()
-          assert 'InAppPurchase.instance' in billing
-          assert 'purchaseStream' in billing
-          assert 'verified' in billing
-          assert 'walletVerified' in billing
-          assert 'checkoutEnabled' in billing
-          assert 'apiBase' in account
-          print('Billing code remains for compatibility but purchase catalog and UI are removed.')
-          PY
-
-      - name: Enforce explicit owner approval for paid checkout
-        env:
-          BILLING_URL: ${{ vars.ELXVRO_BILLING_VERIFY_URL || 'https://block.elxvro.com/verify_purchase.php' }}
-          GOOGLE_WEB_CLIENT_ID: ${{ vars.ELXVRO_GOOGLE_WEB_CLIENT_ID }}
-          BILLING_ENABLED: 'false'
-        run: |
-          set -euo pipefail
-          if [ "$BILLING_ENABLED" = "true" ]; then
-            test "${{ vars.ELXVRO_BILLING_OWNER_APPROVED }}" = "true" || { echo "::error::Owner approval required"; exit 1; }
-            python - <<'PY'
-          import os,sys,urllib.parse
-          p=urllib.parse.urlsplit(os.environ.get("BILLING_URL",""))
-          if p.scheme!="https" or not p.hostname or p.username or p.password or p.fragment:
-              sys.exit("ERROR: Paid checkout requires a valid credential-free HTTPS verifier URL")
-          print("Paid checkout build manually requested; verifier URL is configured.")
-          PY
-            echo "### Payment gate: ENABLED" >> "$GITHUB_STEP_SUMMARY"
-            echo "Client checkout compiled on. Server validation and Play license testing are still required." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "::warning::ELXVRO_BILLING_ENABLED is not true. APK and AAB will have checkout DISABLED."
-            echo "### Payment gate: DISABLED" >> "$GITHUB_STEP_SUMMARY"
-            echo "This v0.28.6 build is explicitly payment-disabled. License-test setup and a separately reviewed test build are required." >> "$GITHUB_STEP_SUMMARY"
-          fi
+          ! grep -q 'in_app_purchase:' pubspec.yaml
+          ! grep -q 'google_sign_in:' pubspec.yaml
+          test ! -e lib/services/play_billing_service.dart
+          test ! -e lib/services/billing_account_service.dart
+          test ! -e lib/widgets/coin_purchase_panel.dart
 
       - name: Build signed release APK
         working-directory: build_source
         env:
-          BILLING_URL: ${{ vars.ELXVRO_BILLING_VERIFY_URL || 'https://block.elxvro.com/verify_purchase.php' }}
-          GOOGLE_WEB_CLIENT_ID: ${{ vars.ELXVRO_GOOGLE_WEB_CLIENT_ID }}
-          BILLING_ENABLED: 'false'
           PG_CLASSIC: 'CgkI6arsvtAGEAIQAw'
           PG_RUSH: 'CgkI6arsvtAGEAIQAg'
           PG_ADVENTURE: 'CgkI6arsvtAGEAIQBA'
@@ -553,9 +494,6 @@ jobs:
         run: |
           test "$RELEASE_SIGNING_CONFIGURED" = "true"
           flutter build apk --release --obfuscate --split-debug-info=build/symbols/apk \
-            --dart-define="ELXVRO_BILLING_VERIFY_URL=${BILLING_URL:-}" \
-            --dart-define="ELXVRO_BILLING_ENABLED=${BILLING_ENABLED:-false}" \
-            --dart-define="ELXVRO_GOOGLE_WEB_CLIENT_ID=${GOOGLE_WEB_CLIENT_ID:-}" \
             --dart-define="ELXVRO_PG_CLASSIC_LEADERBOARD_ID=${PG_CLASSIC}" \
             --dart-define="ELXVRO_PG_COMBO_RUSH_LEADERBOARD_ID=${PG_RUSH}" \
             --dart-define="ELXVRO_PG_ADVENTURE_LEADERBOARD_ID=${PG_ADVENTURE:-}" \
@@ -586,9 +524,6 @@ jobs:
       - name: Build signed Google Play AAB
         working-directory: build_source
         env:
-          BILLING_URL: ${{ vars.ELXVRO_BILLING_VERIFY_URL || 'https://block.elxvro.com/verify_purchase.php' }}
-          GOOGLE_WEB_CLIENT_ID: ${{ vars.ELXVRO_GOOGLE_WEB_CLIENT_ID }}
-          BILLING_ENABLED: 'false'
           PG_CLASSIC: 'CgkI6arsvtAGEAIQAw'
           PG_RUSH: 'CgkI6arsvtAGEAIQAg'
           PG_ADVENTURE: 'CgkI6arsvtAGEAIQBA'
@@ -605,9 +540,6 @@ jobs:
         run: |
           test "$RELEASE_SIGNING_CONFIGURED" = "true"
           flutter build appbundle --release --obfuscate --split-debug-info=build/symbols/aab \
-            --dart-define="ELXVRO_BILLING_VERIFY_URL=${BILLING_URL:-}" \
-            --dart-define="ELXVRO_BILLING_ENABLED=${BILLING_ENABLED:-false}" \
-            --dart-define="ELXVRO_GOOGLE_WEB_CLIENT_ID=${GOOGLE_WEB_CLIENT_ID:-}" \
             --dart-define="ELXVRO_PG_CLASSIC_LEADERBOARD_ID=${PG_CLASSIC}" \
             --dart-define="ELXVRO_PG_COMBO_RUSH_LEADERBOARD_ID=${PG_RUSH}" \
             --dart-define="ELXVRO_PG_ADVENTURE_LEADERBOARD_ID=${PG_ADVENTURE:-}" \
@@ -640,7 +572,6 @@ jobs:
           cp ELXVRO-Blocks-v0.28.6-SIGNED.apk* ELXVRO-Blocks-v0.28.6-APK-AAB/
           cp ELXVRO-Blocks-v0.28.6-GOOGLE-PLAY.aab* ELXVRO-Blocks-v0.28.6-APK-AAB/
           cp ELXVRO-Blocks-v0.28.6-FULL-SOURCE.zip ELXVRO-Blocks-v0.28.6-APK-AAB/
-          cp ELXVRO-Blocks-v0.28.6-HOSTING.zip ELXVRO-Blocks-v0.28.6-APK-AAB/
           ls -lh ELXVRO-Blocks-v0.28.6-APK-AAB/
 
       - name: Upload APK and AAB
