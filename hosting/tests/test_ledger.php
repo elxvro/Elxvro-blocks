@@ -4,7 +4,12 @@ require __DIR__.'/../UPLOAD_TO_BLOCK_SUBDOMAIN/private/Billing.php';
 require __DIR__.'/../UPLOAD_TO_BLOCK_SUBDOMAIN/private/Wallet.php';
 function ok(bool $value,string $message): void {if(!$value)throw new RuntimeException($message);}
 function rejects(callable $fn,string $code): void {try{$fn();}catch(BillingException $e){ok($e->getMessage()===$code,'wrong rejection');return;}throw new RuntimeException('expected '.$code);}
-$db=new PDO(getenv('TEST_DSN'),getenv('TEST_DB_USER'),getenv('TEST_DB_PASSWORD'),[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);
+$db=null;
+for($attempt=0;$attempt<30;$attempt++){
+    try{$db=new PDO(getenv('TEST_DSN'),getenv('TEST_DB_USER'),getenv('TEST_DB_PASSWORD'),[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);break;}
+    catch(PDOException $e){if($attempt===29)throw $e;usleep(1000000);}
+}
+
 $db->exec(file_get_contents(__DIR__.'/../SQL/schema.sql'));
 $db->exec(file_get_contents(__DIR__.'/../SQL/v0283.sql'));
 $config=['purchase_token_hmac_secret'=>str_repeat('a',64),'token_encryption_key'=>base64_encode(str_repeat('b',32))];
