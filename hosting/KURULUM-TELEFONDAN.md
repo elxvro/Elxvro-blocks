@@ -78,7 +78,7 @@ https://block.elxvro.com/verify_purchase.php. Google web OAuth istemcisi sunucun
 izin verdiği audience ile aynı olmalıdır. Android OAuth için paket adı
 com.elxvro.elxvro_blocks ve Play imzalama sertifikası eşleşmelidir.
 Mevcut imzalama anahtarları ve v0.28.4 workflow değiştirilmez; yeni sürüm aynı
-adımlarla ayrı work-v0.28.5 dalında derlenir. Sürüm 0.28.5+59.
+adımlarla ayrı work-v0.28.5-supporter dalında derlenir. Sürüm 0.28.5+59.
 
 Bu paket canlı kurulumun veya Google lisans ödemesinin başarılı olduğuna dair
 kanıt değildir. Cloud/Play/hosting erişimi olmadan bunlar doğrulanamaz. İade
