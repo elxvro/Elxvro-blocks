@@ -469,6 +469,8 @@ jobs:
               sys.exit("ERROR: Paid checkout requires a valid credential-free HTTPS verifier URL")
           print("Paid checkout build manually requested; verifier URL is configured.")
           PY
+            echo "### Payment gate: ENABLED" >> "$GITHUB_STEP_SUMMARY"
+            echo "Client checkout compiled on. Server validation and Play license testing are still required." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "::warning::ELXVRO_BILLING_ENABLED is not true. APK and AAB will have checkout DISABLED."
             echo "### Payment gate: DISABLED" >> "$GITHUB_STEP_SUMMARY"
