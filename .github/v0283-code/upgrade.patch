@@ -154,7 +154,7 @@ index 6d659b6..c5f979d 100644
      await AudioService.instance.setSuspended(false);
      await _syncAudio();
 diff --git a/lib/screens/game_screen.dart b/lib/screens/game_screen.dart
-index 807aea3..dde45bd 100644
+index 807aea3..9dda5a3 100644
 --- a/lib/screens/game_screen.dart
 +++ b/lib/screens/game_screen.dart
 @@ -74,6 +74,7 @@ class _GameScreenState extends State<GameScreen>
@@ -165,6 +165,15 @@ index 807aea3..dde45bd 100644
    bool _paused = false;
    bool _resumePausePending = false;
    String? _eventBanner;
+@@ -425,7 +426,7 @@ class _GameScreenState extends State<GameScreen>
+     }
+     _modeTimer?.cancel();
+     _modeTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+-      if (!mounted || _finishing) {
++      if (!mounted || _finishing || _toolRequestPending) {
+         return;
+       }
+       if (_secondsLeft <= 1) {
 @@ -620,6 +621,13 @@ class _GameScreenState extends State<GameScreen>
      );
    }
@@ -338,12 +347,352 @@ index c0c47d4..9235cbc 100644
          ],
        ),
      );
+diff --git a/lib/services/billing_account_service.dart b/lib/services/billing_account_service.dart
+index 08139e4..86a896d 100644
+--- a/lib/services/billing_account_service.dart
++++ b/lib/services/billing_account_service.dart
+@@ -1,139 +1,123 @@
+-import 'dart:async';
+ import 'dart:convert';
+-
++import 'dart:math';
+ import 'package:flutter/foundation.dart';
+ import 'package:google_sign_in/google_sign_in.dart';
+ import 'package:http/http.dart' as http;
++import 'package:shared_preferences/shared_preferences.dart';
++import 'wallet_snapshot.dart';
+ 
+-/// The backend validates every Google ID token. The phone is NOT trusted to
+-/// authorize a wallet or mint any purchased coins.
+ class BillingAccountService extends ChangeNotifier {
+   BillingAccountService._();
+   static final BillingAccountService instance = BillingAccountService._();
+-
+-  static const webClientId =
+-      String.fromEnvironment('ELXVRO_GOOGLE_WEB_CLIENT_ID');
+-  static const apiBase = 'https://block.elxvro.com';
+-
++  static const webClientId = String.fromEnvironment('ELXVRO_GOOGLE_WEB_CLIENT_ID');
++  static const apiBase = String.fromEnvironment('ELXVRO_BILLING_API_BASE',defaultValue:'https://block.elxvro.com');
+   GoogleSignIn? _google;
+   GoogleSignInAccount? _account;
+   String? _idToken;
++  WalletSnapshot? _wallet;
++  String? _pendingUseSku;
++  int _generation = 0;
++  bool _operationBusy = false;
+   bool busy = false;
+   bool walletVerified = false;
+-  int purchasedCoinBalance = 0;
+-  bool serverSupporter = false;
+   String? message;
+-
++  int get purchasedCoinBalance => walletVerified ? (_wallet?.balance ?? 0) : 0;
++  bool get serverSupporter => walletVerified && (_wallet?.supporter ?? false);
++  bool get checkoutEnabled => walletVerified && (_wallet?.checkoutEnabled ?? false);
++  int inventory(String sku) => walletVerified ? (_wallet?.recoverableInventory(sku, _pendingUseSku) ?? 0) : 0;
++  bool ownsTheme(String id) => walletVerified && (_wallet?.themes.contains(id) ?? false);
+   bool get clientConfigured => webClientId.endsWith('.apps.googleusercontent.com');
+   bool get signedIn => _account != null && _idToken != null;
+   String? get accountEmail => _account?.email;
+   String? get googleUserId => _account?.id;
+-
+-  GoogleSignIn get _provider => _google ??= GoogleSignIn(
+-    scopes: const <String>['email'],
+-    serverClientId: webClientId,
+-  );
+-
+-  /// Explicit sign-in; do not silently sign the user in when opening a game.
++  GoogleSignIn get _provider => _google ??= GoogleSignIn(scopes:const ['email'],serverClientId:webClientId);
+   Future<void> signIn() async {
+-    if (!clientConfigured) {
+-      message = 'Google OAuth kimliği henüz APK içine tanımlanmadı.';
+-      notifyListeners();
+-      return;
+-    }
+-    busy = true;
+-    message = null;
+-    notifyListeners();
++    if (busy || _operationBusy) return;
++    if (!clientConfigured) { message='Google bağlantısı yapılandırılmadı.'; notifyListeners(); return; }
++    busy=true; final generation=++_generation;
++    walletVerified=false; _wallet=null; _pendingUseSku=null; _account=null; _idToken=null; notifyListeners();
+     try {
+-      final account = await _provider.signIn();
+-      if (account == null) {
+-        message = 'Google ile giriş iptal edildi.';
+-        return;
+-      }
+-      final token = (await account.authentication).idToken;
+-      if (token == null || token.isEmpty) {
+-        message = 'Google kimlik jetonu alınamadı. OAuth Android SHA-1 ayarını kontrol edin.';
+-        return;
+-      }
+-      _account = account;
+-      _idToken = token;
+-      await _refreshWallet();
+-    } catch (_) {
+-      message = 'Google giriş bağlantısı kurulamadı.';
+-      walletVerified = false;
+-    } finally {
+-      busy = false;
+-      notifyListeners();
+-    }
++      final user=await _provider.signIn();
++      if(user==null || generation!=_generation)return;
++      final token=(await user.authentication).idToken;
++      if(token==null || generation!=_generation)return;
++      _account=user; _idToken=token; await refreshWallet();
++    } catch (_) {message='Google hesabına bağlanılamadı.';}
++    finally {busy=false;notifyListeners();}
+   }
+-
+-  Future<void> refreshWallet() async {
+-    if (!signedIn) return;
+-    busy = true;
+-    notifyListeners();
++  Future<String?> freshIdToken() async {
++    final user=_account; final generation=_generation;
++    if(user==null)return null;
+     try {
+-      await _refreshWallet();
+-    } finally {
+-      busy = false;
+-      notifyListeners();
+-    }
++      final token=(await user.authentication).idToken;
++      if(generation!=_generation || token==null || token.isEmpty)return null;
++      _idToken=token; return token;
++    } catch (_) {return null;}
+   }
+-
+-  Future<void> _refreshWallet() async {
+-    walletVerified = false;
++  void _accept(dynamic data,int generation) {
++    final next=WalletSnapshot.fromJson(data);
++    if(generation!=_generation)return;
++    if(_wallet==null || next.revision>=_wallet!.revision)_wallet=next;
++    walletVerified=true;
++  }
++  Future<void> refreshWallet() async {
++    final generation=_generation;
+     try {
+-      final response = await http.get(
+-        Uri.parse('$apiBase/wallet.php'),
+-        headers: <String, String>{'Authorization': 'Bearer $_idToken'},
+-      ).timeout(const Duration(seconds: 15));
+-      if (response.statusCode != 200) {
+-        message = response.statusCode == 401
+-            ? 'Google kimlik oturumunun süresi doldu. Tekrar giriş yapın.'
+-            : 'Sunucu cüzdanı açılamadı (${response.statusCode}).';
+-        return;
++      final token=await freshIdToken(); if(token==null)throw const FormatException('Authentication unavailable');
++      final prefs=await SharedPreferences.getInstance();
++      final saved=prefs.getString('paid_pending_v3:${googleUserId!}');
++      final pending=saved==null ? null : jsonDecode(saved);
++      if(generation==_generation) {
++        _pendingUseSku=pending is Map && pending['action']=='use' ? pending['sku'] as String? : null;
+       }
+-      final decoded = jsonDecode(response.body);
+-      if (decoded is! Map<String, dynamic> ||
+-          decoded['source'] != 'verified_purchases' ||
+-          decoded['balance'] is! int || decoded['balance'] < 0 ||
+-          decoded['supporter'] is! bool) {
+-        message = 'Sunucudan geçersiz cüzdan yanıtı geldi.';
+-        return;
+-      }
+-      purchasedCoinBalance = decoded['balance'] as int;
+-      serverSupporter = decoded['supporter'] as bool;
+-      walletVerified = true;
+-      message = 'Google hesabı ve sunucu bağlantısı doğrulandı.';
+-    } catch (_) {
+-      message = 'Cüzdan bağlantısı kurulamadı. İnterneti kontrol edin.';
+-    }
++      final r=await http.get(Uri.parse('$apiBase/wallet.php'),headers:{'Authorization':'Bearer $token'}).timeout(const Duration(seconds:20));
++      if(r.statusCode!=200)throw const FormatException('Wallet unavailable');
++      _accept(jsonDecode(r.body),generation); message='Cüzdan eşitlendi.';
++    } catch (_) {if(generation==_generation){walletVerified=false;message='Cüzdan bağlantısı kurulamadı.';}}
++    finally {notifyListeners();}
+   }
+-
+-  Future<String?> freshIdToken() async {
+-    final user = _account;
+-    if (user == null) return null;
++  static String operationId() {
++    final b=List<int>.generate(16,(_)=>Random.secure().nextInt(256));
++    b[6]=(b[6]&15)|64; b[8]=(b[8]&63)|128;
++    final h=b.map((x)=>x.toRadixString(16).padLeft(2,'0')).join();
++    return '${h.substring(0,8)}-${h.substring(8,12)}-${h.substring(12,16)}-${h.substring(16,20)}-${h.substring(20)}';
++  }
++  Future<bool> transact(String action,String sku) async {
++    if(!signedIn || _operationBusy)return false;
++    _operationBusy=true; busy=true; notifyListeners();
++    final generation=_generation; final user=googleUserId!;
+     try {
+-      final token = (await user.authentication).idToken;
+-      if (token == null || token.isEmpty) return null;
+-      _idToken = token;
+-      return token;
+-    } catch (_) {
+-      return null;
+-    }
++      final prefs=await SharedPreferences.getInstance();
++      final key='paid_pending_v3:$user';
++      final saved=prefs.getString(key);
++      Map<String,dynamic> payload;
++      if(saved!=null) {
++        payload=jsonDecode(saved) as Map<String,dynamic>;
++        if(payload['action']!=action || payload['sku']!=sku) {
++          message='Önce bekleyen işlemi aynı düğmeden tekrar dene.'; return false;
++        }
++      } else {
++        payload={'action':action,'sku':sku,'operationId':operationId()};
++        if(!await prefs.setString(key,jsonEncode(payload)))return false;
++      }
++      _pendingUseSku=action=='use' ? sku : null;
++      final token=await freshIdToken(); if(token==null)return false;
++      final r=await http.post(Uri.parse('$apiBase/spend.php'),headers:{'Content-Type':'application/json','Authorization':'Bearer $token'},body:jsonEncode(payload)).timeout(const Duration(seconds:20));
++      if(r.statusCode!=200) {
++        // Only ledger-level refusals can clear this operation. Auth failures,
++        // rate limits and server errors may follow an earlier committed retry;
++        // retain its ID until the ledger answers definitively.
++        if(r.statusCode==400 || r.statusCode==409 || r.statusCode==422){await prefs.remove(key);_pendingUseSku=null;}
++        message='İşlem tamamlanamadı. Bakiyeni kontrol edip tekrar dene.';return false;
++      }
++      _accept(jsonDecode(r.body),generation);
++      await prefs.remove(key);_pendingUseSku=null;return generation==_generation;
++    } catch (_) {message='Bağlantı kesildi. Aynı işlemi tekrar deneyebilirsin.';return false;}
++    finally {_operationBusy=false;busy=false;notifyListeners();}
+   }
+-
+   Future<void> signOut() async {
+-    try {
+-      await _google?.signOut();
+-    } catch (_) {
+-      // The local session is cleared even if Google cannot be contacted.
+-    }
+-    _account = null;
+-    _idToken = null;
+-    walletVerified = false;
+-    purchasedCoinBalance = 0;
+-    serverSupporter = false;
+-    message = 'Çıkış yapıldı.';
+-    notifyListeners();
++    if(_operationBusy)return;
++    ++_generation;_account=null;_idToken=null;_wallet=null;_pendingUseSku=null;walletVerified=false;notifyListeners();
++    try{await _google?.signOut();}catch(_){}
+   }
+ }
+diff --git a/lib/services/play_billing_service.dart b/lib/services/play_billing_service.dart
+index d5403a2..4d7c60c 100644
+--- a/lib/services/play_billing_service.dart
++++ b/lib/services/play_billing_service.dart
+@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
+ import 'package:crypto/crypto.dart';
+ import 'package:http/http.dart' as http;
+ import 'package:in_app_purchase/in_app_purchase.dart';
+-import 'package:in_app_purchase_android/in_app_purchase_android.dart';
+ 
+ import '../app_state.dart';
+ import 'billing_account_service.dart';
+@@ -40,15 +39,16 @@ class PlayBillingService extends ChangeNotifier {
+   // explicitly authorizes checkout in a new signed Play test build.
+   static const bool checkoutApproved =
+       bool.fromEnvironment('ELXVRO_BILLING_ENABLED', defaultValue: false);
+-  // Safe v0.28.2 preview: the PHP ledger has no spend/consume API yet.
+-  // Never release real-money coins that cannot be spent authoritatively.
+-  static const bool paidWalletSpendReady = false;
++  // Protocol v3 provides authoritative spending and inventory. Checkout still
++  // requires both the compile-time gate and a healthy approved server.
++  static const bool paidWalletSpendReady = true;
+ 
+   final InAppPurchase _store = InAppPurchase.instance;
+   StreamSubscription<List<PurchaseDetails>>? _stream;
+   AppState? _app;
+   Map<String, ProductDetails> _products = <String, ProductDetails>{};
+   bool _initialized = false;
++  Future<void> _deliveryQueue = Future<void>.value();
+   bool loading = false;
+   bool available = false;
+   bool pending = false;
+@@ -58,7 +58,7 @@ class PlayBillingService extends ChangeNotifier {
+       (Uri.tryParse(verificationUrl)?.host.isNotEmpty ?? false);
+   bool get canBuy => available && serverConfigured && checkoutApproved &&
+       paidWalletSpendReady && BillingAccountService.instance.walletVerified &&
+-      BillingAccountService.instance.signedIn && !pending;
++      BillingAccountService.instance.signedIn && BillingAccountService.instance.checkoutEnabled && !pending;
+ 
+   ProductDetails? productFor(String id) => _products[id];
+ 
+@@ -69,7 +69,9 @@ class PlayBillingService extends ChangeNotifier {
+     loading = true;
+     notifyListeners();
+     _stream = _store.purchaseStream.listen(
+-      (updates) => unawaited(_handlePurchases(updates)),
++      (updates) {
++        _deliveryQueue = _deliveryQueue.then((_) => _handlePurchases(updates)).catchError((Object e) { pending = false; notifyListeners(); });
++      },
+       onError: (Object error) {
+         pending = false;
+         message = 'Google Play bağlantısı kesildi.';
+@@ -137,7 +139,10 @@ class PlayBillingService extends ChangeNotifier {
+     }
+   }
+ 
+-  Future<void> restore() => _store.restorePurchases();
++  Future<void> restore() async {
++    await BillingAccountService.instance.refreshWallet();
++    await _store.restorePurchases();
++  }
+ 
+   @override
+   void dispose() {
+@@ -167,14 +172,14 @@ class PlayBillingService extends ChangeNotifier {
+ 
+   Future<void> _deliver(PurchaseDetails item) async {
+     final product = PlayProduct.byId(item.productID);
+-    if (product == null || _app == null || !canBuy) {
++    if (product == null || _app == null || !serverConfigured || !BillingAccountService.instance.signedIn) {
+       pending = false;
+       message = 'Satın alma işleme alınmadı: test sürümünde ödeme kapalı.';
+       return;
+     }
+     final account = BillingAccountService.instance;
+     final bearer = await account.freshIdToken();
+-    if (bearer == null || !account.walletVerified) {
++    if (bearer == null) {
+       pending = false;
+       message = 'Ödeme için doğrulanmış Google hesabı gerekli.';
+       return;
+@@ -212,17 +217,11 @@ class PlayBillingService extends ChangeNotifier {
+       if (!account.walletVerified) {
+         throw const FormatException('wallet_refresh_failed');
+       }
+-      if (product.isSupporter) {
+-        if (item.pendingCompletePurchase) {
+-          await _store.completePurchase(item);
+-        }
+-        message = 'Destekçi rozeti açıldı. Teşekkürler!';
+-      } else {
+-        final android = _store
+-            .getPlatformAddition<InAppPurchaseAndroidPlatformAddition>();
+-        await android.consumePurchase(item);
+-        message = 'Satın alınan coinler sunucu cüzdanına kaydedildi.';
+-      }
++      // Backend retry worker consumes/acknowledges only after durable delivery.
++      // Do not complete or consume on this device; restoration uses the ledger.
++      message = product.isSupporter
++          ? 'Destekçi rozeti hesabına kaydedildi.'
++          : 'Coinler sunucu cüzdanına kaydedildi.';
+     } catch (_) {
+       message = 'Ödeme doğrulanamadı. Hak tanımlanmadı; tekrar dene.';
+     } finally {
 diff --git a/lib/services/wallet_snapshot.dart b/lib/services/wallet_snapshot.dart
 new file mode 100644
-index 0000000..d75d22f
+index 0000000..58b747f
 --- /dev/null
 +++ b/lib/services/wallet_snapshot.dart
-@@ -0,0 +1,32 @@
+@@ -0,0 +1,38 @@
 +class WalletSnapshot {
 +  const WalletSnapshot({required this.balance, required this.supporter,
 +    required this.revision, required this.inventory, required this.themes,
@@ -354,6 +703,12 @@ index 0000000..d75d22f
 +  final Map<String, int> inventory;
 +  final Set<String> themes;
 +  final bool checkoutEnabled;
++  // A response-lost use must remain retryable even after the server reports
++  // zero stock. This enables the same saved operation, never creates inventory.
++  int recoverableInventory(String sku, String? pendingUseSku) {
++    final count=inventory[sku] ?? 0;
++    return count==0 && pendingUseSku==sku ? 1 : count;
++  }
 +  factory WalletSnapshot.fromJson(dynamic data) {
 +    if (data is! Map<String, dynamic> || data['protocol'] != 3 ||
 +        data['source'] != 'verified_purchases' || data['balance'] is! int ||
@@ -376,6 +731,42 @@ index 0000000..d75d22f
 +      themes:Set<String>.from(data['themes']), checkoutEnabled:data['checkoutEnabled']);
 +  }
 +}
+diff --git a/lib/widgets/coin_purchase_panel.dart b/lib/widgets/coin_purchase_panel.dart
+index 7d73f5b..6e33ba8 100644
+--- a/lib/widgets/coin_purchase_panel.dart
++++ b/lib/widgets/coin_purchase_panel.dart
+@@ -26,8 +26,8 @@ class CoinPurchasePanel extends StatelessWidget {
+           Text(
+             account.walletVerified
+               ? (isTr
+-                  ? 'Sunucudaki satın alınmış coin: ${account.purchasedCoinBalance} (test / henüz harcanamaz)'
+-                  : 'Server-purchased coins: ${account.purchasedCoinBalance} (preview / not spendable yet)')
++                  ? 'Sunucudaki satın alınmış coin: ${account.purchasedCoinBalance}'
++                  : 'Server-purchased coins: ${account.purchasedCoinBalance}')
+               : (isTr ? 'Cüzdan doğrulanamadı.' : 'Wallet not verified.'),
+             style: const TextStyle(color: Color(0xFFFFD98B), fontSize: 12)),
+           TextButton.icon(
+@@ -66,9 +66,9 @@ class CoinPurchasePanel extends StatelessWidget {
+         ],
+         const SizedBox(height: 16),
+         _heading(Icons.favorite_rounded,
+-            isTr ? 'GELİŞTİRİCİYİ DESTEKLE' : 'SUPPORT THE DEVELOPER',
+-            isTr ? 'İsteğe bağlı, tek seferlik destek'
+-                : 'Optional one-time support'),
++            isTr ? 'DESTEKÇİ ROZETİ' : 'SUPPORTER BADGE',
++            isTr ? 'Tek seferlik dijital rozet'
++                : 'One-time digital badge'),
+         const SizedBox(height: 12),
+         _tile(
+           product: PlayProduct.packs.last,
+@@ -95,6 +95,7 @@ class CoinPurchasePanel extends StatelessWidget {
+           icon: const Icon(Icons.restore_rounded, size: 17),
+           label: Text(isTr ? 'Satın alımları geri yükle' : 'Restore purchases'),
+         ),
++        Text(isTr ? 'Oyun coinleri önce kullanılır. Yetmezse ücretin tamamı sunucu cüzdanından ödenir. Satın alınan güçler için internet gerekir.' : 'Earned coins are used first. Otherwise the full price uses your server wallet. Paid power-ups require internet.', style: const TextStyle(color: Colors.white54, fontSize: 11)),
+         const Divider(color: Colors.white12, height: 32),
+       ]);
+     });
 diff --git a/pubspec.yaml b/pubspec.yaml
 index aff5d33..92bdd45 100644
 --- a/pubspec.yaml
@@ -389,8 +780,23 @@ index aff5d33..92bdd45 100644
  
  environment:
    sdk: '>=3.4.0 <4.0.0'
+diff --git a/test/v0270_billing_contract_test.dart b/test/v0270_billing_contract_test.dart
+index 780b351..7540b8e 100644
+--- a/test/v0270_billing_contract_test.dart
++++ b/test/v0270_billing_contract_test.dart
+@@ -12,8 +12,8 @@ void main() {
+   });
+   test('no charge without a trusted verification server', () {
+     final src = File('lib/services/play_billing_service.dart').readAsStringSync();
+-    expect(src, contains("if (product == null || _app == null || !canBuy"));
++    expect(src, contains("if (product == null || _app == null || !serverConfigured"));
+     expect(src, contains("data['verified'] != true"));
+-    expect(src, contains('consumePurchase(item)'));
++    expect(src, isNot(contains('consumePurchase(item)')));
+   });
+ }
 diff --git a/test/v0282_server_wallet_preview_test.dart b/test/v0282_server_wallet_preview_test.dart
-index 4ee2680..b85446a 100644
+index 4ee2680..a49b4ef 100644
 --- a/test/v0282_server_wallet_preview_test.dart
 +++ b/test/v0282_server_wallet_preview_test.dart
 @@ -1,12 +1,12 @@
@@ -415,16 +821,16 @@ index 4ee2680..b85446a 100644
      expect(account, contains('Authorization'));
      expect(account, contains('wallet.php'));
 -    expect(account, contains('verified_purchases'));
-+    expect(File('lib/services/wallet_snapshot.dart').readAsStringSync(), contains('verified_purchases')); 
++    expect(File('lib/services/wallet_snapshot.dart').readAsStringSync(), contains('verified_purchases'));
    });
  
    test('Payment must use a verified Google ID token, never local credits', () {
 diff --git a/test/v0283_wallet_test.dart b/test/v0283_wallet_test.dart
 new file mode 100644
-index 0000000..8ffd099
+index 0000000..fe767f6
 --- /dev/null
 +++ b/test/v0283_wallet_test.dart
-@@ -0,0 +1,29 @@
+@@ -0,0 +1,37 @@
 +import 'package:flutter_test/flutter_test.dart';
 +import 'package:elxvro_blocks/services/wallet_snapshot.dart';
 +import 'package:elxvro_blocks/services/billing_account_service.dart';
@@ -447,6 +853,14 @@ index 0000000..8ffd099
 +    final data=valid()..['inventory']={'undo':-1,'refresh':0,'special':2};
 +    expect(()=>WalletSnapshot.fromJson(data),throwsFormatException);
 +    expect(()=>WalletSnapshot.fromJson({'balance':999999}),throwsFormatException);
++  });
++  test('last-item response loss remains recoverable after wallet reload', () {
++    final data=valid()..['inventory']={'undo':0,'refresh':0,'special':0};
++    final reloaded=WalletSnapshot.fromJson(data);
++    expect(reloaded.recoverableInventory('special','special'),1);
++    expect(reloaded.recoverableInventory('undo','special'),0);
++    expect(reloaded.recoverableInventory('special',null),0);
++    expect(WalletSnapshot.fromJson(valid()).recoverableInventory('undo','undo'),3);
 +  });
 +  test('operation identifiers conform to server UUID-v4 replay keys', () {
 +    final ids=List.generate(100,(_)=>BillingAccountService.operationId());
