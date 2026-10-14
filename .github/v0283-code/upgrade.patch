@@ -661,7 +661,7 @@ index d5403a2..4d7c60c 100644
 -    if (product == null || _app == null || !canBuy) {
 +    if (product == null || _app == null || !serverConfigured || !BillingAccountService.instance.signedIn) {
        pending = false;
-       message = 'Satın alma işleme alınmadı: test sürümünde ödeme kapalı.';
+       message = 'Satın alma doğrulaması için Google hesabı ve sunucu bağlantısı gerekli.';
        return;
      }
      final account = BillingAccountService.instance;
