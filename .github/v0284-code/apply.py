@@ -100,3 +100,49 @@ p=Path('test/v0283_wallet_test.dart')
 if p.exists():
     p.write_text(p.read_text())
 print('v0.28.4 supporter-only migration applied')
+
+
+# Replace outdated paid-coin catalog assertions with supporter-only contracts.
+Path('test/v0270_billing_contract_test.dart').write_text("""import 'dart:io';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:elxvro_blocks/services/play_billing_service.dart';
+
+void main() {
+  test('only supporter badge is offered through Google Play Billing', () {
+    expect(PlayProduct.packs.length, 1);
+    expect(PlayProduct.packs.single.id, 'elxvro_supporter_badge');
+    expect(PlayProduct.packs.single.isSupporter, isTrue);
+    expect(PlayProduct.byId('elxvro_coins_500'), isNull);
+    expect(PlayProduct.byId('elxvro_coins_1500'), isNull);
+    expect(PlayProduct.byId('elxvro_coins_4000'), isNull);
+  });
+  test('billing requires server verification and does not consume supporter', () {
+    final source = File('lib/services/play_billing_service.dart').readAsStringSync();
+    expect(source, contains('!serverConfigured'));
+    expect(source, contains("data['verified'] != true"));
+    expect(source, isNot(contains('consumePurchase(item)')));
+  });
+}
+""", encoding='utf-8')
+Path('test/v0281_billing_release_gate_test.dart').write_text("""import 'dart:io';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:elxvro_blocks/services/play_billing_service.dart';
+
+void main() {
+  test('default release blocks payments before approval', () {
+    expect(PlayBillingService.checkoutApproved, isFalse);
+    expect(PlayBillingService.verificationUrl, isEmpty);
+  });
+  test('supporter checkout retains explicit approval and server verification', () {
+    final source = File('lib/services/play_billing_service.dart').readAsStringSync();
+    expect(source, contains("bool.fromEnvironment('ELXVRO_BILLING_ENABLED'"));
+    expect(source, contains('serverConfigured && checkoutApproved'));
+    expect(source, contains('ELXVRO_BILLING_VERIFY_URL'));
+    expect(source, contains("data['verified'] != true"));
+  });
+  test('supporter SKU is the sole stable Play Console product', () {
+    expect(PlayProduct.packs.map((p) => p.id).toList(),
+      <String>['elxvro_supporter_badge']);
+  });
+}
+""", encoding='utf-8')
