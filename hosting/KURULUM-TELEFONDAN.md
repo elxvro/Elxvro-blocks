@@ -1,89 +1,50 @@
-# ELXVRO Blocks v0.28.3
+# ELXVRO Blocks v0.28.3 — telefondan kurulum
 
-PHP 8.1+ (PDO MySQL, cURL, OpenSSL), MySQL 8+/MariaDB InnoDB.
-This package is code, not proof of a live deployment. Live Google account,
-service-account permissions, cron and device purchases must be tested before sales.
+Bu paket canlı sunucuya kurulmuş değildir. Dağıtılan uygulamada satın alma
+kapalıdır. Mevcut config.php ve veritabanı korunacak şekilde hazırlanmıştır.
 
-## Existing installation
-1. Back up your database and existing private/config.php privately.
-2. Upload UPLOAD_TO_BLOCK_SUBDOMAIN contents over the existing app API.
-   There is deliberately NO config.php, service-account JSON or secret in this ZIP.
-3. Run SQL/schema.sql then SQL/v0283.sql in phpMyAdmin. Both are additive CREATE
-   TABLE IF NOT EXISTS migrations; existing player_wallets/play_purchases survive.
-4. Copy private/deployment.example.php to private/deployment.php privately. Set
-   token_encryption_key to base64 of 32 random bytes (PHP random_bytes). Keep it
-   backed up alongside purchase_token_hmac_secret; changing either loses lookup
-   or decryption ability. Do not paste keys into chat, GitHub or downloadable files.
-5. Keep existing Google audience/package/DB/service-account configuration. The
-   service account needs Google Play purchase read and order management rights.
-6. Schedule private/reconcile.php with the host's PHP CLI every minute. It is
-   CLI-only, uses a MySQL advisory lock, scans paginated voided purchases with
-   overlap, validates purchases and retries consume/ack after durable fulfilment.
-7. Verify /private/config.php, /private/deployment.php, service-account JSON and
-   /private/cache are inaccessible by HTTP. Apache .htaccess must be enabled;
-   Nginx requires an equivalent deny rule. HTTPS is mandatory; redirect HTTP at
-   the virtual-host level before activation.
-8. Set payments_enabled=true only for an approved test environment, and
-   billing_mode=test. live_security_approved remains false. Test-card purchases
-   can be fulfilled; real purchase callbacks are refused in test mode.
-9. The distributed signed build has ELXVRO_BILLING_ENABLED=false. After device
-   tests and explicit release approval, build with that flag true and configure
-   live mode. Do not merely toggle the backend or a Console product and assume
-   security is verified.
+1. Hosting panelinde dosya yöneticisini ve phpMyAdmin'i aç. Mevcut veritabanını
+   ve private/config.php dosyasını özel bir konuma yedekle.
+2. UPLOAD_TO_BLOCK_SUBDOMAIN içeriğini block.elxvro.com belge köküne yükle.
+   Pakette config.php yoktur; mevcut dosyanı silme veya değiştirme.
+3. Mevcut veritabanına SQL/schema.sql, ardından SQL/v0283.sql dosyasını içe aktar.
+   Bunlar eksik tabloları ekler; mevcut tabloları silmez.
+4. private/deployment.example.php dosyasını private/deployment.php olarak kopyala.
+   token_encryption_key için sunucuda base64_encode(random_bytes(32)) ile bir
+   anahtar üret. Mevcut HMAC anahtarını ve yeni anahtarı özel olarak yedekle.
+   Gizli anahtarları sohbete, GitHub'a veya dağıtılan ZIP'e ekleme.
+5. Mevcut Google web istemci kimliği, paket adı, veritabanı ve servis hesabı
+   bilgilerini koru. Servis hesabına Play satın alma okuma ve sipariş yönetimi
+   yetkileri gerekir.
+6. Hosting'in zamanlanmış görevler bölümünde private/reconcile.php dosyasını
+   PHP CLI ile her dakika çalıştır. Web adresinden çalıştırılamaz. Görev beş
+   dakikadan uzun süredir başarılı çalışmadıysa satın alma ve harcama engellenir.
+7. HTTPS'i ve private klasörünün dışarıdan erişime kapalı olduğunu kontrol et.
+   Apache'de .htaccess desteği; Nginx'te eşdeğer erişim yasağı gerekir.
+8. Test ortamında billing_mode=test ve payments_enabled=true kullanılır;
+   live_security_approved=false kalır. Bu mod gerçek ödemeleri reddeder.
+   Dağıtılan APK ayrıca ELXVRO_BILLING_ENABLED=false ile derlenmiştir.
+   Ödeme denemesi için yalnızca lisans test hesaplarına dağıtılacak, bu bayrağı
+   açılmış ayrı test derlemesi gerekir. Üretim satışını açma.
 
-A stale/failed reconciliation worker disables checkout and spending after five
-minutes. Monitor cron errors and alert on a stale billing_worker_state timestamp.
-The 200-receipt batch needs load testing before substantial sales; scale worker
-throughput so acknowledgements complete within Google's deadline. No guarantee
-of instant refund detection is made: Google event visibility and the cron period
-bound the detection delay. Consumed refunds are handled by the voided API.
+## Cüzdan davranışı
 
-## API
-All requests use Authorization: Bearer <fresh Google ID token>. Server verifies
-RS256 signature, issuer, audience, expiry and subject, never a client player ID.
+Satın alınan coinler, ücretli envanter ve rozet Google hesabına bağlı sunucu
+kaydından geri yüklenir. Çevrimdışı kazanılan coinler ve ilerleme cihazda kalır.
+Yerel coinler yeterliyse önce onlar kullanılır; yetersizse tüm bedel sunucu
+cüzdanından alınır. İki bakiye birleştirilmez. Ücretli envanter internet gerektirir.
 
-GET /wallet.php returns protocol:3, source:"verified_purchases", balance,
-revision, supporter, debt, inventory:{undo,refresh,special}, themes:[...],
-checkoutEnabled, billingMode.
+İadelerde kalan coin geri alınır. Harcanmış tutar borç olur; borç kapanana kadar
+ücretli harcama ve envanter engellenir. İade takibi anlık değildir; Google'ın
+veriyi sunması ve cron görevinin çalışması gerekir.
 
-POST /verify_purchase.php JSON:
-{"platform":"google_play","productId":"elxvro_coins_500","purchaseToken":"..."}
-Response adds verified:true and productId to the wallet. This does NOT mint coins
-locally. Invalid/pending/cancelled/refunded/account-mismatched tokens fail closed.
-The app sets applicationUserName to SHA256("elxvro.blocks|" + Google subject).
+## Canlı ortamda henüz yapılmayan kontroller
 
-POST /spend.php JSON:
-{"action":"buy","sku":"undo_3","operationId":"UUID-v4"}
-Other SKUs: refresh_3, special_3, power_bundle, theme:night, theme:marble,
-theme:fire, theme:nature, theme:aurora. Prices match the existing game:
-120/120/180/300 and 300/500/700/700/1000 respectively.
-Use action:"use", sku:"undo"|"refresh"|"special" to consume paid inventory.
-Response is the current complete wallet. Reuse the same operationId on uncertain
-network failure; reuse with a different action/SKU is rejected. HTTP 409 means a
-state conflict/insufficient funds, 401 login, 503 unavailable or safety gate.
+- Google OAuth ve servis hesabı doğrulaması.
+- Üç coin paketi ve rozet için lisans test ödemeleri; bekleyen/reddedilen ödeme.
+- İki cihaz, yeniden kurulum, iade ve bağlantı kesilmesi senaryoları.
+- Cron'un durması/yeniden başlaması ve yük altında yeterli hızda çalışması.
+- Yedekli veritabanı geçişi ve özel dosyaların HTTP erişimine kapatılması.
 
-Paid assets are separate from locally earned offline rewards. Existing earned
-coins and powers are preserved and spent first; there is no upload of a trusted
-client-provided balance. If local coins are insufficient, the complete purchase
-price is charged to the paid wallet; balances are not combined. Paid inventory
-requires internet and restores on another device with the same Google account.
-Offline earned rewards remain local (no new cloud save for offline progression).
-Refunds remove available balance; spent amounts become debt. Further paid spending
-and paid inventory access are blocked until debt is cleared. Refunds remove the
-supporter badge unless another unrevoked badge purchase exists.
-
-## Build configuration
-Branch work-v0.28.3, version 0.28.3+57. Original workflows/signing secrets unchanged.
-New version workflow reuses the existing successful restore/Android/signing steps.
-ELXVRO_GOOGLE_WEB_CLIENT_ID must be the same web OAuth audience as the server.
-Android OAuth must contain com.elxvro.elxvro_blocks and Play app-signing SHA-1.
-ELXVRO_BILLING_VERIFY_URL defaults to https://block.elxvro.com/verify_purchase.php.
-The wallet/spend base defaults to https://block.elxvro.com. If changing the
-verifier host, configure ELXVRO_BILLING_API_BASE to the matching HTTPS API base.
-
-## Pending external acceptance
-Real Google signature/permissions, license-test successful/declined/pending
-purchases for all products, badge restore, same-account two-device concurrent
-spending, refunds after spend, cron restart/failure, HTTPS/private-file denial,
-production database backup/migration and load testing require the live environment.
-No hosting configuration or live database was modified by this code change.
+API ve yapılandırma ayrıntıları README.md içindedir. Kontroller tamamlanmadan
+ve açık onay verilmeden gerçek para testi veya üretim yayını yapılmamalıdır.
