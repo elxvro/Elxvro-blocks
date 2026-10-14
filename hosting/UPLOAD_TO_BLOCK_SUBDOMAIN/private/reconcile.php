@@ -8,12 +8,12 @@ if(!$db->query("SELECT GET_LOCK('elxvro_billing_reconcile',0)")->fetchColumn())e
 try{
  // Overlapping 30-day full pagination catches refunds on consumed purchases.
  $page=null;do{$data=$g->voided($page);foreach($data['voidedPurchases']??[] as $v){if(is_string($v['purchaseToken']??null))$w->revoke($v['purchaseToken']);}$page=$data['tokenPagination']['nextPageToken']??null;}while($page);
- $rows=$db->query('SELECT p.*,r.encrypted_token FROM play_purchases p JOIN billing_receipts r USING(token_hmac) WHERE r.revoked=0 AND r.encrypted_token<>\'\' ORDER BY r.checked_at ASC LIMIT 200')->fetchAll();
+ $rows=$db->query('SELECT p.*,r.encrypted_token FROM play_purchases p JOIN billing_receipts r USING(token_hmac) WHERE p.product_id=\'elxvro_supporter_badge\' AND r.revoked=0 AND r.encrypted_token<>\'\' ORDER BY r.checked_at ASC LIMIT 200')->fetchAll();
  foreach($rows as $r){
   $token=$w->decrypt($r['encrypted_token'],$r['token_hmac']);$p=$g->playPurchase($token);
   if(($p['purchaseStateContext']['purchaseState']??null)==='CANCELLED'||($p['productLineItem'][0]['productOfferDetails']['refundableQuantity']??null)===0){$w->revoke($token);continue;}
   PurchaseRules::verify($p,$r['product_id'],$r['google_sub']);
-  $support=Products::get($r['product_id'])['supporter'];
+  $support=true; // Only the non-consumable supporter SKU is reconciled.
   $finished=$support?($p['acknowledgementState']??'')==='ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED':($p['productLineItem'][0]['productOfferDetails']['consumptionState']??'')==='CONSUMPTION_STATE_CONSUMED';
   if(!$finished)$g->finishPurchase($r['product_id'],$token,$support);
   $s=$db->prepare('UPDATE billing_receipts SET finalized=1,checked_at=CURRENT_TIMESTAMP WHERE token_hmac=?');$s->execute([$r['token_hmac']]);

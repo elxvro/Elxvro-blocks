@@ -9,13 +9,13 @@ try{
  $refundable=$purchase['productLineItem'][0]['productOfferDetails']['refundableQuantity']??null;
  if(($purchase['purchaseStateContext']['purchaseState']??null)==='CANCELLED'||$refundable===0){$w->revoke($token);throw new BillingException(409,'purchase_revoked');}
  PurchaseRules::verify($purchase,$id,$sub);
- // Verification/restoration remains available with checkout disabled. New real
- // orders are gated independently from purchase callbacks and pending UI state.
- $test=($purchase['testPurchaseContext']['fopType']??null)==='TEST';
- if(!$test&&(($c['billing_mode']??'disabled')!=='live'||($c['live_security_approved']??false)!==true))throw new BillingException(503,'live_payments_not_approved');
+ SupporterPolicy::authorize($c,$sub,$purchase);
  if(!worker_healthy($db))throw new BillingException(503,'refund_sync_unavailable');
  $consumed=($purchase['productLineItem'][0]['productOfferDetails']['consumptionState']??null)==='CONSUMPTION_STATE_CONSUMED';
  $w->grant($sub,$id,$token,(string)($purchase['orderId']??''),$consumed);
- // Durable receipt is the retry queue. The cron worker owns consume/ack.
+ // Acknowledge only after the durable badge grant. On network failure the
+ // stored receipt remains a retry queue; neither retries nor cron duplicate it.
+ if(($purchase['acknowledgementState']??'')!=='ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED')$google->finishPurchase($id,$token,true);
+ $w->markFinalized($token);
  json_response(200,['verified'=>true,'productId'=>$id]+wallet_response($w,$sub,$c,$db));
 }catch(BillingException $e){json_response($e->httpStatus,['error'=>$e->getMessage()]);}

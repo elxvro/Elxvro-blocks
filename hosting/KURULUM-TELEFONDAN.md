@@ -1,50 +1,85 @@
-# ELXVRO Blocks v0.28.3 — telefondan kurulum
+# ELXVRO Blocks v0.28.5 — destekçi rozeti
 
-Bu paket canlı sunucuya kurulmuş değildir. Dağıtılan uygulamada satın alma
-kapalıdır. Mevcut config.php ve veritabanı korunacak şekilde hazırlanmıştır.
+Tek ürün: `elxvro_supporter_badge`. Tek seferlik, tüketilmeyen dijital rozet.
+Ücretli coin satışı ve sunucu coin harcaması kapalıdır. Oyunda kazanılan coinler
+ve yerel oyun özellikleri bu güncellemeyle değiştirilmez.
 
-1. Hosting panelinde dosya yöneticisini ve phpMyAdmin'i aç. Mevcut veritabanını
-   ve private/config.php dosyasını özel bir konuma yedekle.
-2. UPLOAD_TO_BLOCK_SUBDOMAIN içeriğini block.elxvro.com belge köküne yükle.
-   Pakette config.php yoktur; mevcut dosyanı silme veya değiştirme.
-3. Mevcut veritabanına SQL/schema.sql, ardından SQL/v0283.sql dosyasını içe aktar.
-   Bunlar eksik tabloları ekler; mevcut tabloları silmez.
-4. private/deployment.example.php dosyasını private/deployment.php olarak kopyala.
-   token_encryption_key için sunucuda base64_encode(random_bytes(32)) ile bir
-   anahtar üret. Mevcut HMAC anahtarını ve yeni anahtarı özel olarak yedekle.
-   Gizli anahtarları sohbete, GitHub'a veya dağıtılan ZIP'e ekleme.
-5. Mevcut Google web istemci kimliği, paket adı, veritabanı ve servis hesabı
-   bilgilerini koru. Servis hesabına Play satın alma okuma ve sipariş yönetimi
-   yetkileri gerekir.
-6. Hosting'in zamanlanmış görevler bölümünde private/reconcile.php dosyasını
-   PHP CLI ile her dakika çalıştır. Web adresinden çalıştırılamaz. Görev beş
-   dakikadan uzun süredir başarılı çalışmadıysa satın alma ve harcama engellenir.
-7. HTTPS'i ve private klasörünün dışarıdan erişime kapalı olduğunu kontrol et.
-   Apache'de .htaccess desteği; Nginx'te eşdeğer erişim yasağı gerekir.
-8. Test ortamında billing_mode=test ve payments_enabled=true kullanılır;
-   live_security_approved=false kalır. Bu mod gerçek ödemeleri reddeder.
-   Dağıtılan APK ayrıca ELXVRO_BILLING_ENABLED=false ile derlenmiştir.
-   Ödeme denemesi için yalnızca lisans test hesaplarına dağıtılacak, bu bayrağı
-   açılmış ayrı test derlemesi gerekir. Üretim satışını açma.
+## Mevcut kurulumu koruyarak güncelleme
 
-## Cüzdan davranışı
+1. Mevcut veritabanını ve private/config.php dosyasını özel olarak yedekle.
+2. UPLOAD_TO_BLOCK_SUBDOMAIN içeriğini mevcut API dizinine yükle. Pakette canlı
+   config.php, deployment.php veya servis hesabı anahtarı bulunmaz. Bunları silme.
+3. Eksik tablolar varsa SQL/schema.sql ve SQL/v0283.sql dosyalarını sırayla uygula.
+   CREATE TABLE IF NOT EXISTS kullanılır; mevcut veriler silinmez.
+4. Mevcut private/deployment.php içine örnek dosyadaki eksik alanları ekle.
+   HMAC ve şifreleme anahtarlarını değiştirme. Yeni kurulumda token_encryption_key
+   base64_encode(random_bytes(32)) ile sunucuda üretilmelidir.
+5. Hizmet hesabı JSON dosyasını tercihen web kökünün dışında tut; mevcut
+   service_account_json ayarına özel mutlak dosya yolunu yaz. JSON'u GitHub'a,
+   uygulamaya, ZIP'e veya sohbete koyma. private klasörüne HTTP erişimini engelle.
+6. PHP CLI ile `private/check_setup.php` çalıştır. `--google` seçeneği OAuth ve
+   satın alma API erişimini salt okunur kontrol eder; satın alma oluşturmaz.
+7. `private/reconcile.php` her dakika PHP CLI cron ile çalışmalıdır. Terminal
+   erişimi yoksa hosting panelinin zamanlanmış görevler bölümünü kullan.
+   Beş dakika içinde başarılı senkronizasyon yoksa rozet doğrulaması ve ödeme
+   kapısı kapanır. Eski coin ürünleri doğrulama kuyruğunu artık durdurmaz.
 
-Satın alınan coinler, ücretli envanter ve rozet Google hesabına bağlı sunucu
-kaydından geri yüklenir. Çevrimdışı kazanılan coinler ve ilerleme cihazda kalır.
-Yerel coinler yeterliyse önce onlar kullanılır; yetersizse tüm bedel sunucu
-cüzdanından alınır. İki bakiye birleştirilmez. Ücretli envanter internet gerektirir.
+## Google Cloud ve Play izinleri
 
-İadelerde kalan coin geri alınır. Harcanmış tutar borç olur; borç kapanana kadar
-ücretli harcama ve envanter engellenir. İade takibi anlık değildir; Google'ın
-veriyi sunması ve cron görevinin çalışması gerekir.
+Doğru proje, oyunun Google OAuth istemci kimliği ve mevcut servis hesabının
+project_id alanıyla doğrulanmalıdır; benzer ada bakarak proje seçilmemelidir.
+`androidpublisher.googleapis.com` etkin olmalıdır. Hizmet hesabına Cloud Owner
+veya Editor vermek gerekmez. Play Console Kullanıcılar ve izinler bölümünde
+yalnızca ELXVRO Blocks uygulaması için satın alma API'sinin gerektirdiği
+“Finansal verileri, siparişleri ve iptal anketi yanıtlarını görüntüleme” ve
+“Siparişleri ve abonelikleri yönetme” izinlerini değerlendirin. Diğer uygulamalar,
+üretim yayını, kullanıcı yönetimi ve yönetici erişimi verilmemelidir.
+Hesap oluşturma/anahtar çıkarma ve izin atama kullanıcı onayı gerektirir.
+Kaynak: https://developers.google.com/android-publisher/getting_started
 
-## Canlı ortamda henüz yapılmayan kontroller
+## Önce lisans testi
 
-- Google OAuth ve servis hesabı doğrulaması.
-- Üç coin paketi ve rozet için lisans test ödemeleri; bekleyen/reddedilen ödeme.
-- İki cihaz, yeniden kurulum, iade ve bağlantı kesilmesi senaryoları.
-- Cron'un durması/yeniden başlaması ve yük altında yeterli hızda çalışması.
-- Yedekli veritabanı geçişi ve özel dosyaların HTTP erişimine kapatılması.
+- Play lisans test kullanıcısını ve dahili test dağıtımını Console'da doğrula.
+- deployment.php: payments_enabled=true, billing_mode=test,
+  live_security_approved=false. license_test_subjects içine yalnızca doğrulanmış
+  test Google hesaplarının subject değerlerini ekle; e-posta adresi değildir.
+  Bu değerler hesap girişinden sonra player_wallets.google_sub kaydında bulunur.
+- Hem oyunda hem Play Store'da doğru test hesabını kullan. Satın alma ekranında
+  Google'ın test ödeme aracını görmeden işlemi tamamlama.
+- Dağıtılan v0.28.5 APK/AAB, ELXVRO_BILLING_ENABLED=false ile derlenir.
+  Canlı bağlantı ve lisans test hesabı hazırlandıktan sonra yalnızca test kanalına
+  dağıtılacak ayrı ödeme etkin derleme gerekir. Bu teslimat satış açmaz.
+- Başarılı/reddedilen/bekleyen ödeme, yinelenen callback, oturum değişikliği,
+  yeniden kurulum, aynı hesapla ikinci cihaz, iade ve cron kesintisini dene.
+- Test modu yalnızca Google API'nin TEST olarak işaretlediği ödemeleri kabul eder.
+  Bu sunucu kontrolü, yanlış Play hesabındaki ödeme ekranının gerçek para istemesini
+  önleyemez; bu yüzden lisans test hesabının doğrulanması zorunludur.
+- Üretim ancak test kanıtı ve açık kullanıcı onayı sonrasında açılır.
 
-API ve yapılandırma ayrıntıları README.md içindedir. Kontroller tamamlanmadan
-ve açık onay verilmeden gerçek para testi veya üretim yayını yapılmamalıdır.
+## API
+
+Tüm hesap işlemleri Authorization: Bearer <Google ID token> kullanır.
+GET /wallet.php: protocol, source, supporter, revision, checkoutEnabled, billingMode
+ve eski istemciler için bakiye alanları. Uygulama yalnızca rozet durumunu kullanır.
+POST /verify_purchase.php:
+{"platform":"google_play","productId":"elxvro_supporter_badge","purchaseToken":"..."}
+Başarılı yanıt: verified:true, productId ve güncel hesap durumu.
+Google API satın alımı ve hesaba bağlanan obfuscatedExternalAccountId doğrulanır.
+Kalıcı kayıt önce yazılır; ardından satın alma acknowledge edilir, consume edilmez.
+Ack hatasında kayıt korunur ve cron/geri yükleme aynı tokenı yeniden işler.
+Tekrar token başka hesaba taşınamaz; iade edilen token yeniden rozet veremez.
+POST /spend.php her zaman 410 paid_coin_wallet_retired döndürür.
+GET /verify_purchase.php için method_not_allowed normaldir; bu uç POST bekler.
+
+## Yapılandırma ve teslimat sınırı
+
+API varsayılanı https://block.elxvro.com; doğrulama URL'si
+https://block.elxvro.com/verify_purchase.php. Google web OAuth istemcisi sunucunun
+izin verdiği audience ile aynı olmalıdır. Android OAuth için paket adı
+com.elxvro.elxvro_blocks ve Play imzalama sertifikası eşleşmelidir.
+Mevcut imzalama anahtarları ve v0.28.4 workflow değiştirilmez; yeni sürüm aynı
+adımlarla ayrı work-v0.28.5 dalında derlenir. Sürüm 0.28.5+59.
+
+Bu paket canlı kurulumun veya Google lisans ödemesinin başarılı olduğuna dair
+kanıt değildir. Cloud/Play/hosting erişimi olmadan bunlar doğrulanamaz. İade
+tespiti Google verisinin görünürlüğü ve cron aralığına bağlıdır; anlık değildir.

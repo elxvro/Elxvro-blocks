@@ -24,8 +24,16 @@ rejects(fn()=>$w->grant('11111111111111111111','elxvro_supporter_badge','badge-t
 rejects(fn()=>$w->grant($sub,'elxvro_supporter_badge','other-token','GPA.badge'),'order_already_used');
 $receipt=$db->query("SELECT token_hmac,encrypted_token FROM billing_receipts WHERE order_id='GPA.badge'")->fetch();
 ok($w->decrypt($receipt['encrypted_token'],$receipt['token_hmac'])==='badge-token','encrypted token');
+$w->markFinalized('badge-token');
+ok((int)$db->query("SELECT finalized FROM billing_receipts WHERE order_id='GPA.badge'")->fetchColumn()===1,'ack finalization durable');
+ok((new Wallet($db,$config))->snapshot($sub)['supporter'],'new device restores badge');
 $w->revoke('badge-token');$w->revoke('badge-token');
 ok(!$w->snapshot($sub)['supporter'],'refund revokes supporter');
 rejects(fn()=>$w->grant($sub,'elxvro_supporter_badge','badge-token','GPA.badge'),'purchase_revoked');
 ok($w->snapshot($sub)['balance']===0,'refund does not alter earned coins');
 echo "PASS supporter-only: catalog, grant, duplicate, account isolation, order replay, encryption, refund\n";
+
+$w->grant($sub,'elxvro_supporter_badge','replacement-badge-token','GPA.replacement');
+ok($w->snapshot($sub)['supporter'],'repurchase after refund');
+$w->revoke('badge-token');ok($w->snapshot($sub)['supporter'],'old refund cannot revoke replacement');
+echo "PASS: durable acknowledgement, device restore, repurchase after refund\n";

@@ -1,0 +1,256 @@
+diff --git a/lib/services/billing_account_service.dart b/lib/services/billing_account_service.dart
+index 2636c06..eaf8880 100644
+--- a/lib/services/billing_account_service.dart
++++ b/lib/services/billing_account_service.dart
+@@ -3,7 +3,6 @@ import 'dart:math';
+ import 'package:flutter/foundation.dart';
+ import 'package:google_sign_in/google_sign_in.dart';
+ import 'package:http/http.dart' as http;
+-import 'package:shared_preferences/shared_preferences.dart';
+ import 'wallet_snapshot.dart';
+ 
+ class BillingAccountService extends ChangeNotifier {
+@@ -64,22 +63,10 @@ class BillingAccountService extends ChangeNotifier {
+     final generation=_generation;
+     try {
+       final token=await freshIdToken(); if(token==null)throw const FormatException('Authentication unavailable');
+-      final prefs=await SharedPreferences.getInstance();
+-      final saved=prefs.getString('paid_pending_v3:${googleUserId!}');
+-      final pending=saved==null ? null : jsonDecode(saved);
+-      if(generation==_generation) {
+-        _pendingUseSku=pending is Map && pending['action']=='use' ? pending['sku'] as String? : null;
+-      }
+       final r=await http.get(Uri.parse('$apiBase/wallet.php'),headers:{'Authorization':'Bearer $token'}).timeout(const Duration(seconds:20));
+       if(r.statusCode!=200)throw const FormatException('Wallet unavailable');
+-      _accept(jsonDecode(r.body),generation); message='Cüzdan eşitlendi.';
+-      // Shop purchases already delivered durable inventory/themes. Settle their
+-      // saved ID even if the owned theme no longer offers a purchase button.
+-      // Uses stay pending until gameplay delivers the interrupted tool benefit.
+-      if(generation==_generation && pending is Map && pending['action']=='buy' && pending['sku'] is String) {
+-        await transact('buy',pending['sku'] as String,recoveryId:pending['operationId'] as String);
+-      }
+-    } catch (_) {if(generation==_generation){walletVerified=false;message='Cüzdan bağlantısı kurulamadı.';}}
++      _accept(jsonDecode(r.body),generation); message='Destekçi hesabı eşitlendi.';
++    } catch (_) {if(generation==_generation){walletVerified=false;message='Destekçi hesabı doğrulanamadı.';}}
+     finally {notifyListeners();}
+   }
+   static String operationId() {
+@@ -88,41 +75,7 @@ class BillingAccountService extends ChangeNotifier {
+     final h=b.map((x)=>x.toRadixString(16).padLeft(2,'0')).join();
+     return '${h.substring(0,8)}-${h.substring(8,12)}-${h.substring(12,16)}-${h.substring(16,20)}-${h.substring(20)}';
+   }
+-  Future<bool> transact(String action,String sku,{String? recoveryId}) async {
+-    if(!signedIn || _operationBusy)return false;
+-    _operationBusy=true; busy=true; notifyListeners();
+-    final generation=_generation; final user=googleUserId!;
+-    try {
+-      final prefs=await SharedPreferences.getInstance();
+-      final key='paid_pending_v3:$user';
+-      final saved=prefs.getString(key);
+-      Map<String,dynamic> payload;
+-      if(saved!=null) {
+-        payload=jsonDecode(saved) as Map<String,dynamic>;
+-        if(recoveryId!=null && payload['operationId']!=recoveryId)return false;
+-        if(payload['action']!=action || payload['sku']!=sku) {
+-          message='Önce bekleyen işlemi aynı düğmeden tekrar dene.'; return false;
+-        }
+-      } else {
+-        if(recoveryId!=null)return false; // Another request already settled it.
+-        payload={'action':action,'sku':sku,'operationId':operationId()};
+-        if(!await prefs.setString(key,jsonEncode(payload)))return false;
+-      }
+-      _pendingUseSku=action=='use' ? sku : null;
+-      final token=await freshIdToken(); if(token==null)return false;
+-      final r=await http.post(Uri.parse('$apiBase/spend.php'),headers:{'Content-Type':'application/json','Authorization':'Bearer $token'},body:jsonEncode(payload)).timeout(const Duration(seconds:20));
+-      if(r.statusCode!=200) {
+-        // Only ledger-level refusals can clear this operation. Auth failures,
+-        // rate limits and server errors may follow an earlier committed retry;
+-        // retain its ID until the ledger answers definitively.
+-        if(r.statusCode==400 || r.statusCode==409 || r.statusCode==422){await prefs.remove(key);_pendingUseSku=null;}
+-        message='İşlem tamamlanamadı. Bakiyeni kontrol edip tekrar dene.';return false;
+-      }
+-      _accept(jsonDecode(r.body),generation);
+-      await prefs.remove(key);_pendingUseSku=null;return generation==_generation;
+-    } catch (_) {message='Bağlantı kesildi. Aynı işlemi tekrar deneyebilirsin.';return false;}
+-    finally {_operationBusy=false;busy=false;notifyListeners();}
+-  }
++  Future<bool> transact(String action,String sku,{String? recoveryId}) async => false;
+   Future<void> signOut() async {
+     if(_operationBusy)return;
+     ++_generation;_account=null;_idToken=null;_wallet=null;_pendingUseSku=null;walletVerified=false;notifyListeners();
+diff --git a/lib/services/play_billing_service.dart b/lib/services/play_billing_service.dart
+index 270a19b..6d64e54 100644
+--- a/lib/services/play_billing_service.dart
++++ b/lib/services/play_billing_service.dart
+@@ -16,7 +16,8 @@ class PlayProduct {
+   final bool isSupporter;
+   static const packs = <PlayProduct>[
+     PlayProduct('elxvro_supporter_badge', 0, true),
+-  ];  static PlayProduct? byId(String id) {
++  ];
++  static PlayProduct? byId(String id) {
+     for (final p in packs) {
+       if (p.id == id) return p;
+     }
+@@ -54,7 +55,7 @@ class PlayBillingService extends ChangeNotifier {
+       (Uri.tryParse(verificationUrl)?.host.isNotEmpty ?? false);
+   bool get canBuy => available && serverConfigured && checkoutApproved &&
+       paidWalletSpendReady && BillingAccountService.instance.walletVerified &&
+-      BillingAccountService.instance.signedIn && BillingAccountService.instance.checkoutEnabled && !pending;
++      BillingAccountService.instance.signedIn && BillingAccountService.instance.checkoutEnabled && !BillingAccountService.instance.serverSupporter && !pending;
+ 
+   ProductDetails? productFor(String id) => _products[id];
+ 
+@@ -91,7 +92,7 @@ class PlayBillingService extends ChangeNotifier {
+       if (!serverConfigured) {
+         message = 'Ödeme doğrulama sunucusu henüz bağlanmadı.';
+       } else if (!checkoutApproved || !paidWalletSpendReady) {
+-        message = 'Sunucu cüzdanı test ediliyor. Satın alımlar kapalı.';
++        message = 'Destekçi satın alımı test aşamasında; şu anda kapalı.';
+       }
+     } catch (_) {
+       message = 'Google Play ürünleri yüklenemedi.';
+@@ -119,10 +120,7 @@ class PlayBillingService extends ChangeNotifier {
+         productDetails: details,
+         applicationUserName: boundAccountId,
+       );
+-      final started = product.isSupporter
+-          ? await _store.buyNonConsumable(purchaseParam: param)
+-          : await _store.buyConsumable(
+-              purchaseParam: param, autoConsume: false);
++      final started = await _store.buyNonConsumable(purchaseParam: param);
+       if (!started) {
+         pending = false;
+         message = 'Ödeme başlatılamadı.';
+@@ -136,8 +134,12 @@ class PlayBillingService extends ChangeNotifier {
+   }
+ 
+   Future<void> restore() async {
+-    await BillingAccountService.instance.refreshWallet();
+-    await _store.restorePurchases();
++    final account=BillingAccountService.instance;
++    if(!account.signedIn) {message='Önce Google hesabına giriş yap.';notifyListeners();return;}
++    try {
++      await account.refreshWallet();
++      await _store.restorePurchases();
++    } catch (_) {message='Satın alım geri yüklenemedi. Tekrar deneyebilirsin.';notifyListeners();}
+   }
+ 
+   @override
+@@ -210,16 +212,14 @@ class PlayBillingService extends ChangeNotifier {
+       // The server owns purchases. Never mint the same coins locally;
+       // a separate authenticated spend API is required before paid checkout.
+       await account.refreshWallet();
+-      if (!account.walletVerified) {
++      if (!account.walletVerified || !account.serverSupporter) {
+         throw const FormatException('wallet_refresh_failed');
+       }
+       // Backend retry worker consumes/acknowledges only after durable delivery.
+       // Do not complete or consume on this device; restoration uses the ledger.
+-      message = product.isSupporter
+-          ? 'Destekçi rozeti hesabına kaydedildi.'
+-          : 'Coinler sunucu cüzdanına kaydedildi.';
++      message = 'Destekçi rozeti hesabına kaydedildi.';
+     } catch (_) {
+-      message = 'Ödeme doğrulanamadı. Hak tanımlanmadı; tekrar dene.';
++      message = 'Satın alma sonucu henüz doğrulanamadı. Geri yükle ile tekrar dene.';
+     } finally {
+       pending = false;
+       notifyListeners();
+diff --git a/lib/widgets/coin_purchase_panel.dart b/lib/widgets/coin_purchase_panel.dart
+index e8c67ec..7c54b40 100644
+--- a/lib/widgets/coin_purchase_panel.dart
++++ b/lib/widgets/coin_purchase_panel.dart
+@@ -2,6 +2,7 @@ import 'dart:async';
+ import 'package:flutter/material.dart';
+ import '../app_state.dart';
+ import '../services/play_billing_service.dart';
++import '../services/billing_account_service.dart';
+ 
+ /// Supporter-only Play Billing entry point. No paid coin store.
+ class CoinPurchasePanel extends StatelessWidget {
+@@ -11,9 +12,10 @@ class CoinPurchasePanel extends StatelessWidget {
+   @override
+   Widget build(BuildContext context) {
+     final billing = PlayBillingService.instance;
++    final account = BillingAccountService.instance;
+     final isTr = appState.languageCode == 'tr';
+     final product = PlayProduct.packs.single;
+-    return AnimatedBuilder(animation: billing, builder: (context, _) {
++    return AnimatedBuilder(animation: Listenable.merge([billing,account]), builder: (context, _) {
+       final details = billing.productFor(product.id);
+       final owned = appState.isSupporter;
+       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+@@ -23,11 +25,23 @@ class CoinPurchasePanel extends StatelessWidget {
+           textAlign: TextAlign.center,
+           style: const TextStyle(color: Color(0xFFFFD99A), fontWeight: FontWeight.w900, fontSize: 16)),
+         const SizedBox(height: 8),
+-        Text(isTr ? 'İsteğe bağlı, tek seferlik destek. Oyun avantajı sağlamaz.'
+-                  : 'Optional one-time support. No gameplay benefits.',
++        Text(isTr ? 'Tek seferlik dijital destekçi rozeti. Oyun avantajı sağlamaz.'
++                  : 'One-time digital supporter badge. No gameplay benefits.',
+           textAlign: TextAlign.center,
+           style: const TextStyle(color: Colors.white70, fontSize: 12)),
+         const SizedBox(height: 12),
++        Text(account.accountEmail ?? (isTr ? 'Rozetin Google hesabına kaydedilir.' : 'Your badge is saved to your Google account.'),
++          textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
++        TextButton.icon(
++          onPressed: account.busy || billing.pending ? null : () async {
++            if(account.signedIn) {await account.signOut();}
++            else {await account.signIn();if(account.signedIn)await billing.restore();}
++          },
++          icon: Icon(account.signedIn ? Icons.logout : Icons.login),
++          label: Text(account.signedIn ? (isTr ? 'Hesaptan çık' : 'Sign out') : (isTr ? 'Google ile giriş yap' : 'Sign in with Google')),
++        ),
++        if(account.message != null)
++          Text(account.message!,textAlign:TextAlign.center,style:const TextStyle(color:Colors.white70)),
+         FilledButton.icon(
+           onPressed: billing.canBuy && details != null && !owned
+             ? () => unawaited(billing.buy(product.id)) : null,
+@@ -40,7 +54,7 @@ class CoinPurchasePanel extends StatelessWidget {
+           Text(billing.message!, textAlign: TextAlign.center,
+             style: const TextStyle(color: Colors.white70, fontSize: 12)),
+         TextButton.icon(
+-          onPressed: billing.available && !billing.pending
++          onPressed: account.signedIn && !account.busy && billing.available && !billing.pending
+             ? () => unawaited(billing.restore()) : null,
+           icon: const Icon(Icons.restore_rounded, size: 17),
+           label: Text(isTr ? 'Satın alımı geri yükle' : 'Restore purchase'),
+diff --git a/pubspec.yaml b/pubspec.yaml
+index a786dd3..0df5bfb 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -1,7 +1,7 @@
+ name: elxvro_blocks
+ description: Premium block puzzle game for ELXVRO.
+ publish_to: 'none'
+-version: 0.28.4+58
++version: 0.28.5+59
+ 
+ environment:
+   sdk: '>=3.4.0 <4.0.0'
+diff --git a/test/real_material_audio_test.dart b/test/real_material_audio_test.dart
+index 5087cbc..9dcfa00 100644
+--- a/test/real_material_audio_test.dart
++++ b/test/real_material_audio_test.dart
+@@ -7,6 +7,6 @@ void main() {
+     expect(File('tool/fetch_real_material_audio.sh').existsSync(), isTrue);
+     expect(File('REAL_AUDIO_CREDITS.md').existsSync(), isTrue);
+     final pubspec = File('pubspec.yaml').readAsStringSync();
+-    expect(pubspec, contains('version: 0.28.4+58'));
++    expect(pubspec, contains('version: 0.28.5+59'));
+   });
+ }
+diff --git a/test/v0240_features_test.dart b/test/v0240_features_test.dart
+index b06d1c3..e97b13f 100644
+--- a/test/v0240_features_test.dart
++++ b/test/v0240_features_test.dart
+@@ -38,7 +38,7 @@ void main() {
+         File('lib/screens/daily_missions_screen.dart').readAsStringSync();
+     final game = File('lib/screens/game_screen.dart').readAsStringSync();
+ 
+-    expect(pubspec, contains('version: 0.28.4+58'));
++    expect(pubspec, contains('version: 0.28.5+59'));
+     expect(pubspec, contains('share_plus: 10.1.4'));
+     expect(home, contains('TutorialScreen'));
+     expect(home, contains('ShareService.shareGame'));

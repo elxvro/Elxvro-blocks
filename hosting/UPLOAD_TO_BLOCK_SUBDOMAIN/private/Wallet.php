@@ -115,6 +115,9 @@ final class Wallet {
             $this->changed($sub);return $this->snapshot($sub);
         });
     }
+    public function markFinalized(string $token): void {
+        $this->query('UPDATE billing_receipts SET finalized=1,checked_at=CURRENT_TIMESTAMP WHERE token_hmac=?',[$this->tokenId($token)]);
+    }
     public function revoke(string $token): void {
         $id=$this->tokenId($token);$p=$this->query('SELECT * FROM play_purchases WHERE token_hmac=?',[$id])->fetch();if(!$p)return;
         $this->transaction(function()use($p,$id){

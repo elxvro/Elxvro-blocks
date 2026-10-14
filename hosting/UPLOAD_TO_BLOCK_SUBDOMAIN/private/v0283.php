@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__.'/bootstrap.php';
 require_once __DIR__.'/Wallet.php';
+require_once __DIR__.'/SupporterPolicy.php';
 function billing_config(): array {
     $c=api_config();$p=__DIR__.'/deployment.php';
     if(is_file($p))$c=array_replace($c,require $p);
@@ -17,5 +18,7 @@ function billing_ready(array $c,PDO $db): bool {
         &&($mode!=='live'||($c['live_security_approved']??false)===true)&&worker_healthy($db);
 }
 function wallet_response(Wallet $w,string $sub,array $c,PDO $db): array {
-    return $w->snapshot($sub)+['checkoutEnabled'=>billing_ready($c,$db),'billingMode'=>$c['billing_mode']??'disabled'];
+    $snapshot=$w->snapshot($sub);$healthy=worker_healthy($db);
+    if(!$healthy)$snapshot['supporter']=false; // Do not expose a stale refunded entitlement.
+    return $snapshot+['checkoutEnabled'=>SupporterPolicy::canCheckout($c,$sub)&&$healthy,'billingMode'=>$c['billing_mode']??'disabled'];
 }
