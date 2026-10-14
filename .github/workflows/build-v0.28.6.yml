@@ -3,7 +3,7 @@ name: ELXVRO Blocks v0.28.6 Google Play Signed APK AAB
 on:
   push:
     branches:
-      - work-v0.28.6-supporter
+      - work-v0.28.6-no-payments
     paths:
       - ".github/v0286-code/**"
       - ".github/v0285-code/**"
