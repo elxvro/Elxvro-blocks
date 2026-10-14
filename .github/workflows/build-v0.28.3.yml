@@ -453,6 +453,23 @@ jobs:
         working-directory: build_source
         run: flutter test
 
+      - name: Verify Google Play billing integration contract
+        working-directory: build_source
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          billing = Path('lib/services/play_billing_service.dart').read_text()
+          account = Path('lib/services/billing_account_service.dart').read_text()
+          assert 'InAppPurchase.instance' in billing
+          assert 'purchaseStream' in billing
+          assert 'verified' in billing
+          assert 'walletVerified' in billing
+          assert 'checkoutEnabled' in billing
+          assert 'apiBase' in account
+          print('Google Play billing integration contract checked; server verification still required.')
+          PY
+
       - name: Enforce explicit owner approval for paid checkout
         env:
           BILLING_URL: ${{ vars.ELXVRO_BILLING_VERIFY_URL || 'https://block.elxvro.com/verify_purchase.php' }}
