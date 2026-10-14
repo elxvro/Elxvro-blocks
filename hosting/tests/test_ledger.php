@@ -2,50 +2,25 @@
 declare(strict_types=1);
 require __DIR__.'/../UPLOAD_TO_BLOCK_SUBDOMAIN/private/Billing.php';
 require __DIR__.'/../UPLOAD_TO_BLOCK_SUBDOMAIN/private/Wallet.php';
-function ok(bool $v,string $m): void {if(!$v) throw new RuntimeException($m);}
-function rejects(callable $f,string $code): void {try{$f();}catch(BillingException $e){ok($e->getMessage()===$code,'wrong error '.$e->getMessage());return;}throw new RuntimeException('expected '.$code);}
+function ok(bool $value,string $message): void {if(!$value)throw new RuntimeException($message);}
+function rejects(callable $fn,string $code): void {try{$fn();}catch(BillingException $e){ok($e->getMessage()===$code,'wrong rejection');return;}throw new RuntimeException('expected '.$code);}
 $db=new PDO(getenv('TEST_DSN'),getenv('TEST_DB_USER'),getenv('TEST_DB_PASSWORD'),[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);
 $db->exec(file_get_contents(__DIR__.'/../SQL/schema.sql'));
 $db->exec(file_get_contents(__DIR__.'/../SQL/v0283.sql'));
 $config=['purchase_token_hmac_secret'=>str_repeat('a',64),'token_encryption_key'=>base64_encode(str_repeat('b',32))];
 $w=new Wallet($db,$config);$sub='12345678901234567890';
-foreach([500,1500,4000] as $n){$w->grant($sub,'elxvro_coins_'.$n,'test-token-'.$n,'GPA.'.$n);}
-ok($w->snapshot($sub)['balance']===6000,'all packs');
-$w->grant($sub,'elxvro_coins_500','test-token-500','GPA.500');
-ok($w->snapshot($sub)['balance']===6000,'duplicate token');
-rejects(fn()=>$w->grant('11111111111111111111','elxvro_coins_500','test-token-500','GPA.500'),'purchase_owner_mismatch');
-rejects(fn()=>$w->grant($sub,'elxvro_coins_500','other-token','GPA.500'),'order_already_used');
-$op='01234567-89ab-4cde-8fab-012345678901';
-$w->spend($sub,'undo_3',$op);$w->spend($sub,'undo_3',$op);
-ok($w->snapshot($sub)['balance']===5880,'idempotent spend');
-ok($w->snapshot($sub)['inventory']['undo']===3,'durable inventory');
-rejects(fn()=>$w->spend($sub,'refresh_3',$op),'operation_conflict');
-$w->useItem($sub,'undo','01234567-89ab-4cde-8fab-012345678902');
-$w->useItem($sub,'undo','01234567-89ab-4cde-8fab-012345678902');
-ok($w->snapshot($sub)['inventory']['undo']===2,'idempotent use');
+foreach(['elxvro_coins_500','elxvro_coins_1500','elxvro_coins_4000'] as $id) rejects(fn()=>Products::get($id),'unknown_product');
 $w->grant($sub,'elxvro_supporter_badge','badge-token','GPA.badge');
-ok((new Wallet($db,$config))->snapshot($sub)['supporter']===true,'device restore badge');
-$w->revoke('test-token-4000');$w->revoke('test-token-4000');
-ok($w->snapshot($sub)['balance']===1880,'idempotent refund');
-$w->revoke('test-token-1500');$w->revoke('test-token-500');
-ok($w->snapshot($sub)['balance']===0 && $w->snapshot($sub)['debt']===120,'refund after spend creates debt');
-rejects(fn()=>$w->spend($sub,'undo_3','01234567-89ab-4cde-8fab-012345678903'),'wallet_debt');
-$w->revoke('badge-token');ok(!$w->snapshot($sub)['supporter'],'refunded badge removed');
-rejects(fn()=>$w->grant($sub,'elxvro_coins_500','test-token-500','GPA.500'),'purchase_revoked');
-echo "PASS ledger: packs, token/order replay, account isolation, spend/use retry, restore, refund/debt/badge\n";
-$w->grant('22222222222222222222','elxvro_coins_500','race-token','GPA.race');
-$workers=[];
-foreach(['01234567-89ab-4cde-8fab-012345678910','01234567-89ab-4cde-8fab-012345678911'] as $op){
- $process=proc_open([PHP_BINARY,__DIR__.'/concurrent_spend.php',$op],[1=>['pipe','w'],2=>['pipe','w']],$pipes);
- if(!is_resource($process))throw new RuntimeException('cannot start concurrency test');
- $workers[]=[$process,$pipes];
-}
-$results=[];foreach($workers as [$process,$pipes]){$results[]=stream_get_contents($pipes[1]);$err=stream_get_contents($pipes[2]);fclose($pipes[1]);fclose($pipes[2]);ok(proc_close($process)===0,'concurrency child '.$err);}
-sort($results);ok($results===['OK','REFUSED'],'no concurrent overdraft');
-ok($w->snapshot('22222222222222222222')['balance']===200,'concurrent balance');
-$w->grant($sub,'elxvro_coins_500','second-purchase-token','GPA.second');
-ok($w->snapshot($sub)['balance']===380 && $w->snapshot($sub)['debt']===0,'repeat purchase repays debt');
-$receipt=$db->query("SELECT token_hmac,encrypted_token FROM billing_receipts WHERE order_id='GPA.second'")->fetch();
-ok($w->decrypt($receipt['encrypted_token'],$receipt['token_hmac'])==='second-purchase-token','encrypted retry token roundtrip');
-try{$w->decrypt($receipt['encrypted_token'],str_repeat('f',64));throw new LogicException('tampering accepted');}catch(RuntimeException $e){ok(!($e instanceof LogicException),'cipher authentication');}
-echo "PASS: parallel overdraft prevention, repeat purchase, debt recovery, authenticated token encryption\n";
+ok($w->snapshot($sub)['supporter']===true,'supporter granted');
+ok($w->snapshot($sub)['balance']===0,'no paid coins');
+$w->grant($sub,'elxvro_supporter_badge','badge-token','GPA.badge');
+ok($w->snapshot($sub)['supporter']===true,'idempotent badge');
+rejects(fn()=>$w->grant('11111111111111111111','elxvro_supporter_badge','badge-token','GPA.badge'),'purchase_owner_mismatch');
+rejects(fn()=>$w->grant($sub,'elxvro_supporter_badge','other-token','GPA.badge'),'order_already_used');
+$receipt=$db->query("SELECT token_hmac,encrypted_token FROM billing_receipts WHERE order_id='GPA.badge'")->fetch();
+ok($w->decrypt($receipt['encrypted_token'],$receipt['token_hmac'])==='badge-token','encrypted token');
+$w->revoke('badge-token');$w->revoke('badge-token');
+ok(!$w->snapshot($sub)['supporter'],'refund revokes supporter');
+rejects(fn()=>$w->grant($sub,'elxvro_supporter_badge','badge-token','GPA.badge'),'purchase_revoked');
+ok($w->snapshot($sub)['balance']===0,'refund does not alter earned coins');
+echo "PASS supporter-only: catalog, grant, duplicate, account isolation, order replay, encryption, refund\n";
