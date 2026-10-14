@@ -348,10 +348,10 @@ index c0c47d4..9235cbc 100644
        ),
      );
 diff --git a/lib/services/billing_account_service.dart b/lib/services/billing_account_service.dart
-index 08139e4..86a896d 100644
+index 08139e4..9f8552f 100644
 --- a/lib/services/billing_account_service.dart
 +++ b/lib/services/billing_account_service.dart
-@@ -1,139 +1,123 @@
+@@ -1,139 +1,129 @@
 -import 'dart:async';
  import 'dart:convert';
 -
@@ -500,7 +500,15 @@ index 08139e4..86a896d 100644
 -          decoded['supporter'] is! bool) {
 -        message = 'Sunucudan geçersiz cüzdan yanıtı geldi.';
 -        return;
--      }
++      final r=await http.get(Uri.parse('$apiBase/wallet.php'),headers:{'Authorization':'Bearer $token'}).timeout(const Duration(seconds:20));
++      if(r.statusCode!=200)throw const FormatException('Wallet unavailable');
++      _accept(jsonDecode(r.body),generation); message='Cüzdan eşitlendi.';
++      // Shop purchases already delivered durable inventory/themes. Settle their
++      // saved ID even if the owned theme no longer offers a purchase button.
++      // Uses stay pending until gameplay delivers the interrupted tool benefit.
++      if(generation==_generation && pending is Map && pending['action']=='buy' && pending['sku'] is String) {
++        await transact('buy',pending['sku'] as String);
+       }
 -      purchasedCoinBalance = decoded['balance'] as int;
 -      serverSupporter = decoded['supporter'] as bool;
 -      walletVerified = true;
@@ -508,9 +516,6 @@ index 08139e4..86a896d 100644
 -    } catch (_) {
 -      message = 'Cüzdan bağlantısı kurulamadı. İnterneti kontrol edin.';
 -    }
-+      final r=await http.get(Uri.parse('$apiBase/wallet.php'),headers:{'Authorization':'Bearer $token'}).timeout(const Duration(seconds:20));
-+      if(r.statusCode!=200)throw const FormatException('Wallet unavailable');
-+      _accept(jsonDecode(r.body),generation); message='Cüzdan eşitlendi.';
 +    } catch (_) {if(generation==_generation){walletVerified=false;message='Cüzdan bağlantısı kurulamadı.';}}
 +    finally {notifyListeners();}
    }
