@@ -348,10 +348,10 @@ index c0c47d4..9235cbc 100644
        ),
      );
 diff --git a/lib/services/billing_account_service.dart b/lib/services/billing_account_service.dart
-index 08139e4..9f8552f 100644
+index 08139e4..2636c06 100644
 --- a/lib/services/billing_account_service.dart
 +++ b/lib/services/billing_account_service.dart
-@@ -1,139 +1,129 @@
+@@ -1,139 +1,131 @@
 -import 'dart:async';
  import 'dart:convert';
 -
@@ -507,7 +507,7 @@ index 08139e4..9f8552f 100644
 +      // saved ID even if the owned theme no longer offers a purchase button.
 +      // Uses stay pending until gameplay delivers the interrupted tool benefit.
 +      if(generation==_generation && pending is Map && pending['action']=='buy' && pending['sku'] is String) {
-+        await transact('buy',pending['sku'] as String);
++        await transact('buy',pending['sku'] as String,recoveryId:pending['operationId'] as String);
        }
 -      purchasedCoinBalance = decoded['balance'] as int;
 -      serverSupporter = decoded['supporter'] as bool;
@@ -529,7 +529,7 @@ index 08139e4..9f8552f 100644
 +    final h=b.map((x)=>x.toRadixString(16).padLeft(2,'0')).join();
 +    return '${h.substring(0,8)}-${h.substring(8,12)}-${h.substring(12,16)}-${h.substring(16,20)}-${h.substring(20)}';
 +  }
-+  Future<bool> transact(String action,String sku) async {
++  Future<bool> transact(String action,String sku,{String? recoveryId}) async {
 +    if(!signedIn || _operationBusy)return false;
 +    _operationBusy=true; busy=true; notifyListeners();
 +    final generation=_generation; final user=googleUserId!;
@@ -547,10 +547,12 @@ index 08139e4..9f8552f 100644
 +      Map<String,dynamic> payload;
 +      if(saved!=null) {
 +        payload=jsonDecode(saved) as Map<String,dynamic>;
++        if(recoveryId!=null && payload['operationId']!=recoveryId)return false;
 +        if(payload['action']!=action || payload['sku']!=sku) {
 +          message='Önce bekleyen işlemi aynı düğmeden tekrar dene.'; return false;
 +        }
 +      } else {
++        if(recoveryId!=null)return false; // Another request already settled it.
 +        payload={'action':action,'sku':sku,'operationId':operationId()};
 +        if(!await prefs.setString(key,jsonEncode(payload)))return false;
 +      }
