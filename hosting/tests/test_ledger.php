@@ -33,3 +33,19 @@ rejects(fn()=>$w->spend($sub,'undo_3','01234567-89ab-4cde-8fab-012345678903'),'w
 $w->revoke('badge-token');ok(!$w->snapshot($sub)['supporter'],'refunded badge removed');
 rejects(fn()=>$w->grant($sub,'elxvro_coins_500','test-token-500','GPA.500'),'purchase_revoked');
 echo "PASS ledger: packs, token/order replay, account isolation, spend/use retry, restore, refund/debt/badge\n";
+$w->grant('22222222222222222222','elxvro_coins_500','race-token','GPA.race');
+$workers=[];
+foreach(['01234567-89ab-4cde-8fab-012345678910','01234567-89ab-4cde-8fab-012345678911'] as $op){
+ $process=proc_open([PHP_BINARY,__DIR__.'/concurrent_spend.php',$op],[1=>['pipe','w'],2=>['pipe','w']],$pipes);
+ if(!is_resource($process))throw new RuntimeException('cannot start concurrency test');
+ $workers[]=[$process,$pipes];
+}
+$results=[];foreach($workers as [$process,$pipes]){$results[]=stream_get_contents($pipes[1]);$err=stream_get_contents($pipes[2]);fclose($pipes[1]);fclose($pipes[2]);ok(proc_close($process)===0,'concurrency child '.$err);}
+sort($results);ok($results===['OK','REFUSED'],'no concurrent overdraft');
+ok($w->snapshot('22222222222222222222')['balance']===200,'concurrent balance');
+$w->grant($sub,'elxvro_coins_500','second-purchase-token','GPA.second');
+ok($w->snapshot($sub)['balance']===380 && $w->snapshot($sub)['debt']===0,'repeat purchase repays debt');
+$receipt=$db->query("SELECT token_hmac,encrypted_token FROM billing_receipts WHERE order_id='GPA.second'")->fetch();
+ok($w->decrypt($receipt['encrypted_token'],$receipt['token_hmac'])==='second-purchase-token','encrypted retry token roundtrip');
+try{$w->decrypt($receipt['encrypted_token'],str_repeat('f',64));throw new LogicException('tampering accepted');}catch(RuntimeException $e){ok(!($e instanceof LogicException),'cipher authentication');}
+echo "PASS: parallel overdraft prevention, repeat purchase, debt recovery, authenticated token encryption\n";

@@ -133,12 +133,58 @@ index 09643a5..223f645 100644
      _sfxVolumeSaveTimer?.cancel();
      _musicVolumeSaveTimer?.cancel();
      _uiVolumeSaveTimer?.cancel();
+diff --git a/lib/main.dart b/lib/main.dart
+index 6d659b6..c5f979d 100644
+--- a/lib/main.dart
++++ b/lib/main.dart
+@@ -9,6 +9,7 @@ import 'models/game_theme.dart';
+ import 'screens/launch_screen.dart';
+ import 'services/audio_service.dart';
+ import 'services/play_billing_service.dart';
++import 'services/billing_account_service.dart';
+ 
+ void main() {
+   runZonedGuarded(
+@@ -145,6 +146,7 @@ class _ElxvroBlocksAppState extends State<ElxvroBlocksApp>
+   }
+ 
+   Future<void> _handleResume() async {
++    unawaited(BillingAccountService.instance.refreshWallet());
+     await widget.appState.refreshTemporalState();
+     await AudioService.instance.setSuspended(false);
+     await _syncAudio();
 diff --git a/lib/screens/game_screen.dart b/lib/screens/game_screen.dart
-index 807aea3..78393ce 100644
+index 807aea3..dde45bd 100644
 --- a/lib/screens/game_screen.dart
 +++ b/lib/screens/game_screen.dart
-@@ -631,7 +631,7 @@ class _GameScreenState extends State<GameScreen>
-     if (_finishing || _paused || _resumePausePending) return;
+@@ -74,6 +74,7 @@ class _GameScreenState extends State<GameScreen>
+   int? _hoverCol;
+   int? _hoverPieceIndex;
+   bool _finishing = false;
++  bool _toolRequestPending = false;
+   bool _paused = false;
+   bool _resumePausePending = false;
+   String? _eventBanner;
+@@ -620,6 +621,13 @@ class _GameScreenState extends State<GameScreen>
+     );
+   }
+ 
++  Future<bool> _consumeTool(Future<bool> Function() consume) async {
++    if (_toolRequestPending) return false;
++    setState(() => _toolRequestPending = true);
++    try { return await consume(); }
++    finally { if (mounted) setState(() => _toolRequestPending = false); }
++  }
++
+   bool _allowToolAction() {
+     final nowMs = DateTime.now().millisecondsSinceEpoch;
+     if (nowMs - _lastToolActionEpochMs < 420) return false;
+@@ -628,15 +636,15 @@ class _GameScreenState extends State<GameScreen>
+   }
+ 
+   Future<void> _undoLastMove() async {
+-    if (_finishing || _paused || _resumePausePending) return;
++    if (_finishing || _paused || _resumePausePending || _toolRequestPending) return;
      if (!_allowToolAction()) return;
      final snapshot = _undoSnapshot;
 -    if (snapshot == null || (!_undoAvailable && widget.appState.undoInventory <= 0)) {
@@ -146,25 +192,69 @@ index 807aea3..78393ce 100644
        return;
      }
  
-@@ -668,7 +668,7 @@ class _GameScreenState extends State<GameScreen>
+     if (!_undoAvailable) {
+-      final consumed = await widget.appState.consumeUndo();
++      final consumed = await _consumeTool(widget.appState.consumeUndo);
+       if (!consumed || !mounted) return;
+     }
+ 
+@@ -666,14 +674,14 @@ class _GameScreenState extends State<GameScreen>
+   }
+ 
    Future<void> _refreshPieces() async {
-     if (_finishing || _paused || _resumePausePending) return;
+-    if (_finishing || _paused || _resumePausePending) return;
++    if (_finishing || _paused || _resumePausePending || _toolRequestPending) return;
      if (!_allowToolAction()) return;
 -    if (!_refreshAvailable && widget.appState.refreshInventory <= 0) {
 +    if (!_refreshAvailable && widget.appState.totalRefreshInventory <= 0) {
        return;
      }
  
-@@ -708,7 +708,7 @@ class _GameScreenState extends State<GameScreen>
+     if (!_refreshAvailable) {
+-      final consumed = await widget.appState.consumeRefresh();
++      final consumed = await _consumeTool(widget.appState.consumeRefresh);
+       if (!consumed || !mounted) return;
+     }
+ 
+@@ -706,16 +714,16 @@ class _GameScreenState extends State<GameScreen>
+   }
+ 
    Future<void> _useSpecialBlock() async {
-     if (_finishing || _paused || _resumePausePending) return;
+-    if (_finishing || _paused || _resumePausePending) return;
++    if (_finishing || _paused || _resumePausePending || _toolRequestPending) return;
      if (!_allowToolAction()) return;
 -    if (widget.appState.specialInventory <= 0) {
 +    if (widget.appState.totalSpecialInventory <= 0) {
        return;
      }
      final index = _pieces.indexWhere((piece) => piece != null);
-@@ -872,7 +872,7 @@ class _GameScreenState extends State<GameScreen>
+     if (index < 0) {
+       return;
+     }
+-    final consumed = await widget.appState.consumeSpecial();
++    final consumed = await _consumeTool(widget.appState.consumeSpecial);
+     if (!consumed || !mounted) return;
+     setState(() {
+       _pieces[index] =
+@@ -783,7 +791,7 @@ class _GameScreenState extends State<GameScreen>
+   }
+ 
+   void _updateHover(DragTargetDetails<int> details) {
+-    if (_finishing || _paused || _resumePausePending) return;
++    if (_finishing || _paused || _resumePausePending || _toolRequestPending) return;
+     final index = details.data;
+     final piece = _pieces[index];
+     if (piece == null) {
+@@ -810,7 +818,7 @@ class _GameScreenState extends State<GameScreen>
+   }
+ 
+   void _acceptPiece(DragTargetDetails<int> details) {
+-    if (_finishing || _paused || _resumePausePending) return;
++    if (_finishing || _paused || _resumePausePending || _toolRequestPending) return;
+     final nowMs = DateTime.now().millisecondsSinceEpoch;
+     if (nowMs - _lastPlacementEpochMs < 110) return;
+     _lastPlacementEpochMs = nowMs;
+@@ -872,7 +880,7 @@ class _GameScreenState extends State<GameScreen>
      }
  
      setState(() {
@@ -173,7 +263,16 @@ index 807aea3..78393ce 100644
          _undoSnapshot = before;
        }
        _pieces[index] = null;
-@@ -1447,10 +1447,10 @@ class _GameScreenState extends State<GameScreen>
+@@ -1206,7 +1214,7 @@ class _GameScreenState extends State<GameScreen>
+   }
+ 
+   Future<void> _showPauseMenu() async {
+-    if (_finishing || _paused) return;
++    if (_finishing || _paused || _toolRequestPending) return;
+     final l = AppStrings(widget.appState.languageCode);
+     _modeTimer?.cancel();
+     setState(() => _paused = true);
+@@ -1447,10 +1455,10 @@ class _GameScreenState extends State<GameScreen>
      }
  
      final canRescueWithRefresh =
@@ -187,7 +286,7 @@ index 807aea3..78393ce 100644
      if (canRescueWithRefresh || canRescueWithSpecial || canRescueWithUndo) {
        _showEventBanner(AppStrings.current.f('KRİTİK HAMLE • GÜÇ KULLAN', 'CRITICAL MOVE • USE A POWER'));
        return;
-@@ -2237,9 +2237,9 @@ class _GameScreenState extends State<GameScreen>
+@@ -2237,9 +2245,9 @@ class _GameScreenState extends State<GameScreen>
                              icon: Icons.undo_rounded,
                              label: l.t('game.undo'),
                              charge: (_undoAvailable ? 1 : 0) +
@@ -199,7 +298,7 @@ index 807aea3..78393ce 100644
                              accent: _theme.blockAccent,
                              onPressed: _undoLastMove,
                            ),
-@@ -2250,9 +2250,9 @@ class _GameScreenState extends State<GameScreen>
+@@ -2250,9 +2258,9 @@ class _GameScreenState extends State<GameScreen>
                              icon: Icons.autorenew_rounded,
                              label: l.t('game.refresh'),
                              charge: (_refreshAvailable ? 1 : 0) +
@@ -211,7 +310,7 @@ index 807aea3..78393ce 100644
                              accent: _theme.blockAccent,
                              onPressed: _refreshPieces,
                            ),
-@@ -2262,8 +2262,8 @@ class _GameScreenState extends State<GameScreen>
+@@ -2262,8 +2270,8 @@ class _GameScreenState extends State<GameScreen>
                            child: _GameToolButton(
                              icon: Icons.auto_awesome_rounded,
                              label: l.t('game.special'),
@@ -240,10 +339,11 @@ index c0c47d4..9235cbc 100644
        ),
      );
 diff --git a/lib/services/billing_account_service.dart b/lib/services/billing_account_service.dart
-index 981464f..0fde68e 100644
+index 08139e4..0fde68e 100644
 --- a/lib/services/billing_account_service.dart
 +++ b/lib/services/billing_account_service.dart
-@@ -1,138 +1,114 @@
+@@ -1,139 +1,114 @@
+-import 'dart:async';
  import 'dart:convert';
 -
 +import 'dart:math';
@@ -672,20 +772,26 @@ index 780b351..7540b8e 100644
    });
  }
 diff --git a/test/v0282_server_wallet_preview_test.dart b/test/v0282_server_wallet_preview_test.dart
-index d6b7c45..5da9cf6 100644
+index 4ee2680..b85446a 100644
 --- a/test/v0282_server_wallet_preview_test.dart
 +++ b/test/v0282_server_wallet_preview_test.dart
-@@ -4,8 +4,8 @@ import 'package:elxvro_blocks/services/billing_account_service.dart';
- import 'package:elxvro_blocks/services/play_billing_service.dart';
+@@ -1,12 +1,12 @@
+ import 'dart:io';
+ import 'package:flutter_test/flutter_test.dart';
+ import 'package:elxvro_blocks/services/billing_account_service.dart';
+-// Static-source test avoids initializing Google Play platform channels.
++import 'package:elxvro_blocks/services/play_billing_service.dart';
  
  void main() {
 -  test('v0.28.2 cannot open checkout even if a CI payment flag is set', () {
--    expect(PlayBillingService.paidWalletSpendReady, isFalse);
+-    final source = File('lib/services/play_billing_service.dart').readAsStringSync();
+-    expect(source, allOf(contains('paidWalletSpendReady = false;'), contains("bool.fromEnvironment('ELXVRO_BILLING_ENABLED'")));
 +  test('Checkout requires explicit approval and an authenticated server', () {
 +    expect(PlayBillingService.paidWalletSpendReady, isTrue);
-     expect(PlayBillingService.instance.canBuy, isFalse);
++    expect(PlayBillingService.checkoutApproved, isFalse);
    });
  
+   test('Only official HTTPS wallet endpoint is used', () {
 @@ -14,7 +14,7 @@ void main() {
      final account = File('lib/services/billing_account_service.dart').readAsStringSync();
      expect(account, contains('Authorization'));
