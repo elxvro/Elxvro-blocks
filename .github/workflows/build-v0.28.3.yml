@@ -456,10 +456,11 @@ jobs:
         env:
           BILLING_URL: ${{ vars.ELXVRO_BILLING_VERIFY_URL || 'https://block.elxvro.com/verify_purchase.php' }}
           GOOGLE_WEB_CLIENT_ID: ${{ vars.ELXVRO_GOOGLE_WEB_CLIENT_ID }}
-          BILLING_ENABLED: 'false'
+          BILLING_ENABLED: ${{ vars.ELXVRO_BILLING_ENABLED || 'false' }}
         run: |
           set -euo pipefail
           if [ "$BILLING_ENABLED" = "true" ]; then
+            test "${{ vars.ELXVRO_BILLING_OWNER_APPROVED }}" = "true" || { echo "::error::Owner approval required"; exit 1; }
             python - <<'PY'
           import os,sys,urllib.parse
           p=urllib.parse.urlsplit(os.environ.get("BILLING_URL",""))
@@ -476,7 +477,7 @@ jobs:
         env:
           BILLING_URL: ${{ vars.ELXVRO_BILLING_VERIFY_URL || 'https://block.elxvro.com/verify_purchase.php' }}
           GOOGLE_WEB_CLIENT_ID: ${{ vars.ELXVRO_GOOGLE_WEB_CLIENT_ID }}
-          BILLING_ENABLED: 'false'
+          BILLING_ENABLED: ${{ vars.ELXVRO_BILLING_ENABLED || 'false' }}
           PG_CLASSIC: 'CgkI6arsvtAGEAIQAw'
           PG_RUSH: 'CgkI6arsvtAGEAIQAg'
           PG_ADVENTURE: 'CgkI6arsvtAGEAIQBA'
@@ -528,7 +529,7 @@ jobs:
         env:
           BILLING_URL: ${{ vars.ELXVRO_BILLING_VERIFY_URL || 'https://block.elxvro.com/verify_purchase.php' }}
           GOOGLE_WEB_CLIENT_ID: ${{ vars.ELXVRO_GOOGLE_WEB_CLIENT_ID }}
-          BILLING_ENABLED: 'false'
+          BILLING_ENABLED: ${{ vars.ELXVRO_BILLING_ENABLED || 'false' }}
           PG_CLASSIC: 'CgkI6arsvtAGEAIQAw'
           PG_RUSH: 'CgkI6arsvtAGEAIQAg'
           PG_ADVENTURE: 'CgkI6arsvtAGEAIQBA'
