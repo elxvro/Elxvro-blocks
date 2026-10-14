@@ -26,6 +26,25 @@ if billing.exists():
     source=billing.read_text()
     source=source.replace("PlayProduct('elxvro_supporter_badge', 0, true),", "")
     billing.write_text(source)
+# Strictly disable the legacy billing service at its public entry points.
+# No SKU can be queried or bought; any call returns without initiating payment.
+source=billing.read_text()
+source=source.replace('bool get canBuy => available && serverConfigured && checkoutApproved &&','bool get canBuy => false && available && serverConfigured && checkoutApproved &&')
+source=source.replace("bool.fromEnvironment('ELXVRO_BILLING_ENABLED', defaultValue: false)","false")
+billing.write_text(source)
+# Remove visible supporter ownership and any need to refresh its server wallet.
+state=root/'lib/app_state.dart'
+if state.exists():
+    st=state.read_text()
+    st=st.replace('bool get isSupporter => BillingAccountService.instance.serverSupporter;', 'bool get isSupporter => false;')
+    st=st.replace('BillingAccountService.instance.addListener(_walletChanged);', '// Paid account listener removed.')
+    st=st.replace('BillingAccountService.instance.removeListener(_walletChanged);', '// Paid account listener removed.')
+    state.write_text(st)
+main=root/'lib/main.dart'
+if main.exists():
+    m=main.read_text()
+    m=m.replace('unawaited(BillingAccountService.instance.refreshWallet());','// Paid wallet sync removed.')
+    main.write_text(m)
 pub=root/'pubspec.yaml'
 assert 'version: 0.28.5+59' in pub.read_text()
 pub.write_text(pub.read_text().replace('version: 0.28.5+59','version: 0.28.6+60'))
@@ -36,4 +55,4 @@ for t in ['test/real_material_audio_test.dart','test/v0240_features_test.dart']:
 for t in ['test/v0270_billing_contract_test.dart','test/v0281_billing_release_gate_test.dart']:
     q=root/t
     if q.exists(): q.unlink()
-print('Removed purchase panel and product catalog; remaining integration audit required.')
+print('Payment storefront removed; purchases forcibly disabled, product catalog empty.')
