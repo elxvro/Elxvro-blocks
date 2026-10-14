@@ -9,6 +9,7 @@ on:
       - "hosting/**"
       - ".github/workflows/build-v0.28.3.yml"
   workflow_dispatch:
+# Manual workflow rerun requested 2026-10-14.
 
 permissions:
   contents: read
