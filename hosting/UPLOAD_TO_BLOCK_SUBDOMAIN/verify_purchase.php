@@ -1,36 +1,21 @@
 <?php
 declare(strict_types=1);
-require_once __DIR__ . '/private/bootstrap.php';
-try {
-    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
-        header('Allow: POST');
-        json_response(405, ['error' => 'method_not_allowed']);
-    }
-    $config = api_config();
-    $data = api_start();
-    $sub = api_auth_subject($config);
-    if (($config['payments_enabled'] ?? false) !== true) {
-        json_response(503, ['error' => 'payments_not_enabled']);
-    }
-    $productId = $data['productId'] ?? '';
-    $token = $data['purchaseToken'] ?? '';
-    if (($data['platform'] ?? null) !== 'google_play' || !is_string($productId) ||
-        !is_string($token) || strlen($token) < 16 || strlen($token) > 4096) {
-        json_response(400, ['error' => 'invalid_purchase_request']);
-    }
-    Products::get($productId);
-    $google = new GoogleApi($config);
-    $purchase = $google->playPurchase($token);
-    $product = PurchaseRules::verify($purchase, $productId, $sub);
-    $result = (new Ledger(api_db($config), $config))->grant(
-        $sub, $productId, $token, $product, (string)($purchase['orderId'] ?? ''));
-    // Existing v0.28.1 client consumes/acknowledges after verified response.
-    // The server does not double-consume here. Next release must switch
-    // fulfilment/acknowledgement to a backend retry worker before live sale.
-    json_response(200, $result);
-} catch (BillingException $e) {
-    json_response($e->httpStatus, ['error' => $e->getMessage()]);
-} catch (Throwable $e) {
-    error_log('ELXVRO verify_purchase internal failure: ' . get_class($e));
-    json_response(503, ['error' => 'verification_temporarily_unavailable']);
-}
+require __DIR__.'/private/v0283.php';
+try{
+ $data=api_start();$c=billing_config();$sub=api_auth_subject($c);$db=api_db($c);
+ $id=$data['productId']??null;$token=$data['purchaseToken']??null;
+ if(($data['platform']??null)!=='google_play'||!is_string($id)||!is_string($token)||strlen($token)<16||strlen($token)>4096)throw new BillingException(400,'invalid_purchase_request');
+ Products::get($id);$google=new GoogleApi($c);$purchase=$google->playPurchase($token);$w=new Wallet($db,$c);
+ $refundable=$purchase['productLineItem'][0]['productOfferDetails']['refundableQuantity']??null;
+ if(($purchase['purchaseStateContext']['purchaseState']??null)==='CANCELLED'||$refundable===0){$w->revoke($token);throw new BillingException(409,'purchase_revoked');}
+ PurchaseRules::verify($purchase,$id,$sub);
+ // Verification/restoration remains available with checkout disabled. New real
+ // orders are gated independently from purchase callbacks and pending UI state.
+ $test=($purchase['testPurchaseContext']['fopType']??null)==='TEST';
+ if(!$test&&(($c['billing_mode']??'disabled')!=='live'||($c['live_security_approved']??false)!==true))throw new BillingException(503,'live_payments_not_approved');
+ if(!worker_healthy($db))throw new BillingException(503,'refund_sync_unavailable');
+ $consumed=($purchase['productLineItem'][0]['productOfferDetails']['consumptionState']??null)==='CONSUMPTION_STATE_CONSUMED';
+ $w->grant($sub,$id,$token,(string)($purchase['orderId']??''),$consumed);
+ // Durable receipt is the retry queue. The cron worker owns consume/ack.
+ json_response(200,['verified'=>true,'productId'=>$id]+wallet_response($w,$sub,$c,$db));
+}catch(BillingException $e){json_response($e->httpStatus,['error'=>$e->getMessage()]);}

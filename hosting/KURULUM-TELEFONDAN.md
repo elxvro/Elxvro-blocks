@@ -1,116 +1,89 @@
-# ELXVRO Blocks — block.elxvro.com ödeme doğrulama sunucusu
+# ELXVRO Blocks v0.28.3
 
-**Durum:** Güvenli *hazırlık paketi* (staging). Henüz block.elxvro.com adresine yüklenmedi. Gerçek ödeme kapalıdır. 
+PHP 8.1+ (PDO MySQL, cURL, OpenSSL), MySQL 8+/MariaDB InnoDB.
+This package is code, not proof of a live deployment. Live Google account,
+service-account permissions, cron and device purchases must be tested before sales.
 
-Bu proje ELXVRO Blocks v0.28.1 (Android paket kimliği: `com.elxvro.elxvro_blocks`) için hazırlanmıştır.
-Sunucu adresi: `https://block.elxvro.com/verify_purchase.php`.
+## Existing installation
+1. Back up your database and existing private/config.php privately.
+2. Upload UPLOAD_TO_BLOCK_SUBDOMAIN contents over the existing app API.
+   There is deliberately NO config.php, service-account JSON or secret in this ZIP.
+3. Run SQL/schema.sql then SQL/v0283.sql in phpMyAdmin. Both are additive CREATE
+   TABLE IF NOT EXISTS migrations; existing player_wallets/play_purchases survive.
+4. Copy private/deployment.example.php to private/deployment.php privately. Set
+   token_encryption_key to base64 of 32 random bytes (PHP random_bytes). Keep it
+   backed up alongside purchase_token_hmac_secret; changing either loses lookup
+   or decryption ability. Do not paste keys into chat, GitHub or downloadable files.
+5. Keep existing Google audience/package/DB/service-account configuration. The
+   service account needs Google Play purchase read and order management rights.
+6. Schedule private/reconcile.php with the host's PHP CLI every minute. It is
+   CLI-only, uses a MySQL advisory lock, scans paginated voided purchases with
+   overlap, validates purchases and retries consume/ack after durable fulfilment.
+7. Verify /private/config.php, /private/deployment.php, service-account JSON and
+   /private/cache are inaccessible by HTTP. Apache .htaccess must be enabled;
+   Nginx requires an equivalent deny rule. HTTPS is mandatory; redirect HTTP at
+   the virtual-host level before activation.
+8. Set payments_enabled=true only for an approved test environment, and
+   billing_mode=test. live_security_approved remains false. Test-card purchases
+   can be fulfilled; real purchase callbacks are refused in test mode.
+9. The distributed signed build has ELXVRO_BILLING_ENABLED=false. After device
+   tests and explicit release approval, build with that flag true and configure
+   live mode. Do not merely toggle the backend or a Console product and assume
+   security is verified.
 
-## 1) cPanel'de alt alan adını oluştur
+A stale/failed reconciliation worker disables checkout and spending after five
+minutes. Monitor cron errors and alert on a stale billing_worker_state timestamp.
+The 200-receipt batch needs load testing before substantial sales; scale worker
+throughput so acknowledgements complete within Google's deadline. No guarantee
+of instant refund detection is made: Google event visibility and the cron period
+bound the detection delay. Consumed refunds are handled by the voided API.
 
-- cPanel → **Domains / Alan Adları** → `block.elxvro.com` adresini oluştur.
-- DNS doğru yönlendirilmeli ve **HTTPS / AutoSSL** etkin olmalı. Adres zaten varsa yeniden oluşturma.
-- Alan adının **Document Root / Kök dizin** yolunu not et. Bu dizin `public_html/block` veya panelin ayarladığı başka bir klasör olabilir.
-- PHP **8.1 veya üzeri** sürümünü ve `curl`, `openssl`, `pdo_mysql` eklentilerini seç.
+## API
+All requests use Authorization: Bearer <fresh Google ID token>. Server verifies
+RS256 signature, issuer, audience, expiry and subject, never a client player ID.
 
-## 2) Dosyaları yükle
+GET /wallet.php returns protocol:3, source:"verified_purchases", balance,
+revision, supporter, debt, inventory:{undo,refresh,special}, themes:[...],
+checkoutEnabled, billingMode.
 
-- `ELXVRO-Blocks-block.elxvro.com-HOSTING.zip` dosyasını alt alan adının **belge kök dizinine** yükle.
-- **Extract / Ayıkla** yap. `index.php`, `health.php`, `verify_purchase.php`, `wallet.php`, `private/` doğrudan alt alan adının kökünde görünmeli.
-- `private/.htaccess` dosyasının gerçekten bulunduğunu kontrol et. Özel dosyalar HTTP üzerinden ASLA erişilebilir olmamalı. Apache veya LiteSpeed üzerinde `.htaccess` koruması doğrulanmalı; farklı sunucu kullanılıyorsa koruma ona göre yapılandırılmalı.
-- `https://block.elxvro.com/health.php` adresini aç. İlk yüklemede `setup_required` görünmesi **normal**dir.
+POST /verify_purchase.php JSON:
+{"platform":"google_play","productId":"elxvro_coins_500","purchaseToken":"..."}
+Response adds verified:true and productId to the wallet. This does NOT mint coins
+locally. Invalid/pending/cancelled/refunded/account-mismatched tokens fail closed.
+The app sets applicationUserName to SHA256("elxvro.blocks|" + Google subject).
 
-## 3) MySQL veritabanını oluştur
+POST /spend.php JSON:
+{"action":"buy","sku":"undo_3","operationId":"UUID-v4"}
+Other SKUs: refresh_3, special_3, power_bundle, theme:night, theme:marble,
+theme:fire, theme:nature, theme:aurora. Prices match the existing game:
+120/120/180/300 and 300/500/700/700/1000 respectively.
+Use action:"use", sku:"undo"|"refresh"|"special" to consume paid inventory.
+Response is the current complete wallet. Reuse the same operationId on uncertain
+network failure; reuse with a different action/SKU is rejected. HTTP 409 means a
+state conflict/insufficient funds, 401 login, 503 unavailable or safety gate.
 
-- cPanel → **MySQL Databases** → yeni bir veritabanı ve kullanıcı oluştur.
-- Kullanıcıyı bu veritabanına ata; gerekli tablo oluşturma ve DML izinlerini ver.
-- cPanel → **phpMyAdmin** → o veritabanını seç → **İçe Aktar / Import** → `schema.sql` dosyasını yükle.
-- `player_wallets` ve `play_purchases` tablolarının oluştuğunu kontrol et.
+Paid assets are separate from locally earned offline rewards. Existing earned
+coins and powers are preserved and spent first; there is no upload of a trusted
+client-provided balance. If local coins are insufficient, the complete purchase
+price is charged to the paid wallet; balances are not combined. Paid inventory
+requires internet and restores on another device with the same Google account.
+Offline earned rewards remain local (no new cloud save for offline progression).
+Refunds remove available balance; spent amounts become debt. Further paid spending
+and paid inventory access are blocked until debt is cleared. Refunds remove the
+supporter badge unless another unrevoked badge purchase exists.
 
-## 4) Google Cloud servis hesabını yetkilendir
+## Build configuration
+Branch work-v0.28.3, version 0.28.3+57. Original workflows/signing secrets unchanged.
+New version workflow reuses the existing successful restore/Android/signing steps.
+ELXVRO_GOOGLE_WEB_CLIENT_ID must be the same web OAuth audience as the server.
+Android OAuth must contain com.elxvro.elxvro_blocks and Play app-signing SHA-1.
+ELXVRO_BILLING_VERIFY_URL defaults to https://block.elxvro.com/verify_purchase.php.
+The wallet/spend base defaults to https://block.elxvro.com. If changing the
+verifier host, configure ELXVRO_BILLING_API_BASE to the matching HTTPS API base.
 
-- Google Cloud Console'da mevcut Play Console hesabına bağlı bir proje kullan.
-- **Google Play Android Developer API** (Android Publisher API) hizmetini etkinleştir.
-- Google Play Console API erişimi ayarlarından ilgili hizmet hesabına, yalnızca ödeme/sipariş işlemlerinin doğrulanması için gereken yetkileri tanımla.
-- Hizmet hesabının JSON anahtar dosyasını **Google Cloud'dan** indir.
-- Bu dosyayı sadece alt alan adının `private/google-play-service-account.json` yoluna yükle. Google Play'e bağlı servis hesabının JSON dosyasını GitHub'a, sohbet ekranına, uygulamaya veya herkese açık dizine **ASLA** koyma.
-- JSON özel anahtarı değiştirilebilen/iptal edilebilen bir sırdır. Gereksiz geniş erişim vermemek gerekir.
-
-## 5) Google kullanıcı kimliğini doğrulamaya hazırla
-
-- Google Cloud'dan oyuna ait **Web OAuth Client ID** değerini edin (sonu `.apps.googleusercontent.com` olur).
-- Bu OAuth istemcisinin oyuncunun mobil Google ile giriş akışında sunucu için ID token üretecek şekilde kullanılması gerekir.
-- DİKKAT: Mevcut v0.28.1 uygulaması henüz sunucuya `Authorization: Bearer <Google ID token>` göndermiyor. Bu durum düzeltilmeden ödeme açılmamalı.
-- Yeni satın alma akışında Google Play Billing'e, oturum açmış Google `sub` kimliğine bağlı `obfuscatedAccountId = sha256('elxvro.blocks|' + googleSub)` değeri set edilmelidir.
-- **Play Games hesabına giriş yapmak, tek başına sunucunun beklediği Google OAuth ID tokenının otomatik gönderildiği anlamına gelmez.** Uygulama tarafı buna göre geliştirilecektir.
-
-## 6) Özel ayar dosyası
-
-- `private/config.example.php` dosyasını kopyalayıp **`private/config.php`** olarak kaydet.
-- `db_dsn`, `db_user`, `db_password`, `google_oauth_audience`, `service_account_json`, `purchase_token_hmac_secret` alanlarını doldur.
-- HMAC sırrı, rastgele oluşturulmuş en az 32 karakter (tercihen 64 karakterlik hex) olmalı ve sonradan değiştirilmemelidir.
-- **`payments_enabled => false` değerini değiştirme!** Bu sunucu paketi otomatik olarak ödeme açmaz.
-- cPanel dosya yöneticisinde config.php dosyasının dosya izinlerini uygun biçimde kısıtla (genellikle 600/640, hosting yapılandırmasına göre).
-
-## 7) GitHub Actions bağlantısı (henüz uygulamayı ödeme almaya açmaz)
-
-ELXVRO Blocks GitHub deposu → Settings → Secrets and variables → Actions → Variables:
-
-`ELXVRO_BILLING_VERIFY_URL = https://block.elxvro.com/verify_purchase.php`
-
-Mevcut `work-v0.28.1` derleme akışında **varsayılan checkout kapalıdır**.
-Sadece URL eklemek gerçek ödemeleri açmaz; Android uygulamasının sunucuya Google ID token yollayacak şekilde geliştirilmesi ve test edilmesi gerekir.
-
-## Sunucunun erişim sözleşmesi
-
-**GET** `/health.php` — gizli bilgi vermeyen servis durumu.
-
-**GET** `/wallet.php`
-Header: `Authorization: Bearer GOOGLE_ID_TOKEN`
-Yanıt: `{"balance":1500,"supporter":false,"source":"verified_purchases"}` (örnek)
-
-**POST** `/verify_purchase.php`
-Headers: `Content-Type: application/json`, `Authorization: Bearer GOOGLE_ID_TOKEN`
-Gövde:
-
-```json
-{"platform":"google_play","productId":"elxvro_coins_500","purchaseToken":"GERCEK_GOOGLE_PLAY_TOKEN"}
-```
-
-Yalnızca doğru hesaba bağlı, Google Play tarafından **PURCHASED** olduğu doğrulanmış, tam olarak tek ürünlü, iade edilmemiş satın alımlarda sunucu coinleri **bir kez** hesaba ekler.
-
-```json
-{"verified":true,"productId":"elxvro_coins_500","alreadyGranted":false,"awardedCoins":500,"balance":500,"supporter":false}
-```
-
-Tekrar edilen bir token `alreadyGranted:true`, `awardedCoins:0` sonucu üretir ve bakiyeye tekrar eklenmez. Aynı token başka hesapta tekrar kullanılamaz.
-
-## Ürün kimlikleri
-
-| Ürün | Ürün ID | Türkiye fiyatı |
-|---|---|---|
-| 500 Coin | `elxvro_coins_500` | ₺9,99 |
-| 1500 Coin | `elxvro_coins_1500` | ₺24,99 |
-| 4000 Coin | `elxvro_coins_4000` | ₺49,99 |
-| Destekçi Paketi | `elxvro_supporter_badge` | ₺19,99 |
-
-Bu fiyatlar sunucudan değil **Google Play Console** üzerinden yönetilir.
-
-## Yayınlamadan ÖNCE zorunlu kalan işler
-
-1. Uygulamada oturum açmış oyuncudan sunucu için **Google ID token** edinme ve API'ye aktarma.
-2. Billing satın alımlarında **obfuscatedAccountId** gönderme ve destekçi geri yüklemeyi doğru hesapla ilişkilendirme.
-3. Sunucudan gelen `balance` / `alreadyGranted` alanlarına göre oyun cüzdanını senkronize etme; mevcut APK'nın yerel `SharedPreferences` coin bakiyesine güvenip tekrar coin eklemeyi bırakma.
-4. Mevcut oyunda oynayarak kazanılan coinlerle satın alınan coinlerin birlikte tutarlı biçimde nasıl saklanacağını belirleme. Şimdiki örnek sunucu **yalnızca doğrulanmış satın alım coinlerini** kaydeder.
-5. Sipariş tüketimi/onayı için güvenli ve tekrar deneyen sunucu işlemleri; uygulamanın bağlantı kesintilerinde 3 günlük onay süresini kaçırmaması.
-6. Google Play Voided Purchases API / RTDN ile **iptal ve iade takibi**, geri alma ve mutabakat.
-7. Sunucu erişim sınırları, saldırı önleme, SQL yedekleri, uygulama entegrasyon testleri.
-8. Google Play lisans testi hesabıyla, ücret çekmeden test satın alımları; üretim ödemelerini ancak sahibinin onayıyla aç.
-
-Bu dosyalar güvenlik kilidi açık olan üretim sunucusu değildir; **staging kurulum paketidir**. Gerçek ödemeler aktif edilemez.
-
-## Gerekli teknik doğrulama
-
-- `private/config.php`, `.json` ve `private/Billing.php` dosyaları doğrudan web tarayıcısıyla okunamamalı (403/404).
-- HTTPS sertifikası geçerli olmalı.
-- Yapılandırma sonrası `health.php` → `configured_staging` (ödeme hâlâ kapalı).
-- Test için `php tests/test_rules.php` yerel olarak çalıştırıldığında güvenlik kontrolleri geçmelidir.
+## Pending external acceptance
+Real Google signature/permissions, license-test successful/declined/pending
+purchases for all products, badge restore, same-account two-device concurrent
+spending, refunds after spend, cron restart/failure, HTTPS/private-file denial,
+production database backup/migration and load testing require the live environment.
+No hosting configuration or live database was modified by this code change.

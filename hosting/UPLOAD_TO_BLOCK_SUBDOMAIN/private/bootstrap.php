@@ -4,7 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/Billing.php';
 
 set_exception_handler(static function (Throwable $e): void {
-    error_log('ELXVRO Billing unhandled: ' . $e->getMessage());
+    error_log('ELXVRO Billing unhandled: ' . get_class($e));
     json_response(500, ['error' => 'internal_error']);
 });
 
@@ -80,7 +80,7 @@ function api_db(array $config): PDO
             PDO::ATTR_EMULATE_PREPARES => false,
         ]);
     } catch (Throwable $e) {
-        error_log('ELXVRO DB connection: ' . $e->getMessage());
+        error_log('ELXVRO DB connection: ' . get_class($e));
         json_response(503, ['error' => 'database_unavailable']);
     }
 }

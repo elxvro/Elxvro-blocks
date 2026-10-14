@@ -78,6 +78,13 @@ final class GoogleApi
         }
     }
 
+    public function voided(?string $page): array
+    {
+        $query=['startTime'=>(string)((time()-29*86400)*1000),'type'=>0,'includeQuantityBasedPartialRefund'=>'true','maxResults'=>1000];
+        if($page!==null)$query['token']=$page;
+        return $this->apiGet('https://androidpublisher.googleapis.com/androidpublisher/v3/applications/'.rawurlencode($this->packageName()).'/purchases/voidedpurchases?'.http_build_query($query));
+    }
+
     private function apiGet(string $url): array
     {
         [$status, $response] = HttpClient::request('GET', $url,
@@ -241,8 +248,8 @@ final class PurchaseRules
         }
         $details = $items[0]['productOfferDetails'] ?? [];
         // Reject malformed numeric values rather than coercing strings such as '1invalid' to 1.
-        $quantity = $details['quantity'] ?? 1;
-        $refundable = $details['refundableQuantity'] ?? 1;
+        $quantity = $details['quantity'] ?? null;
+        $refundable = $details['refundableQuantity'] ?? null;
         if (!is_array($details) || !is_int($quantity) || $quantity !== 1 ||
             !is_int($refundable) || $refundable !== 1) {
             throw new BillingException(409, 'quantity_or_refund_mismatch');
@@ -258,49 +265,3 @@ final class PurchaseRules
     }
 }
 
-final class Ledger
-{
-    public function __construct(private readonly PDO $db, private readonly array $config) {}
-
-    public function grant(string $sub, string $productId, string $token, array $product, string $orderId): array
-    {
-        $secret = (string)($this->config['purchase_token_hmac_secret'] ?? '');
-        if (strlen($secret) < 32) throw new BillingException(503, 'token_key_unconfigured');
-        $tokenId = hash_hmac('sha256', $token, $secret);
-        if (strlen($orderId) > 128) throw new BillingException(422, 'invalid_order_id');
-        try {
-            $this->db->beginTransaction();
-            $stmt = $this->db->prepare('INSERT IGNORE INTO player_wallets (google_sub) VALUES (?)');
-            $stmt->execute([$sub]);
-            $wallet = $this->db->prepare('SELECT balance, supporter FROM player_wallets WHERE google_sub = ? FOR UPDATE');
-            $wallet->execute([$sub]);
-            $owned = $wallet->fetch();
-            if (!$owned) throw new RuntimeException('Wallet not created');
-            $q = $this->db->prepare('SELECT google_sub, product_id, coins_granted FROM play_purchases WHERE token_hmac = ? FOR UPDATE');
-            $q->execute([$tokenId]);
-            $prior = $q->fetch();
-            if ($prior) {
-                if (!hash_equals((string)$prior['google_sub'], $sub) ||
-                    !hash_equals((string)$prior['product_id'], $productId)) {
-                    throw new BillingException(409, 'purchase_already_used_by_another_account');
-                }
-                $this->db->commit();
-                return ['verified' => true, 'productId' => $productId, 'alreadyGranted' => true,
-                    'awardedCoins' => 0, 'balance' => (int)$owned['balance'], 'supporter' => (bool)$owned['supporter']];
-            }
-            $coins = (int)$product['coins'];
-            $supporter = !empty($product['supporter']);
-            $insert = $this->db->prepare('INSERT INTO play_purchases (token_hmac, google_sub, product_id, order_id, coins_granted) VALUES (?,?,?,?,?)');
-            $insert->execute([$tokenId, $sub, $productId, $orderId, $coins]);
-            $change = $this->db->prepare('UPDATE player_wallets SET balance = balance + ?, supporter = GREATEST(supporter, ?), updated_at = CURRENT_TIMESTAMP WHERE google_sub = ?');
-            $change->execute([$coins, (int)$supporter, $sub]);
-            $this->db->commit();
-            return ['verified' => true, 'productId' => $productId, 'alreadyGranted' => false,
-                'awardedCoins' => $coins, 'balance' => (int)$owned['balance'] + $coins,
-                'supporter' => $supporter || (bool)$owned['supporter']];
-        } catch (Throwable $e) {
-            if ($this->db->inTransaction()) $this->db->rollBack();
-            throw $e;
-        }
-    }
-}

@@ -30,3 +30,9 @@ foreach (Products::CATALOG as $id => $entry) {
     check(($entry['supporter'] === true) || $entry['coins'] > 0, 'invalid catalog ' . $id);
 }
 echo "PASS: 10 checks; catalog, product, purchaser, refund and pending payment rules.\n";
+$missing=$sample;unset($missing['productLineItem'][0]['productOfferDetails']['refundableQuantity']);
+denied(fn()=>PurchaseRules::verify($missing,'elxvro_coins_1500',$sub),'quantity_or_refund_mismatch');
+$cancelled=$sample;$cancelled['purchaseStateContext']['purchaseState']='CANCELLED';
+denied(fn()=>PurchaseRules::verify($cancelled,'elxvro_coins_1500',$sub),'payment_not_completed');
+try{(new GoogleIdentity(['google_oauth_audience'=>'test']))->subject('eyJhbGciOiJub25lIn0.eyJzdWIiOiIxMjM0NTY3ODkwMTIzNDU2Nzg5MCJ9.ZmFrZQ');throw new LogicException('Unsigned identity accepted');}catch(RuntimeException $e){check(!($e instanceof LogicException),'identity');}
+echo "PASS: missing refund fields, cancelled payment, forged identity\n";
