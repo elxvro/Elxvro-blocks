@@ -470,7 +470,9 @@ jobs:
           print("Paid checkout build manually requested; verifier URL is configured.")
           PY
           else
-            echo "Safe staging mode: checkout remains disabled."
+            echo "::warning::ELXVRO_BILLING_ENABLED is not true. APK and AAB will have checkout DISABLED."
+            echo "### Payment gate: DISABLED" >> "$GITHUB_STEP_SUMMARY"
+            echo "Set repository variable ELXVRO_BILLING_ENABLED=true and ELXVRO_BILLING_OWNER_APPROVED=true before creating a payment-enabled release." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Build signed release APK
