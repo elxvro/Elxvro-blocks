@@ -466,6 +466,14 @@ jobs:
               new = old.replace('version: 0.28.7+61', 'version: 0.28.8+62')
               if old != new:
                   path.write_text(new)
+          theme_test = Path('test/theme_refresh_test.dart')
+          test_source = theme_test.read_text()
+          test_source = test_source.replace('hasLength(9)', 'hasLength(11)')
+          test_source = test_source.replace(
+              "        'magma',",
+              "        'magma',\n        'arctic',\n        'copper',",
+          )
+          theme_test.write_text(test_source)
           PY
 
       - name: Test
