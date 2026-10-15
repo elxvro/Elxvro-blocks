@@ -77,8 +77,27 @@ jobs:
         run: |
           set -euo pipefail
           APP=extracted/elxvro-blocks
-          cp source_snapshot/lib/screens/daily_missions_screen.dart "$APP/lib/screens/daily_missions_screen.dart"
-          cp source_snapshot/lib/models/game_theme.dart "$APP/lib/models/game_theme.dart"
+          python - <<'PY'
+          from pathlib import Path
+          base = Path('extracted/elxvro-blocks/lib')
+          source = Path('source_snapshot/lib')
+          theme_file = base / 'models/game_theme.dart'
+          theme = theme_file.read_text()
+          new_themes = (source / 'models/game_theme.dart').read_text()
+          start = new_themes.index("  GameThemeData(\\n    id: 'arctic'")
+          insert = new_themes[start:new_themes.rindex('];')]
+          assert "id: 'arctic'" not in theme
+          assert theme.endswith('];\\n')
+          theme_file.write_text(theme[:-3] + insert + '];\\n')
+          missions_file = base / 'screens/daily_missions_screen.dart'
+          missions = missions_file.read_text()
+          additions = (source / 'screens/daily_missions_screen.dart').read_text()
+          start = additions.index('                  Padding(\\n                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),')
+          anchor = '                  Expanded(\\n                    child: ListView.separated('
+          block = additions[start:additions.index(anchor, start)]
+          assert anchor in missions and 'HAFTALIK HEDEF' not in missions
+          missions_file.write_text(missions.replace(anchor, block + anchor, 1))
+          PY
           sed -i 's/version: 0.28.7+61/version: 0.28.8+62/' "$APP/pubspec.yaml"
           grep -F 'version: 0.28.8+62' "$APP/pubspec.yaml"
 
