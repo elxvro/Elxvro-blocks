@@ -97,6 +97,67 @@ class DailyMissionsScreen extends StatelessWidget {
                       ],
                     ),
                   ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(18),
+                        color: selectedTheme.blockAccent.withValues(alpha: 0.09),
+                        border: Border.all(color: selectedTheme.blockAccent.withValues(alpha: 0.25)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            AppStrings.current.f('HAFTALIK HEDEF', 'WEEKLY CHALLENGE'),
+                            style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.1, color: selectedTheme.blockAccent),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            AppStrings.current.f(
+                              '${appState.weeklyScore} / ${AppState.weeklyGoal} puan  •  ${appState.weeklyGames} oyun',
+                              '${appState.weeklyScore} / ${AppState.weeklyGoal} points  •  ${appState.weeklyGames} games',
+                            ),
+                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          ),
+                          const SizedBox(height: 8),
+                          LinearProgressIndicator(
+                            value: appState.weeklyProgress,
+                            backgroundColor: Colors.white12,
+                            color: selectedTheme.blockAccent,
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: <Widget>[
+                              Expanded(
+                                child: Text(
+                                  AppStrings.current.f(
+                                    'Haftalık rekor: ${appState.weeklyBestScore}  •  Ödül: ${AppState.weeklyRewardAmount} coin',
+                                    'Weekly best: ${appState.weeklyBestScore}  •  Reward: ${AppState.weeklyRewardAmount} coins',
+                                  ),
+                                  style: const TextStyle(color: Colors.white60, fontSize: 11),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: appState.weeklyRewardAvailable
+                                    ? () async {
+                                        final claimed = await appState.claimWeeklyReward();
+                                        if (claimed) {
+                                          unawaited(AudioService.instance.playReward());
+                                        }
+                                      }
+                                    : null,
+                                child: Text(appState.weeklyRewardClaimed
+                                    ? AppStrings.current.f('ALINDI', 'CLAIMED')
+                                    : AppStrings.current.f('AL', 'CLAIM')),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                   Expanded(
                     child: ListView.separated(
                       padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
