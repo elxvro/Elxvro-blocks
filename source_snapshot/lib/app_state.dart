@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'l10n/app_strings.dart';
+import 'models/weekly_objective.dart';
 
 class AppState extends ChangeNotifier {
   static const String _bestScoreKey = 'best_score';
@@ -113,6 +114,12 @@ class AppState extends ChangeNotifier {
 
   static const int weeklyGoal = 25000;
   static const int weeklyRewardAmount = 250;
+
+  List<WeeklyObjective> get weeklyMissions => weeklyObjectives(
+        games: weeklyGames,
+        totalScore: weeklyScore,
+        bestScore: weeklyBestScore,
+      );
 
   double get weeklyProgress =>
       (weeklyScore / weeklyGoal).clamp(0.0, 1.0).toDouble();
