@@ -437,6 +437,18 @@ jobs:
         working-directory: build_source
         run: flutter analyze
 
+      - name: Migrate release version assertions
+        working-directory: build_source
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for path in Path('test').glob('*.dart'):
+              old = path.read_text()
+              new = old.replace('version: 0.28.7+61', 'version: 0.28.8+62')
+              if old != new:
+                  path.write_text(new)
+          PY
+
       - name: Test
         working-directory: build_source
         run: flutter test
