@@ -110,6 +110,26 @@ jobs:
           ! grep -q 'CustomPainter' "$BG"
           ! grep -q 'Canvas ' "$BG"
 
+      - name: Migrate release version assertions
+        working-directory: extracted/elxvro-blocks
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for path in Path('test').glob('*.dart'):
+              old = path.read_text()
+              new = old.replace('version: 0.28.7+61', 'version: 0.28.8+62')
+              if old != new:
+                  path.write_text(new)
+          theme_test = Path('test/theme_refresh_test.dart')
+          test_source = theme_test.read_text()
+          test_source = test_source.replace('hasLength(9)', 'hasLength(11)')
+          test_source = test_source.replace(
+              "        'magma',",
+              "        'magma',\n        'arctic',\n        'copper',",
+          )
+          theme_test.write_text(test_source)
+          PY
+
       - name: Create complete v0.28.7 source ZIP
         run: |
           set -euo pipefail
@@ -455,26 +475,6 @@ jobs:
       - name: Analyze
         working-directory: build_source
         run: flutter analyze
-
-      - name: Migrate release version assertions
-        working-directory: build_source
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          for path in Path('test').glob('*.dart'):
-              old = path.read_text()
-              new = old.replace('version: 0.28.7+61', 'version: 0.28.8+62')
-              if old != new:
-                  path.write_text(new)
-          theme_test = Path('test/theme_refresh_test.dart')
-          test_source = theme_test.read_text()
-          test_source = test_source.replace('hasLength(9)', 'hasLength(11)')
-          test_source = test_source.replace(
-              "        'magma',",
-              "        'magma',\n        'arctic',\n        'copper',",
-          )
-          theme_test.write_text(test_source)
-          PY
 
       - name: Test
         working-directory: build_source
