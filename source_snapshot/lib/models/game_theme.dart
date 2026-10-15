@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_strings.dart';
+
 enum ThemeMaterial {
   glass,
   wood,
@@ -35,6 +37,11 @@ class GameThemeData {
   final Color cell;
   final Color block;
   final Color blockAccent;
+}
+
+extension LocalizedGameThemeData on GameThemeData {
+  String get displayName => AppStrings.current.r(name);
+  String get displaySubtitle => AppStrings.current.r(subtitle);
 }
 
 // Kimlikler önceki sürümlerle uyumluluk için korunur. Böylece daha önce
