@@ -102,10 +102,10 @@ jobs:
           social = social_file.read_text()
           social_import = "import '../widgets/premium_background.dart';"
           assert social_import in social
-          social = social.replace(social_import, social_import + "\\nimport '../widgets/weekly_league_card.dart';", 1)
+          social = social.replace(social_import, social_import + "\nimport '../widgets/weekly_league_card.dart';", 1)
           weekly_anchor = '                        _WeeklyCard(appState: appState),'
           assert weekly_anchor in social
-          social = social.replace(weekly_anchor, weekly_anchor + "\\n                        const SizedBox(height: 12),\\n                        WeeklyLeagueCard(appState: appState),", 1)
+          social = social.replace(weekly_anchor, weekly_anchor + "\n                        const SizedBox(height: 12),\n                        WeeklyLeagueCard(appState: appState),", 1)
           social_file.write_text(social)
           (base / 'widgets/weekly_league_card.dart').write_text(
               (source / 'widgets/weekly_league_card.dart').read_text()
