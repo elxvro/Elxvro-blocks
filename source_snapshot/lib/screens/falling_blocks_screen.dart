@@ -44,6 +44,9 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
   int _score = 0;
   int _lines = 0;
   int _combo = 0;
+  int _riseTicks = 0;
+  int _riseCount = 0;
+  bool _locking = false;
   bool _paused = false;
   bool _gameOver = false;
   bool _finishing = false;
@@ -71,7 +74,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
   Duration get _fallInterval {
     if (_isAdventure) {
       final level = widget.adventureLevel!;
-      return Duration(milliseconds: level.fallingIntervalMs);
+      return Duration(milliseconds: max(105, level.fallingIntervalMs - _riseCount * 9));
     }
     final ms = max(125, 620 - (_arcadeLevel - 1) * 48);
     return Duration(milliseconds: ms);
@@ -158,6 +161,9 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
     _score = 0;
     _lines = 0;
     _combo = 0;
+    _riseTicks = 0;
+    _riseCount = 0;
+    _locking = false;
     _paused = false;
     _gameOver = false;
     _finishing = false;
@@ -198,9 +204,88 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
     if (_paused || _gameOver || _finishing) return;
     _timer = Timer.periodic(_fallInterval, (_) {
       if (mounted && !_paused && !_gameOver && !_finishing) {
+        if (_isAdventure) {
+          _riseTicks++;
+          final limit = max(4, 15 - _riseCount ~/ 3);
+          if (_riseTicks >= limit) {
+            _riseTicks = 0;
+            _riseBoard();
+            return;
+          }
+        }
         _stepDown();
       }
     });
+  }
+
+  void _riseBoard() {
+    if (!_isAdventure || _paused || _gameOver || _finishing || _locking) return;
+    // A rising row pushes the board and the active falling piece upward.
+    if (_board.first.any((cell) => cell >= 0)) {
+      unawaited(_finish(success: false));
+      return;
+    }
+    final hole = _random.nextInt(_cols);
+    final newRow = List<int>.generate(
+      _cols, (column) => column == hole ? -1 : _random.nextInt(7),
+    );
+    setState(() {
+      _board.removeAt(0);
+      _board.add(newRow);
+      _row = max(-3, _row - 1);
+      _riseCount++;
+    });
+    if (!_canPlace(_piece, _row, _col)) {
+      unawaited(_finish(success: false));
+      return;
+    }
+    _restartTimer();
+  }
+
+  int _breakColorClusters() {
+    final visited = List<List<bool>>.generate(
+      _rows, (_) => List<bool>.filled(_cols, false),
+    );
+    final removed = <(int, int)>[];
+    for (var row = 0; row < _rows; row++) {
+      for (var col = 0; col < _cols; col++) {
+        if (visited[row][col] || _board[row][col] < 0) continue;
+        final color = _board[row][col];
+        final cluster = <(int, int)>[(row, col)];
+        visited[row][col] = true;
+        for (var i = 0; i < cluster.length; i++) {
+          final (r, c) = cluster[i];
+          for (final (dr, dc) in const <(int, int)>[
+            (-1, 0), (1, 0), (0, -1), (0, 1),
+          ]) {
+            final nr = r + dr;
+            final nc = c + dc;
+            if (nr < 0 || nr >= _rows || nc < 0 || nc >= _cols) continue;
+            if (visited[nr][nc] || _board[nr][nc] != color) continue;
+            visited[nr][nc] = true;
+            cluster.add((nr, nc));
+          }
+        }
+        if (cluster.length >= 3) removed.addAll(cluster);
+      }
+    }
+    for (final (r, c) in removed) {
+      _board[r][c] = -1;
+    }
+    // Let remaining blocks settle so subsequent matches are possible.
+    if (removed.isNotEmpty) {
+      for (var c = 0; c < _cols; c++) {
+        final blocks = <int>[];
+        for (var r = _rows - 1; r >= 0; r--) {
+          if (_board[r][c] >= 0) blocks.add(_board[r][c]);
+        }
+        for (var r = _rows - 1; r >= 0; r--) {
+          final index = _rows - 1 - r;
+          _board[r][c] = index < blocks.length ? blocks[index] : -1;
+        }
+      }
+    }
+    return removed.length;
   }
 
   bool _canPlace(_FallingPiece piece, int row, int col) {
@@ -290,7 +375,8 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
   }
 
   Future<void> _lockPiece() async {
-    if (_finishing || _gameOver) return;
+    if (_finishing || _gameOver || _locking) return;
+    _locking = true;
 
     var overflow = false;
     for (final cell in _piece.cells) {
@@ -306,8 +392,15 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
     }
 
     if (overflow) {
+      _locking = false;
       await _finish(success: false);
       return;
+    }
+
+    final broken = _isAdventure ? _breakColorClusters() : 0;
+    if (broken > 0) {
+      _score += broken * (18 + _difficultyLevel * 2);
+      _lines += broken ~/ 3;
     }
 
     final cleared = <int>[];
@@ -358,6 +451,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
     }
 
     if (_isAdventure && _score >= _targetScore) {
+      _locking = false;
       await _finish(success: true);
       return;
     }
@@ -368,10 +462,12 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
     _col = ((_cols - _piece.width) ~/ 2).clamp(0, _cols - 1);
 
     if (!_canPlace(_piece, _row, _col)) {
+      _locking = false;
       await _finish(success: false);
       return;
     }
 
+    _locking = false;
     if (mounted) {
       setState(() {});
       _restartTimer();
