@@ -334,6 +334,20 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
     _dragDy = 0;
   }
 
+  void _settleFloatingBlocks() {
+    for (var c = 0; c < _cols; c++) {
+      var write = _rows - 1;
+      for (var r = _rows - 1; r >= 0; r--) {
+        final color = _board[r][c];
+        if (color < 0) continue;
+        _board[write][c] = color;
+        if (write != r) _board[r][c] = -1;
+        write--;
+      }
+      for (var r = write; r >= 0; r--) _board[r][c] = -1;
+    }
+  }
+
   Future<void> _lockPiece() async {
     if (_finishing || _gameOver || _locking) return;
     _locking = true;
@@ -370,6 +384,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
         _board.insert(0, List<int>.filled(_cols, -1));
       }
 
+      if (_isAdventure) _settleFloatingBlocks();
       _combo += 1;
       _lines += cleared.length;
       final base = switch (cleared.length) {
@@ -404,12 +419,6 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
       }
     }
 
-    if (_isAdventure && _score >= _targetScore) {
-      _locking = false;
-      await _finish(success: true);
-      return;
-    }
-
     _piece = _nextPiece;
     _nextPiece = _randomPiece();
     _row = -1;
@@ -434,11 +443,11 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
     _timer?.cancel();
 
     var earned = 0;
-    if (_isAdventure && success) {
+    if (_isAdventure) {
       final level = widget.adventureLevel!;
       earned = await widget.appState.completeAdventureLevel(
         level: level.number,
-        reward: level.reward,
+        reward: 0,
         score: _score,
       );
 
@@ -468,7 +477,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
       builder: (dialogContext) {
         final adventure = widget.adventureLevel;
         final canGoNext =
-            success && adventure != null && adventure.number < adventureLevelCount;
+            adventure != null && adventure.number < adventureLevelCount;
 
         return AlertDialog(
           backgroundColor: const Color(0xFF101719),
@@ -477,7 +486,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
             _isAdventure
                 ? (success
                     ? AppStrings.current.f('BÖLÜM TAMAMLANDI', 'LEVEL COMPLETE')
-                    : AppStrings.current.f('BÖLÜM BAŞARISIZ', 'LEVEL FAILED'))
+                    : AppStrings.current.f('OYUN BİTTİ', 'GAME OVER'))
                 : AppStrings.current.f('DÜŞEN BLOKLAR', 'FALLING BLOCKS'),
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -505,8 +514,8 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
               Text(
                 _isAdventure
                     ? AppStrings.current.f(
-                        "Hedef $_targetScore puan  •  $_lines çizgi${earned > 0 ? '  •  +$earned coin' : ''}",
-                        "Target $_targetScore score  •  $_lines lines${earned > 0 ? '  •  +$earned coin' : ''}",
+                        "$_lines çizgi • Serbest skor",
+                        "$_lines lines • Unlimited score",
                       )
                     : AppStrings.current.f(
                         '$_lines çizgi  •  Seviye $_arcadeLevel\nEn iyi: ${widget.appState.fallingBlocksBestScore}',
@@ -625,35 +634,20 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
                     : AppStrings.current.f('DÜŞEN BLOKLAR', 'FALLING BLOCKS'),
                 score: _score,
                 lines: _lines,
-                targetScore: _targetScore,
+                targetScore: _isAdventure ? 0 : _targetScore,
                 level: _difficultyLevel,
                 accent: levelAccent,
                 paused: _paused,
                 onBack: () => Navigator.of(context).pop(),
                 onPause: _togglePause,
               ),
-              if (_isAdventure)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 6),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(999),
-                    child: LinearProgressIndicator(
-                      minHeight: 5,
-                      value: _targetScore <= 0
-                          ? 0
-                          : (_score / _targetScore).clamp(0.0, 1.0).toDouble(),
-                      backgroundColor: Colors.white.withValues(alpha: 0.055),
-                      valueColor: AlwaysStoppedAnimation<Color>(levelAccent),
-                    ),
-                  ),
-                ),
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final widthByScreen = constraints.maxWidth - 6;
-                    final widthByHeight = (constraints.maxHeight + 18) / 2;
-                    final boardWidth =
-                        min(widthByScreen, widthByHeight).clamp(228.0, 448.0);
+                    final widthByScreen = constraints.maxWidth - (_isAdventure ? 2 : 6);
+                     final widthByHeight = constraints.maxHeight / (_rows / _cols);
+                     final boardWidth = min(widthByScreen, widthByHeight)
+                         .clamp(0.0, constraints.maxWidth);
                     final cell = boardWidth / _cols;
                     final boardHeight = cell * _rows;
 
@@ -665,7 +659,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
                         child: Container(
                           width: boardWidth,
                           height: boardHeight,
-                          padding: const EdgeInsets.all(3),
+                          padding: EdgeInsets.all(_isAdventure ? 1 : 3),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.topLeft,
