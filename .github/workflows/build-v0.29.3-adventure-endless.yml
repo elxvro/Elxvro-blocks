@@ -3,7 +3,7 @@ name: ELXVRO Blocks v0.29.3 Adventure Fix APK AAB
 on:
   push:
     branches:
-      - work-v0.29.3-independent-rise
+      - work-v0.29.3-adventure-endless
     paths:
       - "tools/apply_rising_update.py"
       - "source_snapshot/lib/screens/falling_blocks_screen.dart"
@@ -11,13 +11,13 @@ on:
       - "source_snapshot/lib/widgets/weekly_league_card.dart"
       - "source_snapshot/lib/screens/daily_missions_screen.dart"
       - "source_snapshot/lib/models/game_theme.dart"
-      - ".github/workflows/build-v0.29.3-independent-rise.yml"
+      - ".github/workflows/build-v0.29.3-adventure-endless.yml"
       - ".github/v0287-code/**"
       - ".github/v0285-code/**"
       - ".github/v0284-code/**"
       - ".github/v0283-code/**"
       - "hosting/**"
-      - ".github/workflows/build-v0.29.3-independent-rise.yml"
+      - ".github/workflows/build-v0.29.3-adventure-endless.yml"
   workflow_dispatch:
 # Manual workflow rerun requested 2026-10-14.
 
@@ -154,7 +154,7 @@ jobs:
           set -euo pipefail
           APP=extracted/elxvro-blocks
           mkdir -p "$APP/.github/workflows"
-          cp .github/workflows/build-v0.29.3-independent-rise.yml "$APP/.github/workflows/build-v0.29.3-independent-rise.yml"
+          cp .github/workflows/build-v0.29.3-adventure-endless.yml "$APP/.github/workflows/build-v0.29.3-adventure-endless.yml"
           cp -R .github/v0287-code "$APP/.github/"
           rm -f ELXVRO-Blocks-v0.29.3-FULL-SOURCE.zip
           (
@@ -167,7 +167,7 @@ jobs:
           unzip -q ELXVRO-Blocks-v0.29.3-FULL-SOURCE.zip -d build_source
           test -f build_source/pubspec.yaml
           test -f build_source/lib/app_state.dart
-          test -f build_source/.github/workflows/build-v0.29.3-independent-rise.yml
+          test -f build_source/.github/workflows/build-v0.29.3-adventure-endless.yml
 
       - name: Upload complete source ZIP
         uses: actions/upload-artifact@v4
