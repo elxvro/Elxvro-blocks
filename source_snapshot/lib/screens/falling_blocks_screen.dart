@@ -442,10 +442,9 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
     _finishing = true;
     _timer?.cancel();
 
-    var earned = 0;
     if (_isAdventure) {
       final level = widget.adventureLevel!;
-      earned = await widget.appState.completeAdventureLevel(
+      await widget.appState.completeAdventureLevel(
         level: level.number,
         reward: 0,
         score: _score,
