@@ -43,10 +43,10 @@ changes = [
     ("  int _riseCount = 0;\n", ""),
     ("    _riseCount = 0;\n", ""),
     ("      _riseCount++;\n", ""),
-    ("    var overflow = false;\n    for (final cell in _piece.cells) {",
-     "    var overflow = false;\n    final placedRows = <int>{};\n    for (final cell in _piece.cells) {"),
-    ("        _board[r][c] = _piece.colorIndex;\n",
-     "        _board[r][c] = _piece.colorIndex;\n        placedRows.add(r);\n"),
+    ("    var overflow = false;\n    final contactCells = <int>{};",
+     "    var overflow = false;\n    final placedRows = <int>{};\n    final contactCells = <int>{};"),
+    ("        _board[r][c] = _piece.colorIndex;\n        contactCells.add(r * _cols + c);",
+     "        _board[r][c] = _piece.colorIndex;\n        placedRows.add(r);\n        contactCells.add(r * _cols + c);"),
     ("    for (var r = 0; r < _rows; r++) {\n      if (_board[r].every((cell) => cell >= 0)) cleared.add(r);\n    }",
      "    for (final r in placedRows) {\n      if (_board[r].every((cell) => cell >= 0)) cleared.add(r);\n    }\n    cleared.sort();"),
 ]
@@ -54,6 +54,8 @@ for old, new in changes:
     if old not in gameplay:
         raise SystemExit("Missing gameplay anchor: " + repr(old[:80]))
     gameplay = gameplay.replace(old, new, 1)
+if "_fallImpactCells" not in gameplay or "_ghostCells" in gameplay:
+    raise SystemExit("Impact animation regression detected")
 gameplay_path.write_text(gameplay)
 
 state_path = root / "lib/app_state.dart"
