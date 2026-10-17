@@ -133,6 +133,8 @@ jobs:
               'v022_language_gameplay_test.dart': [
                   ("contains('constraints.maxWidth - 6')",
                    "contains('constraints.maxWidth - (_isAdventure ? 2 : 6)')"),
+                  ("contains('clamp(228.0, 448.0)')",
+                   "contains('clamp(0.0, constraints.maxWidth)')"),
               ],
           }
           for name, changes in tests.items():
