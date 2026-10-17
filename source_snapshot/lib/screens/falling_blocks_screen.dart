@@ -256,7 +256,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
   }
 
   void _stepDown() {
-    if (_paused || _gameOver || _finishing) return;
+    if (_paused || _gameOver || _finishing || _locking) return;
     if (_canPlace(_piece, _row + 1, _col)) {
       setState(() => _row += 1);
       return;
@@ -331,17 +331,23 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
     _dragDy = 0;
   }
 
-  void _settleFloatingBlocks() {
-    for (var c = 0; c < _cols; c++) {
-      var write = _rows - 1;
-      for (var r = _rows - 1; r >= 0; r--) {
-        final color = _board[r][c];
-        if (color < 0) continue;
-        _board[write][c] = color;
-        if (write != r) _board[r][c] = -1;
-        write--;
+  Future<void> _settleFloatingBlocks() async {
+    // After a cleared line, unsupported stones fall one row at a time so
+    // that the player can actually see them fill the empty spaces.
+    while (mounted && !_gameOver && !_finishing) {
+      var moved = false;
+      for (var r = _rows - 2; r >= 0; r--) {
+        for (var c = 0; c < _cols; c++) {
+          if (_board[r][c] >= 0 && _board[r + 1][c] < 0) {
+            _board[r + 1][c] = _board[r][c];
+            _board[r][c] = -1;
+            moved = true;
+          }
+        }
       }
-      for (var r = write; r >= 0; r--) _board[r][c] = -1;
+      if (!moved) break;
+      setState(() {});
+      await Future<void>.delayed(const Duration(milliseconds: 65));
     }
   }
 
@@ -384,7 +390,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
         _board.insert(0, List<int>.filled(_cols, -1));
       }
 
-      if (_isAdventure) _settleFloatingBlocks();
+      if (_isAdventure) await _settleFloatingBlocks();
       _combo += 1;
       _lines += cleared.length;
       final base = switch (cleared.length) {
