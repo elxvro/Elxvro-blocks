@@ -67,5 +67,5 @@ state_path.write_text(state)
 pubspec = root / "pubspec.yaml"
 p = pubspec.read_text()
 assert "version: 0.28.9+63" in p
-pubspec.write_text(p.replace("version: 0.28.9+63", "version: 0.29.0+64"))
+pubspec.write_text(p.replace("version: 0.28.9+63", "version: 0.29.1+65"))
 print("Applied rising adventure and economy update.")
