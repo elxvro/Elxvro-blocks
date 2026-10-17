@@ -45,7 +45,6 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
   int _lines = 0;
   int _combo = 0;
   int _riseTicks = 0;
-  int _riseCount = 0;
   bool _locking = false;
   bool _paused = false;
   bool _gameOver = false;
@@ -162,7 +161,6 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
     _lines = 0;
     _combo = 0;
     _riseTicks = 0;
-    _riseCount = 0;
     _locking = false;
     _paused = false;
     _gameOver = false;
@@ -243,7 +241,6 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
       _board
         ..clear()
         ..addAll(proposed);
-      _riseCount++;
     });
     _restartTimer();
   }
