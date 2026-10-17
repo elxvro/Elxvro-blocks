@@ -74,7 +74,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
   Duration get _fallInterval {
     if (_isAdventure) {
       final level = widget.adventureLevel!;
-      return Duration(milliseconds: max(105, level.fallingIntervalMs - _riseCount * 9));
+      return Duration(milliseconds: max(105, level.fallingIntervalMs - _riseCount * 14));
     }
     final ms = max(125, 620 - (_arcadeLevel - 1) * 48);
     return Duration(milliseconds: ms);
@@ -175,22 +175,12 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
   }
 
   void _seedAdventureBoard() {
-    final level = widget.adventureLevel!;
-    final seeded = Random(level.number * 9173 + 31);
-    final maxRows = (3 + level.chapter).clamp(3, 8);
-    final desired = level.startingBlocks.clamp(0, 32);
-    var placed = 0;
-    var guard = 0;
-
-    while (placed < desired && guard < 500) {
-      guard += 1;
-      final row = _rows - 1 - seeded.nextInt(maxRows);
-      final col = seeded.nextInt(_cols);
-      if (_board[row][col] >= 0) continue;
-      final occupied = _board[row].where((cell) => cell >= 0).length;
-      if (occupied >= _cols - 3) continue;
-      _board[row][col] = seeded.nextInt(7);
-      placed += 1;
+    // Start with two visible rising rows. Avoid pre-filled full rows.
+    for (var row = _rows - 2; row < _rows; row++) {
+      final gap = _random.nextInt(_cols);
+      for (var col = 0; col < _cols; col++) {
+        _board[row][col] = col == gap ? -1 : _random.nextInt(7);
+      }
     }
   }
 
@@ -206,7 +196,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
       if (mounted && !_paused && !_gameOver && !_finishing) {
         if (_isAdventure) {
           _riseTicks++;
-          final limit = max(4, 15 - _riseCount ~/ 3);
+          final limit = max(2, 6 - _riseCount ~/ 4);
           if (_riseTicks >= limit) {
             _riseTicks = 0;
             _riseBoard();
@@ -240,52 +230,6 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
       return;
     }
     _restartTimer();
-  }
-
-  int _breakColorClusters() {
-    final visited = List<List<bool>>.generate(
-      _rows, (_) => List<bool>.filled(_cols, false),
-    );
-    final removed = <(int, int)>[];
-    for (var row = 0; row < _rows; row++) {
-      for (var col = 0; col < _cols; col++) {
-        if (visited[row][col] || _board[row][col] < 0) continue;
-        final color = _board[row][col];
-        final cluster = <(int, int)>[(row, col)];
-        visited[row][col] = true;
-        for (var i = 0; i < cluster.length; i++) {
-          final (r, c) = cluster[i];
-          for (final (dr, dc) in const <(int, int)>[
-            (-1, 0), (1, 0), (0, -1), (0, 1),
-          ]) {
-            final nr = r + dr;
-            final nc = c + dc;
-            if (nr < 0 || nr >= _rows || nc < 0 || nc >= _cols) continue;
-            if (visited[nr][nc] || _board[nr][nc] != color) continue;
-            visited[nr][nc] = true;
-            cluster.add((nr, nc));
-          }
-        }
-        if (cluster.length >= 3) removed.addAll(cluster);
-      }
-    }
-    for (final (r, c) in removed) {
-      _board[r][c] = -1;
-    }
-    // Let remaining blocks settle so subsequent matches are possible.
-    if (removed.isNotEmpty) {
-      for (var c = 0; c < _cols; c++) {
-        final blocks = <int>[];
-        for (var r = _rows - 1; r >= 0; r--) {
-          if (_board[r][c] >= 0) blocks.add(_board[r][c]);
-        }
-        for (var r = _rows - 1; r >= 0; r--) {
-          final index = _rows - 1 - r;
-          _board[r][c] = index < blocks.length ? blocks[index] : -1;
-        }
-      }
-    }
-    return removed.length;
   }
 
   bool _canPlace(_FallingPiece piece, int row, int col) {
@@ -395,12 +339,6 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
       _locking = false;
       await _finish(success: false);
       return;
-    }
-
-    final broken = _isAdventure ? _breakColorClusters() : 0;
-    if (broken > 0) {
-      _score += broken * (18 + _difficultyLevel * 2);
-      _lines += broken ~/ 3;
     }
 
     final cleared = <int>[];
