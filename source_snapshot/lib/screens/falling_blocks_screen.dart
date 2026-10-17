@@ -200,6 +200,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
           if (_riseTicks >= limit) {
             _riseTicks = 0;
             _riseBoard();
+            if (!_locking && !_finishing && !_gameOver) _stepDown();
             return;
           }
         }
@@ -210,25 +211,40 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
 
   void _riseBoard() {
     if (!_isAdventure || _paused || _gameOver || _finishing || _locking) return;
-    // A rising row pushes the board and the active falling piece upward.
+    // The bottom stack rises independently; never move the falling piece.
     if (_board.first.any((cell) => cell >= 0)) {
       unawaited(_finish(success: false));
       return;
     }
+    // Check the proposed rising board before applying it. When it meets the
+    // falling piece, settle that piece first rather than pushing it upwards.
     final hole = _random.nextInt(_cols);
-    final newRow = List<int>.generate(
-      _cols, (column) => column == hole ? -1 : _random.nextInt(7),
-    );
-    setState(() {
-      _board.removeAt(0);
-      _board.add(newRow);
-      _row = max(-3, _row - 1);
-      _riseCount++;
-    });
-    if (!_canPlace(_piece, _row, _col)) {
-      unawaited(_finish(success: false));
+    final proposed = <List<int>>[
+      for (var r = 1; r < _rows; r++) List<int>.from(_board[r]),
+      List<int>.generate(
+        _cols, (c) => c == hole ? -1 : _random.nextInt(7),
+      ),
+    ];
+    var collision = false;
+    for (final (dr, dc) in _piece.cells) {
+      final r = _row + dr;
+      final c = _col + dc;
+      if (r >= 0 && r < _rows && c >= 0 && c < _cols &&
+          proposed[r][c] >= 0) {
+        collision = true;
+        break;
+      }
+    }
+    if (collision) {
+      unawaited(_lockPiece());
       return;
     }
+    setState(() {
+      _board
+        ..clear()
+        ..addAll(proposed);
+      _riseCount++;
+    });
     _restartTimer();
   }
 
