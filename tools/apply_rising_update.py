@@ -56,6 +56,28 @@ for old, new in changes:
     gameplay = gameplay.replace(old, new, 1)
 if "_fallImpactCells" not in gameplay or "_ghostCells" in gameplay:
     raise SystemExit("Impact animation regression detected")
+
+# Apply only the visible gravity effect, without replacing production impact
+# rendering, changing speed, scoring, clearing thresholds or other modes.
+snapshot = source.read_text()
+new_start = snapshot.index("  Future<void> _settleFloatingBlocks() async {")
+new_end = snapshot.index("\n  Future<void> _lockPiece()", new_start)
+old_start = gameplay.index("  void _settleFloatingBlocks() {")
+old_end = gameplay.index("\n  Future<void> _lockPiece()", old_start)
+gameplay = (gameplay[:old_start] + snapshot[new_start:new_end]
+            + gameplay[old_end:])
+step_guard = "  void _stepDown() {\n    if (_paused || _gameOver || _finishing) return;"
+gravity_call = "      if (_isAdventure) _settleFloatingBlocks();"
+if gameplay.count(step_guard) != 1 or gameplay.count(gravity_call) != 1:
+    raise SystemExit("Gravity patch anchors not unique")
+gameplay = gameplay.replace(
+    step_guard,
+    "  void _stepDown() {\n    if (_paused || _gameOver || _finishing || _locking) return;",
+    1,
+)
+gameplay = gameplay.replace(
+    gravity_call, "      if (_isAdventure) await _settleFloatingBlocks();", 1
+)
 gameplay_path.write_text(gameplay)
 
 state_path = root / "lib/app_state.dart"
