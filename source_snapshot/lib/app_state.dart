@@ -112,7 +112,7 @@ class AppState extends ChangeNotifier {
   bool isLoaded = false;
 
   static const int weeklyGoal = 25000;
-  static const int weeklyRewardAmount = 250;
+  static const int weeklyRewardAmount = 80;
 
   double get weeklyProgress =>
       (weeklyScore / weeklyGoal).clamp(0.0, 1.0).toDouble();
@@ -225,27 +225,31 @@ class AppState extends ChangeNotifier {
   }
 
   int get dailyRewardAmount {
-    const rewards = <int>[50, 75, 100, 125, 150, 200, 300];
+    const rewards = <int>[10, 15, 20, 25, 30, 40, 60];
     final day = dailyRewardDay.clamp(1, 7).toInt();
     return rewards[day - 1];
   }
 
   int themePrice(String id) {
+    // Previously unlocked themes remain unlocked at no additional cost.
     switch (id) {
       case 'classic':
         return 0;
       case 'night':
-        return 300;
+        return 2400;
       case 'marble':
-        return 500;
+        return 3600;
       case 'fire':
-        return 700;
       case 'nature':
-        return 700;
+        return 4800;
       case 'aurora':
-        return 1000;
+        return 7200;
+      case 'arctic':
+        return 9000;
+      case 'copper':
+        return 10500;
       default:
-        return 500;
+        return 6000;
     }
   }
 
@@ -669,7 +673,7 @@ class AppState extends ChangeNotifier {
     } else {
       loginStreak = 1;
     }
-    const rewards = <int>[50, 75, 100, 125, 150, 200, 300];
+    const rewards = <int>[10, 15, 20, 25, 30, 40, 60];
     coins += rewards[loginStreak - 1];
     _lastRewardClaimDate = today;
     notifyListeners();
