@@ -40,15 +40,15 @@ gameplay = gameplay_path.read_text()
 changes = [
     ("max(105, level.fallingIntervalMs - _riseCount * 14)", "max(420, level.fallingIntervalMs)"),
     ("final limit = max(2, 6 - _riseCount ~/ 4);", "const limit = 8;"),
-    ("  int _riseCount = 0;\\n", ""),
-    ("    _riseCount = 0;\\n", ""),
-    ("      _riseCount++;\\n", ""),
-    ("    var overflow = false;\\n    for (final cell in _piece.cells) {",
-     "    var overflow = false;\\n    final placedRows = <int>{};\\n    for (final cell in _piece.cells) {"),
-    ("        _board[r][c] = _piece.colorIndex;\\n",
-     "        _board[r][c] = _piece.colorIndex;\\n        placedRows.add(r);\\n"),
-    ("    for (var r = 0; r < _rows; r++) {\\n      if (_board[r].every((cell) => cell >= 0)) cleared.add(r);\\n    }",
-     "    for (final r in placedRows) {\\n      if (_board[r].every((cell) => cell >= 0)) cleared.add(r);\\n    }\\n    cleared.sort();"),
+    ("  int _riseCount = 0;\n", ""),
+    ("    _riseCount = 0;\n", ""),
+    ("      _riseCount++;\n", ""),
+    ("    var overflow = false;\n    for (final cell in _piece.cells) {",
+     "    var overflow = false;\n    final placedRows = <int>{};\n    for (final cell in _piece.cells) {"),
+    ("        _board[r][c] = _piece.colorIndex;\n",
+     "        _board[r][c] = _piece.colorIndex;\n        placedRows.add(r);\n"),
+    ("    for (var r = 0; r < _rows; r++) {\n      if (_board[r].every((cell) => cell >= 0)) cleared.add(r);\n    }",
+     "    for (final r in placedRows) {\n      if (_board[r].every((cell) => cell >= 0)) cleared.add(r);\n    }\n    cleared.sort();"),
 ]
 for old, new in changes:
     if old not in gameplay:
