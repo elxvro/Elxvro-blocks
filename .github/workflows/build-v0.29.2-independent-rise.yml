@@ -616,3 +616,5 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 # Google OAuth Client ID eklendikten sonra yeniden derleme
+
+# Trigger signed v0.29.2 release build.
