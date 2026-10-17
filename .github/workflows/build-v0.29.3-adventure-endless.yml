@@ -1,11 +1,12 @@
-name: ELXVRO Blocks v0.29.3 Adventure Fix APK AAB
+name: ELXVRO Blocks v0.29.4 Android Compatibility APK AAB
 
 on:
   push:
     branches:
-      - work-v0.29.3-adventure-endless
+      - work-v0.29.4-adventure-endless
     paths:
       - "tools/apply_rising_update.py"
+      - "tools/apply_android_compat.py"
       - "source_snapshot/lib/screens/falling_blocks_screen.dart"
       - "source_snapshot/lib/app_state.dart"
       - "source_snapshot/lib/widgets/weekly_league_card.dart"
@@ -120,6 +121,9 @@ jobs:
       - name: Apply rising adventure and economy changes
         run: python tools/apply_rising_update.py
 
+      - name: Optimize Flutter edge-to-edge layout and splash decode
+        run: python tools/apply_android_compat.py --dart extracted/elxvro-blocks
+
       - name: Update legacy adventure expectations for endless mode
         run: |
           python - <<'PY'
@@ -163,7 +167,7 @@ jobs:
           from pathlib import Path
           for path in Path('test').glob('*.dart'):
               old = path.read_text()
-              new = old.replace('version: 0.28.7+61', 'version: 0.29.3+67')
+              new = old.replace('version: 0.28.7+61', 'version: 0.29.4+68')
               if old != new:
                   path.write_text(new)
           theme_test = Path('test/theme_refresh_test.dart')
@@ -183,15 +187,16 @@ jobs:
           mkdir -p "$APP/.github/workflows"
           cp .github/workflows/build-v0.29.3-adventure-endless.yml "$APP/.github/workflows/build-v0.29.3-adventure-endless.yml"
           cp -R .github/v0287-code "$APP/.github/"
-          rm -f ELXVRO-Blocks-v0.29.3-FULL-SOURCE.zip
+          cp tools/apply_android_compat.py "$APP/tool/apply_android_compat.py"
+          rm -f ELXVRO-Blocks-v0.29.4-FULL-SOURCE.zip
           (
             cd "$APP"
-            zip -qr ../../ELXVRO-Blocks-v0.29.3-FULL-SOURCE.zip .               -x "build/*" ".dart_tool/*" ".git/*"
+            zip -qr ../../ELXVRO-Blocks-v0.29.4-FULL-SOURCE.zip .               -x "build/*" ".dart_tool/*" ".git/*"
           )
-          unzip -t ELXVRO-Blocks-v0.29.3-FULL-SOURCE.zip >/dev/null
+          unzip -t ELXVRO-Blocks-v0.29.4-FULL-SOURCE.zip >/dev/null
           rm -rf build_source
           mkdir build_source
-          unzip -q ELXVRO-Blocks-v0.29.3-FULL-SOURCE.zip -d build_source
+          unzip -q ELXVRO-Blocks-v0.29.4-FULL-SOURCE.zip -d build_source
           test -f build_source/pubspec.yaml
           test -f build_source/lib/app_state.dart
           test -f build_source/.github/workflows/build-v0.29.3-adventure-endless.yml
@@ -199,8 +204,8 @@ jobs:
       - name: Upload complete source ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: ELXVRO-Blocks-v0.29.3-FULL-SOURCE
-          path: ELXVRO-Blocks-v0.29.3-FULL-SOURCE.zip
+          name: ELXVRO-Blocks-v0.29.4-FULL-SOURCE
+          path: ELXVRO-Blocks-v0.29.4-FULL-SOURCE.zip
           if-no-files-found: error
           retention-days: 14
 
@@ -216,6 +221,13 @@ jobs:
       - name: Apply Android branding
         working-directory: build_source
         run: python tool/apply_android_branding.py
+
+      - name: Configure explicit Android 15/16 edge-to-edge
+        working-directory: build_source
+        run: |
+          python tool/apply_android_compat.py --android .
+          grep -F 'WindowCompat.enableEdgeToEdge(window)' android/app/src/main/kotlin/com/elxvro/elxvro_blocks/MainActivity.kt
+          grep -F 'androidx.core:core-ktx:1.17.0' android/app/build.gradle.kts
 
       - name: Configure live Play Games app id
         working-directory: build_source
@@ -625,23 +637,23 @@ jobs:
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -1)
           "$APKSIGNER" verify --verbose "$APK"
           jarsigner -verify "$AAB"
-          cp "$APK" ELXVRO-Blocks-v0.29.3-SIGNED.apk
-          cp "$AAB" ELXVRO-Blocks-v0.29.3-GOOGLE-PLAY.aab
-          sha256sum ELXVRO-Blocks-v0.29.3-SIGNED.apk > ELXVRO-Blocks-v0.29.3-SIGNED.apk.sha256
-          sha256sum ELXVRO-Blocks-v0.29.3-GOOGLE-PLAY.aab > ELXVRO-Blocks-v0.29.3-GOOGLE-PLAY.aab.sha256
-          mkdir -p ELXVRO-Blocks-v0.29.3-APK-AAB
-          cp ELXVRO-Blocks-v0.29.3-SIGNED.apk* ELXVRO-Blocks-v0.29.3-APK-AAB/
-          cp ELXVRO-Blocks-v0.29.3-GOOGLE-PLAY.aab* ELXVRO-Blocks-v0.29.3-APK-AAB/
-          cp ELXVRO-Blocks-v0.29.3-FULL-SOURCE.zip ELXVRO-Blocks-v0.29.3-APK-AAB/
-          ls -lh ELXVRO-Blocks-v0.29.3-APK-AAB/
+          cp "$APK" ELXVRO-Blocks-v0.29.4-SIGNED.apk
+          cp "$AAB" ELXVRO-Blocks-v0.29.4-GOOGLE-PLAY.aab
+          sha256sum ELXVRO-Blocks-v0.29.4-SIGNED.apk > ELXVRO-Blocks-v0.29.4-SIGNED.apk.sha256
+          sha256sum ELXVRO-Blocks-v0.29.4-GOOGLE-PLAY.aab > ELXVRO-Blocks-v0.29.4-GOOGLE-PLAY.aab.sha256
+          mkdir -p ELXVRO-Blocks-v0.29.4-APK-AAB
+          cp ELXVRO-Blocks-v0.29.4-SIGNED.apk* ELXVRO-Blocks-v0.29.4-APK-AAB/
+          cp ELXVRO-Blocks-v0.29.4-GOOGLE-PLAY.aab* ELXVRO-Blocks-v0.29.4-APK-AAB/
+          cp ELXVRO-Blocks-v0.29.4-FULL-SOURCE.zip ELXVRO-Blocks-v0.29.4-APK-AAB/
+          ls -lh ELXVRO-Blocks-v0.29.4-APK-AAB/
 
       - name: Upload APK and AAB
         uses: actions/upload-artifact@v4
         with:
-          name: ELXVRO-Blocks-v0.29.3-APK-AAB
-          path: ELXVRO-Blocks-v0.29.3-APK-AAB/
+          name: ELXVRO-Blocks-v0.29.4-APK-AAB
+          path: ELXVRO-Blocks-v0.29.4-APK-AAB/
           if-no-files-found: error
           retention-days: 14
 # Google OAuth Client ID eklendikten sonra yeniden derleme
 
-# Trigger signed v0.29.3 release build.
+# Trigger signed v0.29.4 release build.
