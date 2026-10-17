@@ -74,7 +74,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
   Duration get _fallInterval {
     if (_isAdventure) {
       final level = widget.adventureLevel!;
-      return Duration(milliseconds: max(105, level.fallingIntervalMs - _riseCount * 14));
+      return Duration(milliseconds: max(420, level.fallingIntervalMs));
     }
     final ms = max(125, 620 - (_arcadeLevel - 1) * 48);
     return Duration(milliseconds: ms);
@@ -196,7 +196,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
       if (mounted && !_paused && !_gameOver && !_finishing) {
         if (_isAdventure) {
           _riseTicks++;
-          final limit = max(2, 6 - _riseCount ~/ 4);
+          const limit = 8;
           if (_riseTicks >= limit) {
             _riseTicks = 0;
             _riseBoard();
@@ -353,6 +353,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
     _locking = true;
 
     var overflow = false;
+    final placedRows = <int>{};
     for (final cell in _piece.cells) {
       final r = _row + cell.$1;
       final c = _col + cell.$2;
@@ -362,6 +363,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
       }
       if (r < _rows && c >= 0 && c < _cols) {
         _board[r][c] = _piece.colorIndex;
+        placedRows.add(r);
       }
     }
 
@@ -372,9 +374,10 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
     }
 
     final cleared = <int>[];
-    for (var r = 0; r < _rows; r++) {
+    for (final r in placedRows) {
       if (_board[r].every((cell) => cell >= 0)) cleared.add(r);
     }
+    cleared.sort();
 
     if (cleared.isNotEmpty) {
       for (final r in cleared.reversed) {
