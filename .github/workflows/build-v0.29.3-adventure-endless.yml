@@ -3,7 +3,7 @@ name: ELXVRO Blocks v0.29.4 Android Compatibility APK AAB
 on:
   push:
     branches:
-      - work-v0.29.4-adventure-endless
+      - work-v0.29.3-adventure-endless
     paths:
       - "tools/apply_rising_update.py"
       - "tools/apply_android_compat.py"
