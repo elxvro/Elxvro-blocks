@@ -10,7 +10,7 @@ root = Path("extracted/elxvro-blocks")
 source = Path("source_snapshot/lib/screens/falling_blocks_screen.dart")
 base = subprocess.check_output([
     "git", "show",
-    "work-v0.28.9-weekly-challenge:source_snapshot/lib/screens/falling_blocks_screen.dart",
+    "origin/work-v0.28.9-weekly-challenge:source_snapshot/lib/screens/falling_blocks_screen.dart",
 ], text=True)
 updated = source.read_text()
 diff = "".join(difflib.unified_diff(
