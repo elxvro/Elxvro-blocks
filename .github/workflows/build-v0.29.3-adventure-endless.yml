@@ -120,6 +120,31 @@ jobs:
       - name: Apply rising adventure and economy changes
         run: python tools/apply_rising_update.py
 
+      - name: Update legacy adventure expectations for endless mode
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          root = Path('extracted/elxvro-blocks/test')
+          tests = {
+              'v021_experience_test.dart': [
+                  ("contains('_score >= _targetScore')",
+                   "isNot(contains('_score >= _targetScore'))"),
+              ],
+              'v022_language_gameplay_test.dart': [
+                  ("contains('constraints.maxWidth - 6')",
+                   "contains('constraints.maxWidth - (_isAdventure ? 2 : 6)')"),
+              ],
+          }
+          for name, changes in tests.items():
+              path = root / name
+              content = path.read_text()
+              for old, new in changes:
+                  if old not in content:
+                      raise RuntimeError(f'{name}: missing old expectation {old}')
+                  content = content.replace(old, new)
+              path.write_text(content)
+          PY
+
       - name: Recheck widget-only gameplay background
         run: |
           set -euo pipefail
