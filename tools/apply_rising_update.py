@@ -33,23 +33,8 @@ print(result.stdout, result.stderr)
 if result.returncode:
     raise SystemExit("Adventure patch did not apply cleanly")
 
-gameplay_path = root / "lib/screens/falling_blocks_screen.dart"
-gameplay = gameplay_path.read_text()
-changes = [
-    ("max(105, level.fallingIntervalMs - _riseCount * 14)", "max(420, level.fallingIntervalMs)"),
-    ("final limit = max(2, 6 - _riseCount ~/ 4);", "const limit = 8;"),
-    ("    var overflow = false;\\n    for (final cell in _piece.cells) {",
-     "    var overflow = false;\\n    final placedRows = <int>{};\\n    for (final cell in _piece.cells) {"),
-    ("        _board[r][c] = _piece.colorIndex;\\n",
-     "        _board[r][c] = _piece.colorIndex;\\n        placedRows.add(r);\\n"),
-    ("    for (var r = 0; r < _rows; r++) {\\n      if (_board[r].every((cell) => cell >= 0)) cleared.add(r);\\n    }",
-     "    for (final r in placedRows) {\\n      if (_board[r].every((cell) => cell >= 0)) cleared.add(r);\\n    }\\n    cleared.sort();"),
-]
-for old, new in changes:
-    if old not in gameplay:
-        raise SystemExit("Gameplay adjustment anchor missing: " + old[:70])
-    gameplay = gameplay.replace(old, new, 1)
-gameplay_path.write_text(gameplay)
+# Use the tested snapshot with the speed and line-clear fixes already applied.
+(root / "lib/screens/falling_blocks_screen.dart").write_text(source.read_text())
 
 state_path = root / "lib/app_state.dart"
 state = state_path.read_text()
