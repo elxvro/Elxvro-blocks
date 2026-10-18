@@ -3,7 +3,7 @@ name: ELXVRO Blocks v0.33.1 Runtime Crash Fix APK AAB
 on:
   push:
     branches:
-      - feature/v0.33.1-animal-match-100
+      - fix/v0.33.1-adventure-falling-runtime
     paths:
       - "tools/apply_rising_update.py"
       - "tools/apply_v0311_endless_adventure.py"
@@ -35,13 +35,13 @@ on:
       - "source_snapshot/lib/widgets/weekly_league_card.dart"
       - "source_snapshot/lib/screens/daily_missions_screen.dart"
       - "source_snapshot/lib/models/game_theme.dart"
-      - ".github/workflows/build-v0.33.1-animal-match.yml"
+      - ".github/workflows/build-v0.33.1-runtime-screens.yml"
       - ".github/v0287-code/**"
       - ".github/v0285-code/**"
       - ".github/v0284-code/**"
       - ".github/v0283-code/**"
       - "hosting/**"
-      - ".github/workflows/build-v0.33.1-animal-match.yml"
+      - ".github/workflows/build-v0.33.1-runtime-screens.yml"
   workflow_dispatch:
 # Manual workflow rerun requested 2026-10-14.
 
@@ -104,7 +104,7 @@ jobs:
           set -euo pipefail
           APP=extracted/elxvro-blocks
           mkdir -p "$APP/.github/workflows"
-          cp .github/workflows/build-v0.33.1-animal-match.yml "$APP/.github/workflows/build-v0.33.1-animal-match.yml"
+          cp .github/workflows/build-v0.33.1-runtime-screens.yml "$APP/.github/workflows/build-v0.33.1-runtime-screens.yml"
           cp -R .github/v0287-code "$APP/.github/"
           cp tools/apply_android_compat.py "$APP/tool/apply_android_compat.py"
           cp tools/apply_play_games_sdk_update.py "$APP/tool/apply_play_games_sdk_update.py"
@@ -123,7 +123,7 @@ jobs:
           unzip -q ELXVRO-Blocks-v0.33.1-FULL-SOURCE.zip -d build_source
           test -f build_source/pubspec.yaml
           test -f build_source/lib/app_state.dart
-          test -f build_source/.github/workflows/build-v0.33.1-animal-match.yml
+          test -f build_source/.github/workflows/build-v0.33.1-runtime-screens.yml
 
       - name: Upload complete source ZIP
         uses: actions/upload-artifact@v4
