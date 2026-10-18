@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Adapt ELXVRO Blocks v0.29.4 for Android edge-to-edge and efficient bitmaps."""
+"""Adapt ELXVRO Blocks v0.29.6 for Android edge-to-edge and efficient bitmaps."""
 from pathlib import Path
 import argparse
 
@@ -22,8 +22,6 @@ def apply_dart(root: Path) -> None:
       // Android 15+ uses edge-to-edge; opt in on earlier Android too.
       unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
       SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        systemNavigationBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light,
         systemNavigationBarIconBrightness: Brightness.light,
         systemNavigationBarContrastEnforced: false,
@@ -72,7 +70,12 @@ def apply_android(root: Path) -> None:
         '''class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WindowCompat.enableEdgeToEdge(window)
+        // Draw behind both system bars. No deprecated bar color setters:
+        // WindowCompat.enableEdgeToEdge would inline them under R8.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val insets = WindowCompat.getInsetsController(window, window.decorView)
+        insets.isAppearanceLightStatusBars = false
+        insets.isAppearanceLightNavigationBars = false
     }
 }''',
         'MainActivity edge-to-edge handler',
@@ -90,9 +93,9 @@ dependencies {
 }
 '''
     gradle.write_text(data)
-    assert 'WindowCompat.enableEdgeToEdge(window)' in kotlin.read_text()
+    assert 'WindowCompat.setDecorFitsSystemWindows(window, false)' in kotlin.read_text()
     assert 'androidx.core:core-ktx:1.17.0' in gradle.read_text()
-    print('Android 15/16 edge-to-edge and compatibility configured.')
+    print('Android 15/16 edge-to-edge configured without direct bar color APIs.')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
