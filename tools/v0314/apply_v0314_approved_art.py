@@ -44,6 +44,14 @@ if s.count(needle) != 1:
 test.write_text(s.replace(needle,
     'expect(bytes.lengthInBytes, greaterThan(110000), reason:path);', 1))
 
+# Update layout regression to the approved larger world-card dimensions.
+visual = root / 'test/adventure_visual_v0313_test.dart'
+content = visual.read_text()
+old = "contains('height: 139')"
+if content.count(old) != 1:
+    raise RuntimeError('Unexpected original world-card size assertion')
+visual.write_text(content.replace(old, "contains('height: 175')", 1))
+
 for path in ('lib/screens/home_screen.dart', 'lib/screens/game_screen.dart',
              'lib/models/game_theme.dart', 'lib/services/audio_service.dart',
              'lib/app_state.dart'):
