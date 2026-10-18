@@ -92,7 +92,7 @@ jobs:
           test -s artifact-v0321/ELXVRO-Blocks-v0.32.1-FULL-SOURCE.zip
           unzip -q artifact-v0321/ELXVRO-Blocks-v0.32.1-FULL-SOURCE.zip -d "$APP"
           base64 -d tools/v0330/animal_match_overlay.b64 > /tmp/animal-match-overlay.zip
-          echo '28a0f80dbb17950bcbe9bed9b07987e9585f76bc973b0e21a9efbe0bea4cc23b  /tmp/animal-match-overlay.zip' | sha256sum -c -
+          echo 'c55a8f76842f7cb4a39e5a65610b660c07fa3ad420d59b8c53ea7cd58d88eee0  /tmp/animal-match-overlay.zip' | sha256sum -c -
           unzip -oq /tmp/animal-match-overlay.zip -d "$APP"
           test -f "$APP/lib/screens/animal_adventure_screen.dart"
           test -f "$APP/lib/game/animal_match_engine.dart"
