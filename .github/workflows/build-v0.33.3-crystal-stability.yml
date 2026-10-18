@@ -97,6 +97,7 @@ jobs:
           unzip -q artifact-v0331/ELXVRO-Blocks-v0.33.1-FULL-SOURCE.zip -d "$APP"
           patch -p1 -d "$APP" < tools/v0332/v0332.patch
           python tools/v0333/apply.py "$APP"
+          patch -p1 -d "$APP" < tools/v0333/vfx.patch
           # Preserve original regression checks while updating pinned version.
           python - <<'PYFIX'
           from pathlib import Path
@@ -107,6 +108,9 @@ jobs:
                   f.write_text(new)
           PYFIX
           cp tools/v0333/apply.py "$APP/tool/v0333_apply.py"
+          cp tools/v0333/vfx.patch "$APP/tool/v0333_vfx.patch"
+          test -f "$APP/lib/widgets/animal_crystal_burst.dart"
+          test -f "$APP/test/v0333_crystal_stability_test.dart"
           grep -Fx 'version: 0.33.3+86' "$APP/pubspec.yaml"
           grep -F 'final shape = _shapes[_pieceBag.next()]' "$APP/lib/screens/falling_blocks_screen.dart"
           grep -F 'Kayıt okunamadı; bölümler açık' "$APP/lib/screens/animal_adventure_screen.dart"
