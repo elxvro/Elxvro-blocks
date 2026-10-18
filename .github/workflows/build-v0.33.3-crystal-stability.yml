@@ -3,7 +3,7 @@ name: ELXVRO Blocks v0.33.3 Progress Recovery and Falling Bag APK AAB
 on:
   push:
     branches:
-      - fix/v0.33.3-adventure-progress-falling-bag
+      - fix/v0.33.3-adventure-stability-vfx
     paths:
       - "tools/apply_rising_update.py"
       - "tools/apply_v0311_endless_adventure.py"
@@ -12,10 +12,10 @@ on:
       - "tools/v0320/**"
       - "tools/v0321/**"
       - "tools/v0330/**"
-      - "tools/v0333/**
-      - "tools/v0332/**""
-      - "tools/v0333/**
-      - "tools/v0332/**""
+      - "tools/v0333/**"
+      - "tools/v0332/**"
+      - "tools/v0333/**"
+      - "tools/v0332/**"
       - "tools/apply_v0312_illustrated_worlds.py"
       - "tools/v0312/**"
       - "tools/v0311/**"
