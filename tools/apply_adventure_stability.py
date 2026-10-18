@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply v0.29.5 adventure fixes to the v0.29.4 assembled Flutter source."""
+"""Apply v0.29.6 adventure fixes to the v0.29.4 assembled Flutter source."""
 from pathlib import Path
 import sys
 
@@ -84,10 +84,10 @@ state_path.write_text(state)
 
 pubspec = root / 'pubspec.yaml'
 pubspec.write_text(replace_one(pubspec.read_text(),
-    'version: 0.29.4+68', 'version: 0.29.5+69', 'release version'))
+    'version: 0.29.4+68', 'version: 0.29.6+70', 'release version'))
 for path in (root / 'test').glob('*.dart'):
     original = path.read_text()
-    adjusted = original.replace('version: 0.29.4+68', 'version: 0.29.5+69')
+    adjusted = original.replace('version: 0.29.4+68', 'version: 0.29.6+70')
     if adjusted != original:
         path.write_text(adjusted)
-print('Applied v0.29.5+69 adventure collision, locking and progression fixes.')
+print('Applied v0.29.6+70 adventure collision, locking and progression fixes.')
