@@ -94,6 +94,15 @@ jobs:
           test -s artifact-v0331/ELXVRO-Blocks-v0.33.1-FULL-SOURCE.zip
           unzip -q artifact-v0331/ELXVRO-Blocks-v0.33.1-FULL-SOURCE.zip -d "$APP"
           patch -p1 -d "$APP" < tools/v0332/v0332.patch
+          # Preserve original regression checks while updating pinned version.
+          python - <<'PYFIX'
+          from pathlib import Path
+          for f in Path('extracted/elxvro-blocks/test').glob('*.dart'):
+              old = f.read_text()
+              new = old.replace('version: 0.33.1+84', 'version: 0.33.2+85')
+              if old != new:
+                  f.write_text(new)
+          PYFIX
           cp tools/v0332/v0332.patch "$APP/tool/v0332.patch"
           grep -Fx 'version: 0.33.2+85' "$APP/pubspec.yaml"
           grep -F 'final shape = _shapes[_pieceBag.next()]' "$APP/lib/screens/falling_blocks_screen.dart"
