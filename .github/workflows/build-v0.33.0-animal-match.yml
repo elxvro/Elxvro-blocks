@@ -120,6 +120,7 @@ jobs:
           p.write_text(s)
           print('Animal UI widget delimiters verified and repaired.')
           PY
+          python tools/v0330/apply_layout_and_legacy_test_fix.py "$APP"
           test -f "$APP/lib/screens/animal_adventure_screen.dart"
           test -f "$APP/lib/game/animal_match_engine.dart"
           test -f "$APP/assets/images/animal_gems/fox.png"
