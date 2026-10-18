@@ -1,0 +1,20 @@
+--- a/lib/screens/animal_adventure_screen.dart
++++ b/lib/screens/animal_adventure_screen.dart
+@@ -615,7 +615,7 @@
+                 child:Stack(children:<Widget>[
+                   AnimatedBuilder(
+                     animation:_burstController,
+-                    child:                  GridView.builder(shrinkWrap:true,
++                    child:RepaintBoundary(child:GridView.builder(shrinkWrap:true,
+                   physics:const NeverScrollableScrollPhysics(),
+                   gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(
+                     crossAxisCount:AnimalMatchEngine.width,
+@@ -668,7 +668,7 @@
+                             child:_gem(id))),
+                       ));
+                   },
+-                ),
++                )),
+                     builder:(context, child){
+                       if (_burstCells.isEmpty) return child!;
+                       final profile = CrystalImpactProfile(
