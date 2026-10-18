@@ -31,6 +31,9 @@ def modes(s):
     s=repl(s,'if (index == 1) {','if (index == 0) {','falling index')
     s=repl(s,'if (index == 2) {','if (index == 1) {','duel index')
     s=repl(s,'GameMode.values[index - 3]','GameMode.values[index - 2]','mode offset')
+    s=repl(s,"    this.bestLabel = '',\n",'','remove obsolete badge option')
+    s=repl(s,'  final String bestLabel;\n','','remove badge field')
+    s=repl(s,"${bestLabel.isEmpty ? AppStrings.current.t('modes.record') : bestLabel}","${AppStrings.current.t('modes.record')}",'simplify best badge')
     assert 'AdventureScreen' not in s and "modes.adventure" not in s
     return s
 patch('lib/screens/modes_screen.dart',modes)
@@ -171,7 +174,7 @@ def falling(s):
     s=repl(s,'    required this.adventure,\n','','control ctor flag')
     s=repl(s,'  final bool adventure;\n','','control flag field')
     s=repl(s,'color: adventure ? const Color(0xFF122245) : emphasized','color: emphasized','control bg')
-    s=cut(s,'                decoration: adventure ? BoxDecoration(', '                child: Row(', '                child: Row(\n', 'simplify controls deco')
+    s=cut(s,'                decoration: adventure ? BoxDecoration(', '                child: Row(', '', 'simplify controls deco')
     s=s.replace('_finish(success: false)', '_finish()')
     s=repl(s,'constraints.maxWidth *\n                        1 - 6','constraints.maxWidth - 6','simplify board width')
     assert '_isAdventure' not in s and 'Adventure' not in s and 'adventure' not in s
