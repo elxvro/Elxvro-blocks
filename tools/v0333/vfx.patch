@@ -1,0 +1,650 @@
+--- a/lib/game/animal_match_engine.dart
++++ b/lib/game/animal_match_engine.dart
+@@ -51,13 +51,34 @@
+   int get baseReward => 20 + number ~/ 5;
+ }
+ 
++/// An immutable cascade snapshot, independent from Flutter's rendering.
++/// [fallDistances] maps each destination cell to the number of rows that its
++/// gem has travelled; newly spawned gems fall from above the board.
++class AnimalMatchStep {
++  const AnimalMatchStep({
++    required this.before,
++    required this.after,
++    required this.clearedCells,
++    required this.fallDistances,
++    required this.chain,
++  });
++
++  final List<int> before;
++  final List<int> after;
++  final Set<int> clearedCells;
++  final List<int> fallDistances;
++  final int chain;
++}
++
+ class AnimalMatchResult {
+   const AnimalMatchResult({required this.valid, required this.cleared,
+-    required this.cascades, required this.scoreGained});
++    required this.cascades, required this.scoreGained,
++    this.steps = const <AnimalMatchStep>[]});
+   final bool valid;
+   final int cleared;
+   final int cascades;
+   final int scoreGained;
++  final List<AnimalMatchStep> steps;
+   static const invalid = AnimalMatchResult(
+     valid: false, cleared: 0, cascades: 0, scoreGained: 0,
+   );
+@@ -189,12 +210,37 @@
+     return _resolve();
+   }
+ 
+-  AnimalMatchResult _resolve() {
++  /// Applies gravity once and records each destination's travel distance.
++  /// Maximum work is bounded by the fixed 7 x 8 grid.
++  List<int> _fallAndRefill() {
++    final distances = List<int>.filled(cells, 0);
++    for (var col = 0; col < width; col++) {
++      var writeY = height - 1;
++      for (var y = height - 1; y >= 0; y--) {
++        final value = board[y * width + col];
++        if (value >= 0) {
++          board[writeY * width + col] = value;
++          distances[writeY * width + col] = writeY - y;
++          writeY--;
++        }
++      }
++      while (writeY >= 0) {
++        board[writeY * width + col] = _random.nextInt(kinds);
++        distances[writeY * width + col] = writeY + 1;
++        writeY--;
++      }
++    }
++    return distances;
++  }
++
++  AnimalMatchResult _resolve({List<AnimalMatchStep> initialSteps = const []}) {
+     var totalCleared = 0, cascade = 0, gained = 0;
++    final steps = <AnimalMatchStep>[...initialSteps];
+     for (var round = 0; round < 30; round++) {
+       final positions = _collectMatches();
+       if (positions.isEmpty) break;
+       cascade++;
++      final before = List<int>.of(board);
+       var levelHits = 0;
+       for (final index in positions) {
+         if (board[index] == level.featuredGem) levelHits++;
+@@ -203,29 +249,27 @@
+       totalCleared += positions.length;
+       gained += positions.length * 12 * cascade;
+       for (final index in positions) {board[index] = -1;}
+-      // Gravity resolves each column independently.
+-      for (var col = 0; col < width; col++) {
+-        var writeY = height - 1;
+-        for (var y = height - 1; y >= 0; y--) {
+-          final value = board[y * width + col];
+-          if (value >= 0) {
+-            board[writeY * width + col] = value;
+-            writeY--;
+-          }
+-        }
+-        while (writeY >= 0) {
+-          board[writeY * width + col] = _random.nextInt(kinds);
+-          writeY--;
+-        }
+-      }
++      final distances = _fallAndRefill();
++      steps.add(AnimalMatchStep(
++        before: before,
++        after: List<int>.of(board),
++        clearedCells: Set<int>.unmodifiable(positions),
++        fallDistances: List<int>.unmodifiable(distances),
++        chain: cascade,
++      ));
+     }
+     score += gained;
+     matches += totalCleared;
+     maxCascade = max(maxCascade, cascade);
+     if (targetProgress >= level.target) won = true;
+-    if (!won && !_hasPossibleSwap()) _createPlayableBoard();
+-    return AnimalMatchResult(valid: true, cleared: totalCleared,
+-      cascades: cascade, scoreGained: gained);
++    // A pathological cascade must not leave a permanently matched or dead
++    // board. The next action always starts with a legal, settled board.
++    if (!won && (hasExistingMatches || !_hasPossibleSwap())) {
++      _createPlayableBoard();
++    }
++    return AnimalMatchResult(valid: true,
++      cleared: totalCleared + initialSteps.fold<int>(0, (sum, s) => sum + s.clearedCells.length),
++      cascades: cascade, scoreGained: gained, steps: steps);
+   }
+ 
+   AnimalMatchResult hammer(int index) {
+@@ -233,46 +277,47 @@
+       return AnimalMatchResult.invalid;
+     }
+     hammers--;
+-    final gem = board[index];
+-    if (gem == level.featuredGem) targetProgress++;
++    final before = List<int>.of(board);
++    if (board[index] == level.featuredGem) targetProgress++;
+     score += 20;
+-    final col = index % width;
+-    var y = index ~/ width;
+-    while (y > 0) {
+-      board[y * width + col] = board[(y - 1) * width + col];
+-      y--;
+-    }
+-    board[col] = _random.nextInt(kinds);
++    board[index] = -1;
++    final distances = _fallAndRefill();
++    final step = AnimalMatchStep(
++      before: before, after: List<int>.of(board),
++      clearedCells: Set<int>.unmodifiable(<int>{index}),
++      fallDistances: List<int>.unmodifiable(distances), chain: 1,
++    );
+     if (targetProgress >= level.target) won = true;
+-    if (!won) _resolve();
+-    return const AnimalMatchResult(valid: true, cleared: 1,
+-      cascades: 0, scoreGained: 20);
++    final followup = _resolve(initialSteps: <AnimalMatchStep>[step]);
++    return AnimalMatchResult(valid: true, cleared: followup.cleared,
++      cascades: followup.cascades, scoreGained: followup.scoreGained + 20,
++      steps: followup.steps);
+   }
+ 
+   AnimalMatchResult rainbow() {
+     if (ended || orbs <= 0) return AnimalMatchResult.invalid;
+-    orbs--;
+     final selected = <int>{};
+     for (var i = 0; i < cells; i++) {
+       if (board[i] == level.featuredGem) selected.add(i);
+     }
+     if (selected.isEmpty) return AnimalMatchResult.invalid;
++    orbs--;
++    final before = List<int>.of(board);
+     final cleared = selected.length;
+     targetProgress += cleared;
+     score += cleared * 18;
+     for (final i in selected) {board[i] = -1;}
+-    for (var col = 0; col < width; col++) {
+-      var dst = height - 1;
+-      for (var row = height - 1; row >= 0; row--) {
+-        final gem = board[row * width + col];
+-        if (gem >= 0) {board[dst * width + col] = gem; dst--;}
+-      }
+-      while (dst >= 0) {board[dst * width + col] = _random.nextInt(kinds); dst--;}
+-    }
++    final distances = _fallAndRefill();
++    final step = AnimalMatchStep(
++      before: before, after: List<int>.of(board),
++      clearedCells: Set<int>.unmodifiable(selected),
++      fallDistances: List<int>.unmodifiable(distances), chain: 1,
++    );
+     if (targetProgress >= level.target) won = true;
+-    if (!won) _resolve();
+-    return AnimalMatchResult(valid: true, cleared: cleared,
+-      cascades: 0, scoreGained: cleared * 18);
++    final followup = _resolve(initialSteps: <AnimalMatchStep>[step]);
++    return AnimalMatchResult(valid: true, cleared: followup.cleared,
++      cascades: followup.cascades, scoreGained: followup.scoreGained + cleared * 18,
++      steps: followup.steps);
+   }
+ 
+   bool shuffle() {
+--- a/lib/screens/animal_adventure_screen.dart
++++ b/lib/screens/animal_adventure_screen.dart
+@@ -1,3 +1,4 @@
++import 'dart:async';
+ import 'dart:math';
+ import 'package:flutter/material.dart';
+ import 'package:flutter/services.dart';
+@@ -5,6 +6,8 @@
+ import '../app_state.dart';
+ import '../game/animal_match_engine.dart';
+ import '../models/game_theme.dart';
++import '../services/audio_service.dart';
++import '../widgets/animal_crystal_burst.dart';
+ import '../services/animal_match_progress.dart';
+ import '../widgets/coin_badge.dart';
+ import '../widgets/premium_background.dart';
+@@ -208,7 +211,16 @@
+   State<AnimalMatchScreen> createState() => _AnimalMatchScreenState();
+ }
+ 
+-class _AnimalMatchScreenState extends State<AnimalMatchScreen> {
++class _AnimalMatchScreenState extends State<AnimalMatchScreen>
++    with SingleTickerProviderStateMixin {
++  late final AnimationController _burstController;
++  late List<int> _visibleBoard;
++  List<int> _fallDistances = List<int>.filled(AnimalMatchEngine.cells, 0);
++  List<int> _burstBefore = List<int>.filled(AnimalMatchEngine.cells, 0);
++  Set<int> _burstCells = <int>{};
++  int _burstChain = 1;
++  int _fallTick = 0;
++  bool _busy = false;
+   late AnimalMatchLevel _level;
+   late AnimalMatchEngine _engine;
+   int? _selected;
+@@ -216,34 +228,92 @@
+   double _dragX = 0, _dragY = 0;
+   bool _hammer = false;
+   bool _finishing = false;
+-  int _animationTick = 0;
+ 
+   @override
+   void initState() {
+     super.initState();
++    _burstController = AnimationController(
++      vsync: this, duration: const Duration(milliseconds: 275));
+     _reset();
+   }
++
++  @override
++  void dispose() {
++    _burstController.dispose();
++    super.dispose();
++  }
++
+   void _reset() {
++    _burstController.reset();
++    _burstCells = <int>{};
++    _fallDistances = List<int>.filled(AnimalMatchEngine.cells, 0);
++    _busy = false;
+     _level = AnimalMatchLevel(widget.number);
+     _engine = AnimalMatchEngine(_level);
++    _visibleBoard = List<int>.of(_engine.board);
+     _selected = null;
+     _hammer = false;
+     _finishing = false;
+-    _animationTick++;
+   }
+ 
+   Future<void> _act(AnimalMatchResult result) async {
+     if (!result.valid) {
+-      HapticFeedback.selectionClick();
++      if (widget.appState.hapticsEnabled) HapticFeedback.selectionClick();
+       return;
+     }
+-    if (widget.appState.hapticsEnabled) HapticFeedback.lightImpact();
+-    setState(() { _selected = null; _animationTick++; });
+-    if (_engine.ended) await _finish();
++    // Block all gestures immediately; synchronous model resolution must not
++    // race asynchronous cascades, booster taps or the completion dialog.
++    _busy = true;
++    setState(() => _selected = null);
++    try {
++      final effects = result.steps.take(5).toList(growable: false);
++      for (final step in effects) {
++        if (!mounted) return;
++        setState(() {
++          _visibleBoard = step.before;
++          _burstBefore = step.before;
++          _burstCells = step.clearedCells;
++          _burstChain = step.chain;
++          _fallDistances = List<int>.filled(AnimalMatchEngine.cells, 0);
++        });
++        if (widget.appState.hapticsEnabled) {
++          if (step.clearedCells.length >= 5 || step.chain >= 3) {
++            HapticFeedback.mediumImpact();
++          } else {
++            HapticFeedback.lightImpact();
++          }
++        }
++        unawaited(AudioService.instance.playClearTier(
++          _currentTheme(widget.appState).audioProfile,
++          lineCount: (step.clearedCells.length ~/ 3).clamp(1, 4),
++          combo: step.chain,
++        ));
++        _burstController.forward(from: 0);
++        await Future<void>.delayed(const Duration(milliseconds: 265));
++        if (!mounted) return;
++        setState(() {
++          _burstCells = <int>{};
++          _visibleBoard = step.after;
++          _fallDistances = step.fallDistances;
++                _fallTick++;
++        });
++        await Future<void>.delayed(const Duration(milliseconds: 315));
++      }
++    } finally {
++      if (mounted) {
++        setState(() {
++          _visibleBoard = List<int>.of(_engine.board);
++          _burstCells = <int>{};
++          _fallDistances = List<int>.filled(AnimalMatchEngine.cells, 0);
++          _busy = false;
++              });
++      }
++    }
++    if (mounted && _engine.ended) await _finish();
+   }
+ 
+   void _tap(int index) {
+-    if (_engine.ended || _finishing) return;
++    if (_engine.ended || _finishing || _busy) return;
+     if (_hammer) {
+       _hammer = false;
+       _act(_engine.hammer(index));
+@@ -255,6 +325,13 @@
+       setState(() => _selected = null);
+     } else {
+       final first = _selected!;
++      final adjacent = (first - index).abs() == AnimalMatchEngine.width ||
++        (first ~/ AnimalMatchEngine.width == index ~/ AnimalMatchEngine.width &&
++          (first - index).abs() == 1);
++      if (!adjacent) {
++        setState(() => _selected = index);
++        return;
++      }
+       setState(() => _selected = null);
+       _act(_engine.swap(first, index));
+     }
+@@ -263,7 +340,7 @@
+   void _dragEnd() {
+     final i = _startDrag;
+     _startDrag = null;
+-    if (i == null || _engine.ended || _finishing) return;
++    if (i == null || _engine.ended || _finishing || _busy) return;
+     final ax = _dragX.abs(), ay = _dragY.abs();
+     final direction = ax > ay
+       ? (_dragX > 0 ? 1 : -1)
+@@ -317,6 +394,7 @@
+   }
+ 
+   Future<void> _pause() async {
++    if (_busy || _finishing) return;
+     await showDialog<void>(context:context, builder:(context)=> AlertDialog(
+       title: const Text('DURAKLATILDI'),
+       content: Text('Bölüm ${widget.number} · ${_level.animalName}'),
+@@ -362,7 +440,7 @@
+     child: Padding(padding:const EdgeInsets.symmetric(horizontal:3),
+       child: Material(color:color.withValues(alpha:.15),
+         borderRadius:BorderRadius.circular(16),
+-        child:InkWell(onTap: count>0 && !_engine.ended ? onTap : null,
++        child:InkWell(onTap: count>0 && !_engine.ended && !_busy ? onTap : null,
+           borderRadius:BorderRadius.circular(16),
+           child:Container(
+             padding:const EdgeInsets.symmetric(vertical:10,horizontal:2),
+@@ -437,20 +515,25 @@
+                     color:accent.withValues(alpha:.19),blurRadius:18)],
+                 ),
+                 padding:const EdgeInsets.all(4),
+-                child:GridView.builder(shrinkWrap:true,
++                child:Stack(children:<Widget>[
++                  GridView.builder(shrinkWrap:true,
+                   physics:const NeverScrollableScrollPhysics(),
+                   gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(
+                     crossAxisCount:AnimalMatchEngine.width,
+                     childAspectRatio:1,crossAxisSpacing:2,mainAxisSpacing:2),
+                   itemCount:AnimalMatchEngine.cells,
+                   itemBuilder:(context,index) {
+-                    final id=_engine.board[index];
++                    final id=_visibleBoard[index];
+                     final selected=_selected==index;
+                     return GestureDetector(
+                       key:ValueKey('animal_cell_$index'),
+                       onTap:()=>_tap(index),
+-                      onPanStart:(_){ _startDrag=index;_dragX=0;_dragY=0; },
++                      onPanStart:(_){
++                        if (_busy) return;
++                        _startDrag=index;_dragX=0;_dragY=0;
++                      },
+                       onPanUpdate:(details){
++                        if (_busy) return;
+                         _dragX+=details.delta.dx;_dragY+=details.delta.dy;
+                       },
+                       onPanEnd:(_)=>_dragEnd(),
+@@ -464,15 +547,28 @@
+                             :Colors.white.withValues(alpha:.055),
+                             width:selected?1.7:.5)),
+                         child:Padding(padding:const EdgeInsets.all(1),
+-                          child:AnimatedSwitcher(
+-                            duration:const Duration(milliseconds:145),
+-                            child:KeyedSubtree(
+-                              key:ValueKey('$index-$id-$_animationTick'),
+-                              child:_gem(id)),
+-                          )),
++                          child:_fallDistances[index] == 0 ? _gem(id) :
++                            TweenAnimationBuilder<double>(
++                            key:ValueKey('animal_fall_$index-$_fallTick'),
++                            tween:Tween<double>(
++                              begin:_fallDistances[index].toDouble(),end:0),
++                            duration:const Duration(milliseconds:285),
++                            curve:Curves.easeOutBack,
++                            builder:(context,fall,child)=>Transform.translate(
++                              offset:Offset(0,-fall * (width-8) / AnimalMatchEngine.width),
++                              child:child),
++                            child:_gem(id))),
+                       ));
+                   },
+                 ),
++                  Positioned.fill(child:IgnorePointer(child:CustomPaint(
++                    painter:AnimalCrystalBurst(
++                      animation:_burstController,
++                      cells:_burstCells,before:_burstBefore,
++                      palette:_gemColors,chain:_burstChain,
++                    ),
++                  ))),
++                ]),
+               )))),
+             const SizedBox(height:7),
+             Text(_hammer ? 'ÇEKİÇ: KIRILACAK HAYVANA DOKUN'
+@@ -488,7 +584,10 @@
+                 _act(_engine.rainbow());
+               },const Color(0xFFC690FF)),
+               _booster(Icons.shuffle_rounded,'KARIŞTIR',_engine.shuffles,(){
+-                if(_engine.shuffle()) setState((){_selected=null;_animationTick++;});
++                if(_engine.shuffle()) setState((){
++                  _selected=null;_fallTick++;
++                  _visibleBoard=List<int>.of(_engine.board);
++                });
+               },const Color(0xFF7DEFC8)),
+             ]),
+           ]),
+--- a/lib/widgets/animal_crystal_burst.dart
++++ b/lib/widgets/animal_crystal_burst.dart
+@@ -0,0 +1,125 @@
++import 'dart:math' as math;
++
++import 'package:flutter/material.dart';
++
++/// Lightweight, GPU-friendly layered crystal feedback. Only this painter
++/// repaints at animation-frame frequency; the 56-image board remains static.
++class AnimalCrystalBurst extends CustomPainter {
++  AnimalCrystalBurst({
++    required this.animation,
++    required this.cells,
++    required this.before,
++    required this.palette,
++    required this.chain,
++  }) : super(repaint: animation);
++
++  final Animation<double> animation;
++  final Set<int> cells;
++  final List<int> before;
++  final List<Color> palette;
++  final int chain;
++
++  @override
++  void paint(Canvas canvas, Size size) {
++    if (cells.isEmpty || size.isEmpty) return;
++    final t = animation.value.clamp(0.0, 1.0);
++    final fade = (1.0 - t) * (1.0 - t);
++    final side = size.width / 7;
++    final viewport = Offset.zero & size;
++    canvas.save();
++    canvas.clipRect(viewport);
++
++    final active = cells.take(28).toList(growable: false);
++    for (final index in active) {
++      final row = index ~/ 7;
++      final col = index % 7;
++      final center = Offset((col + .5) * side, (row + .5) * side);
++      final type = before[index].clamp(0, palette.length - 1).toInt();
++      final color = palette[type];
++      final rng = math.Random(3187 + index * 103 + chain * 111);
++      final burst = side * (.32 + t * (chain > 2 ? 1.6 : 1.25));
++
++      // Expanding impact ring and secondary chromatic halo.
++      for (var ring = 0; ring < 2; ring++) {
++        final progress = ((t + ring * .16) / (1 + ring * .16)).clamp(0.0, 1.0);
++        final radius = side * (.16 + progress * (ring == 0 ? .94 : 1.43));
++        canvas.drawCircle(center, radius, Paint()
++          ..style = PaintingStyle.stroke
++          ..strokeWidth = (ring == 0 ? 3.2 : 1.5) * (1 - progress) + .2
++          ..color = (ring == 0 ? Colors.white : color)
++              .withValues(alpha: (1 - progress) * .72 * fade));
++      }
++      // Luminous impact core.
++      canvas.drawCircle(center, side * (.25 + t * .22), Paint()
++        ..color = color.withValues(alpha: .46 * fade));
++      canvas.drawCircle(center, side * (.12 + t * .12), Paint()
++        ..color = Colors.white.withValues(alpha: .93 * fade));
++
++      // Crystal shards: deterministic orientation avoids per-frame random work.
++      for (var part = 0; part < 11; part++) {
++        final theta = (part + rng.nextDouble() * .58) * math.pi * 2 / 11;
++        final speed = .52 + rng.nextDouble() * .67;
++        final dx = math.cos(theta), dy = math.sin(theta);
++        final distance = burst * speed * (1 - (1 - t) * (1 - t));
++        final origin = center + Offset(dx * distance, dy * distance + t * t * side * .27);
++        final length = side * (.12 + rng.nextDouble() * .14) * (1 - t * .58);
++        final width = length * (.32 + rng.nextDouble() * .33);
++        final perp = Offset(-dy * width, dx * width);
++        final tip = origin + Offset(dx * length, dy * length);
++        final back = origin - Offset(dx * length * .45, dy * length * .45);
++        final shard = Path()
++          ..moveTo(tip.dx, tip.dy)
++          ..lineTo((origin + perp).dx, (origin + perp).dy)
++          ..lineTo(back.dx, back.dy)
++          ..lineTo((origin - perp).dx, (origin - perp).dy)
++          ..close();
++        canvas.drawPath(shard, Paint()
++          ..color = Color.lerp(color, Colors.white, part.isEven ? .75 : .32)!
++              .withValues(alpha: (.82 - .34 * t) * fade));
++        if (part.isEven) {
++          final streakStart = origin - Offset(dx * side * .16, dy * side * .16);
++          canvas.drawLine(streakStart, origin, Paint()
++            ..strokeWidth = 1.2 * (1 - t) + .3
++            ..strokeCap = StrokeCap.round
++            ..color = Colors.white.withValues(alpha: .65 * fade));
++        }
++      }
++
++      // Fine sparks / high-frequency glints complement larger fragments.
++      for (var spark = 0; spark < 10; spark++) {
++        final angle = (spark + rng.nextDouble()) * math.pi * 2 / 10;
++        final radius = burst * (.45 + rng.nextDouble() * .95);
++        final pos = center + Offset(math.cos(angle) * radius, math.sin(angle) * radius);
++        final sparklePaint = Paint()..color = Colors.white.withValues(alpha: .95 * fade);
++        final length = side * .037 * (1 - t * .5);
++        canvas.drawLine(pos.translate(-length, 0), pos.translate(length, 0), sparklePaint..strokeWidth = 1.25);
++        canvas.drawLine(pos.translate(0, -length), pos.translate(0, length), sparklePaint);
++      }
++    }
++
++    if (chain > 1 && t < .82) {
++      // Compact floating cascade emphasis rather than a full-screen overlay.
++      final point = active.first;
++      final anchor = Offset(((point % 7) + .5) * side, ((point ~/ 7) + .5) * side);
++      final label = TextPainter(
++        text: TextSpan(text: 'x$chain COMBO', style: TextStyle(
++          color: Colors.white.withValues(alpha: (1 - t).clamp(0.0, 1.0)),
++          fontSize: 14.0 + chain.clamp(0, 5).toDouble() * 1.2,
++          fontWeight: FontWeight.w900, letterSpacing: 1.2,
++          shadows: <Shadow>[Shadow(color: palette[0], blurRadius: 10)],
++        )),
++        textDirection: TextDirection.ltr,
++      )..layout();
++      label.paint(canvas, Offset(
++        (anchor.dx - label.width / 2).clamp(0.0, math.max(0.0, size.width - label.width)).toDouble(),
++        (anchor.dy - side * .85 - t * side * .8).clamp(0.0, math.max(0.0, size.height - label.height)).toDouble(),
++      ));
++    }
++    canvas.restore();
++  }
++
++  @override
++  bool shouldRepaint(covariant AnimalCrystalBurst old) =>
++      old.cells != cells || old.before != before || old.chain != chain ||
++      old.palette != palette || old.animation != animation;
++}
+--- a/test/v0333_crystal_stability_test.dart
++++ b/test/v0333_crystal_stability_test.dart
+@@ -0,0 +1,74 @@
++import 'dart:math';
++
++import 'package:flutter_test/flutter_test.dart';
++import 'package:elxvro_blocks/game/animal_match_engine.dart';
++
++void main() {
++  test('every animated cascade contains safe immutable board snapshots', () {
++    for (var level = 1; level <= 100; level += 7) {
++      for (var seed = 0; seed < 9; seed++) {
++        final engine = AnimalMatchEngine(AnimalMatchLevel(level),
++            random: Random(level * 137 + seed));
++        var actions = 0;
++        while (!engine.ended && actions < 20) {
++          AnimalMatchResult? move;
++          for (var index = 0; index < AnimalMatchEngine.cells && move == null; index++) {
++            for (final offset in <int>[1, AnimalMatchEngine.width]) {
++              final other = index + offset;
++              if (other >= AnimalMatchEngine.cells) continue;
++              if (offset == 1 && index ~/ AnimalMatchEngine.width !=
++                  other ~/ AnimalMatchEngine.width) continue;
++              final result = engine.swap(index, other);
++              if (result.valid) {move = result; break;}
++            }
++          }
++          expect(move, isNotNull, reason: 'No legal move at $level:$seed:$actions');
++          expect(move!.steps, isNotEmpty);
++          expect(move.steps.length, lessThanOrEqualTo(30));
++          for (final step in move.steps) {
++            expect(step.before.length, AnimalMatchEngine.cells);
++            expect(step.after.length, AnimalMatchEngine.cells);
++            expect(step.fallDistances.length, AnimalMatchEngine.cells);
++            expect(step.clearedCells, isNotEmpty);
++            expect(step.fallDistances.every((n) => n >= 0 && n <= 8), isTrue);
++            expect(step.before.every((n) => n >= 0 && n < AnimalMatchEngine.kinds), isTrue);
++            expect(step.after.every((n) => n >= 0 && n < AnimalMatchEngine.kinds), isTrue);
++          }
++          expect(engine.board.every((n) => n >= 0 && n < 6), isTrue);
++          if (!engine.ended) {
++            expect(engine.hasExistingMatches, isFalse);
++            expect(engine.hasPossibleSwap, isTrue);
++          }
++          actions++;
++        }
++      }
++    }
++  });
++
++  test('hammer and rainbow return deterministic explosion and falling frames', () {
++    final engine = AnimalMatchEngine(AnimalMatchLevel(1), random: Random(21));
++    final before = List<int>.of(engine.board);
++    final hit = engine.hammer(15);
++    expect(hit.valid, isTrue);
++    expect(hit.steps.first.clearedCells, <int>{15});
++    expect(hit.steps.first.before, before);
++    expect(hit.steps.first.after.length, AnimalMatchEngine.cells);
++    if (!engine.ended) {
++      final count = engine.orbs;
++      final orb = engine.rainbow();
++      expect(orb.valid, isTrue);
++      expect(orb.steps, isNotEmpty);
++      expect(engine.orbs, count - 1);
++    }
++  });
++
++  test('rainbow booster cannot be consumed when its target color is absent', () {
++    final engine = AnimalMatchEngine(AnimalMatchLevel(2), random: Random(51));
++    final other = (engine.level.featuredGem + 1) % AnimalMatchEngine.kinds;
++    engine.board.fillRange(0, AnimalMatchEngine.cells, other);
++    final remaining = engine.orbs;
++    final result = engine.rainbow();
++    expect(result.valid, isFalse);
++    expect(engine.orbs, remaining);
++  });
++}
