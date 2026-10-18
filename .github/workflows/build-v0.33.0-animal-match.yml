@@ -102,6 +102,25 @@ jobs:
           assert s.count('.clamp(1, 100);') == 2
           p.write_text(s.replace('.clamp(1, 100);', '.clamp(1, 100).toInt();'))
           PY
+          # Correct unmatched widget closing parentheses in the first-generated
+          # animal match UI before packaging source and running flutter analyze.
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('extracted/elxvro-blocks/lib/screens/animal_adventure_screen.dart')
+          s=p.read_text()
+          fixes=[
+              ("                          ]))),\\n                    )));".replace('\\n','\n'),
+               "                          ]))),\\n                    ));".replace('\\n','\n')),
+              ("                  _stat('PUAN','\u0024{_engine.score}',const Color(0xFFFFD677)),\\n                ]))),".replace('\\n','\n'),
+               "                  _stat('PUAN','\u0024{_engine.score}',const Color(0xFFFFD677)),\\n                ])),".replace('\\n','\n')),
+          ]
+          for old,new in fixes:
+              if s.count(old)!=1:
+                  raise RuntimeError('UI structural fix expected exactly one anchor')
+              s=s.replace(old,new,1)
+          p.write_text(s)
+          print('Animal match screen widget brackets repaired')
+          PY
           test -f "$APP/lib/screens/animal_adventure_screen.dart"
           test -f "$APP/lib/game/animal_match_engine.dart"
           test -f "$APP/assets/images/animal_gems/fox.png"
