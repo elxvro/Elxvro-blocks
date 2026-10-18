@@ -1,7 +1,5 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:elxvro_blocks/services/play_games_service.dart';
-import 'package:elxvro_blocks/services/play_games_ids.dart';
 
 void main() {
   test('Play Games SDK and Android native SDK version are pinned', () {
