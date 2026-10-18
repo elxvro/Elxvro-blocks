@@ -14,6 +14,8 @@ def replace(old, new, name):
         raise RuntimeError(f'{name}: expected one anchor, found {count}')
     source = source.replace(old, new, 1)
 
+replace("import 'package:shared_preferences/shared_preferences.dart';\n", "",
+        'remove obsolete UI storage import')
 replace("import '../game/combo_rush_rules.dart';",
         "import '../game/combo_rush_rules.dart';\nimport '../game/classic_session_store.dart';",
         'new store import')
