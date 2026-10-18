@@ -149,8 +149,20 @@ change(result, "(turkish ? 'BÖLÜM TAMAMLANDI!' : 'LEVEL COMPLETE!')",
 
 # Previous levels retain stored targetScore metadata; it is no longer a stop rule.
 level='lib/models/adventure_level.dart'
-change(level, "'$fallingTargetScore puana ulaş • hız ve renk her bölüm değişir',\n        'Reach $fallingTargetScore points • speed and colors change every level',",
-             "'Kaybedene kadar skor topla • görevleri tamamla',\n        'Score until defeat • complete your objectives',", 'level description')
+change(level, "  String get objective => AppStrings.current.f(\n        '$fallingTargetScore puana ulaş • hız ve renk her bölüm değişir',\n        'Reach $fallingTargetScore points • speed and colors change every level',\n      );",
+  """  String get objective => switch (AppStrings.current.languageCode) {
+    'tr' => 'Kaybedene kadar skor topla • görevlerini tamamla',
+    'en' => 'Score until defeat • complete your objectives',
+    'de' => 'Spiele bis zur Niederlage • erfülle deine Ziele',
+    'fr' => 'Joue jusqu’à la défaite • accomplis tes objectifs',
+    'es' => 'Juega hasta perder • completa tus objetivos',
+    'pt' => 'Jogue até perder • conclua seus objetivos',
+    'it' => 'Gioca fino alla sconfitta • completa gli obiettivi',
+    'ru' => 'Играй до поражения • выполняй задания',
+    'ar' => 'العب حتى الخسارة • أكمل أهدافك',
+    'zh' => '坚持到失败 • 完成你的目标',
+    _ => 'Score until defeat • complete your objectives',
+  };""", 'ten-language Adventure objective')
 
 pubspec=root/'pubspec.yaml'
 content=pubspec.read_text()
