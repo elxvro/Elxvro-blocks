@@ -31,6 +31,15 @@ for test_file in (root / 'test').glob('*.dart'):
     new = raw.replace('version: 0.31.2+78', 'version: 0.31.3+79')
     new = new.replace('AssetImage(AdventureWorldBackdrop.assetFor(index))',
                       'Image.asset(AdventureWorldBackdrop.assetFor(index))')
+    # Historical source assertions must follow the redesigned Adventure layout.
+    if test_file.name == 'adventure_world_images_test.dart':
+        new = new.replace(
+            "contains('Image.asset(AdventureWorldBackdrop.assetFor(index))')",
+            "contains('Image.asset(AdventureWorldBackdrop.assetFor(index)')")
+    if test_file.name == 'v022_language_gameplay_test.dart':
+        new = new.replace(
+            'constraints.maxWidth - (_isAdventure ? 2 : 6)',
+            'constraints.maxWidth *')
     if new != raw: test_file.write_text(new)
 assert 'version: 0.31.3+79' in pubspec.read_text()
 print('ELXVRO v0.31.3 UI applied. Other screens, themes and saves intact.')
