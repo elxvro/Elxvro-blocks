@@ -311,7 +311,7 @@ jobs:
           set -euo pipefail
           APP=extracted/elxvro-blocks
           python tools/v0313/apply_v0313_ui.py "$APP"
-          grep -F 'version: 0.31.4+80' "$APP/pubspec.yaml"
+          grep -F 'version: 0.31.3+79' "$APP/pubspec.yaml"
           grep -F 'class _AdventureBattleHeader' "$APP/lib/screens/falling_blocks_screen.dart"
           grep -F 'Widget _worldOverview(' "$APP/lib/screens/adventure_screen.dart"
           (
