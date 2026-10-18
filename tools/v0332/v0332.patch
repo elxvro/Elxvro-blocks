@@ -1,0 +1,297 @@
+--- a/lib/screens/animal_adventure_screen.dart
++++ b/lib/screens/animal_adventure_screen.dart
+@@ -30,32 +30,37 @@
+   '🐆','🦎','🦎','🦎','🦎','🐸','🐠','🐙','🦑','⭐',
+   '🦀','🦞','🦋','🐝','🐞','🪲','🐜','🦗','🐌','🐟',
+ ];
+ 
+ class AnimalAdventureScreen extends StatefulWidget {
+-  const AnimalAdventureScreen({super.key, required this.appState});
++  const AnimalAdventureScreen({super.key, required this.appState, this.progress});
+   final AppState appState;
++  /// Optional progress source allows deterministic load/retry widget tests.
++  final AnimalMatchProgress? progress;
+   @override
+   State<AnimalAdventureScreen> createState() => _AnimalAdventureScreenState();
+ }
+ 
+ class _AnimalAdventureScreenState extends State<AnimalAdventureScreen> {
+-  final AnimalMatchProgress _progress = AnimalMatchProgress();
++  late final AnimalMatchProgress _progress =
++      widget.progress ?? AnimalMatchProgress();
+   bool _loading = true;
+   bool _loadFailed = false;
+   @override
+   void initState() {
+     super.initState();
+     _load();
+   }
+   Future<void> _load() async {
+-    if (mounted) setState(() { _loading = true; _loadFailed = false; });
++    // A slow/invalid local preference must NEVER make all 100 levels unusable.
++    // Keep the previously loaded progress or the fresh level-1 defaults.
++    if (mounted) setState(() => _loading = true);
+     try {
+       await _progress.load().timeout(const Duration(seconds: 8));
+       if (mounted) setState(() { _loading = false; _loadFailed = false; });
+-    } catch (error) {
+-      debugPrint('Animal Adventure progress loading failed: $error');
++    } catch (error, stack) {
++      debugPrint('Animal Adventure progress read failed: $error\n$stack');
+       if (mounted) setState(() { _loading = false; _loadFailed = true; });
+     }
+   }
+ 
+   Future<void> _start(int level) async {
+@@ -118,28 +123,33 @@
+                     backgroundColor: Colors.white.withValues(alpha: .10)),
+                   const SizedBox(height: 7),
+                   Text('★ ${_progress.totalStars}/300',
+                     style: const TextStyle(fontSize: 12, color: Color(0xFFFFD67B))),
+                 ]))),
++          if (_loadFailed)
++            Padding(
++              padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
++              child: Material(
++                color: theme.board.withValues(alpha: .90),
++                borderRadius: BorderRadius.circular(14),
++                child: Row(children: <Widget>[
++                  const SizedBox(width: 10),
++                  const Icon(Icons.info_outline_rounded,
++                    size: 18, color: Color(0xFFFFD67B)),
++                  const SizedBox(width: 8),
++                  Expanded(child: Text(tr
++                    ? 'Kayıt okunamadı; bölümler açık. Tekrar dene.'
++                    : 'Save unavailable; levels accessible. Retry.',
++                    style: const TextStyle(fontSize: 11))),
++                  TextButton(onPressed: _load,
++                    child: Text(tr ? 'YENİLE' : 'RETRY')),
++                ]),
++              ),
++            ),
+           Expanded(child: _loading
+             ? const Center(child: CircularProgressIndicator())
+-            : _loadFailed
+-              ? Center(child: Column(
+-                  mainAxisSize: MainAxisSize.min,
+-                  children: <Widget>[
+-                    const Icon(Icons.error_outline_rounded, size: 35),
+-                    const SizedBox(height: 10),
+-                    Text(tr ? 'Bölümler yüklenemedi' : 'Could not load levels'),
+-                    const SizedBox(height: 12),
+-                    FilledButton.icon(
+-                      onPressed: _load,
+-                      icon: const Icon(Icons.refresh_rounded),
+-                      label: Text(tr ? 'TEKRAR DENE' : 'RETRY'),
+-                    ),
+-                  ],
+-                ))
+-              : GridView.builder(
++            : GridView.builder(
+               padding: const EdgeInsets.fromLTRB(17, 0, 17, 28),
+               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                 crossAxisCount: 3, childAspectRatio: .79,
+                 mainAxisSpacing: 10, crossAxisSpacing: 10),
+               itemCount: 100,
+--- a/lib/screens/falling_blocks_screen.dart
++++ b/lib/screens/falling_blocks_screen.dart
+@@ -5,10 +5,11 @@
+ import 'package:flutter/services.dart';
+ 
+ import '../app_state.dart';
+ import '../l10n/app_strings.dart';
+ import '../game/drag_step_accumulator.dart';
++import '../game/falling_piece_bag.dart';
+ import '../models/game_theme.dart';
+ import '../services/audio_service.dart';
+ import '../widgets/gameplay_background.dart';
+ import '../widgets/themed_block_tile.dart';
+ import '../widgets/falling_impact_overlay.dart';
+@@ -29,10 +30,11 @@
+     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+   static const int _rows = 20;
+   static const int _cols = 10;
+ 
+   final Random _random = Random();
++  late final FallingPieceBag _pieceBag = FallingPieceBag(random: _random);
+   late List<List<int>> _board;
+   late _FallingPiece _piece;
+   late _FallingPiece _nextPiece;
+   Timer? _timer;
+   late final AnimationController _fallImpactController;
+@@ -141,10 +143,11 @@
+     // Initialize the full 20x10 board before GridView renders any cell.
+     _board = List<List<int>>.generate(
+       _rows, (_) => List<int>.filled(_cols, -1), growable: true);
+     _fallImpactController.reset();
+     _fallImpactCells = <int>{};
++    _pieceBag.reset();
+     _piece = _randomPiece();
+     _nextPiece = _randomPiece();
+     _row = 0;
+     _col = ((_cols - _piece.width) ~/ 2).clamp(0, _cols - 1);
+     _score = 0;
+@@ -159,11 +162,11 @@
+       if (mounted) _restartTimer();
+     });
+   }
+ 
+   _FallingPiece _randomPiece() {
+-    final shape = _shapes[_random.nextInt(_shapes.length)];
++    final shape = _shapes[_pieceBag.next()];
+     return _FallingPiece(shape, _random.nextInt(7));
+   }
+ 
+   void _restartTimer() {
+     _timer?.cancel();
+@@ -263,10 +266,17 @@
+   }
+ 
+   Future<void> _lockPiece() async {
+     if (_finishing || _gameOver || _locking) return;
+     _locking = true;
++    // Never overwrite a settled cell with a colliding active piece. This
++    // protects the board even if input and an async lock interleave.
++    if (!_canPlace(_piece, _row, _col)) {
++      _locking = false;
++      await _finish();
++      return;
++    }
+ 
+     var overflow = false;
+     final placedRows = <int>{};
+     final contactCells = <int>{};
+     for (final cell in _piece.cells) {
+--- a/lib/game/falling_piece_bag.dart
++++ b/lib/game/falling_piece_bag.dart
+@@ -0,0 +1,32 @@
++import 'dart:math';
++
++/// All seven tetromino shapes appear once per bag. Adjacent pieces are never
++/// identical, including across bag boundaries. Colors remain theme-driven.
++class FallingPieceBag {
++  FallingPieceBag({Random? random}) : _random = random ?? Random();
++  final Random _random;
++  final List<int> _bag = <int>[];
++  int? _previous;
++
++  int next() {
++    if (_bag.isEmpty) {
++      _bag.addAll(List<int>.generate(7, (i) => i));
++      _bag.shuffle(_random);
++      // Shuffle can place the previously played shape at the boundary.
++      if (_bag.first == _previous) {
++        final swap = 1 + _random.nextInt(_bag.length - 1);
++        final first = _bag[0];
++        _bag[0] = _bag[swap];
++        _bag[swap] = first;
++      }
++    }
++    final shape = _bag.removeAt(0);
++    _previous = shape;
++    return shape;
++  }
++
++  void reset() {
++    _bag.clear();
++    _previous = null;
++  }
++}
+--- a/test/v0332_regressions_test.dart
++++ b/test/v0332_regressions_test.dart
+@@ -0,0 +1,82 @@
++import 'dart:math';
++
++import 'package:flutter/material.dart';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++import 'package:elxvro_blocks/app_state.dart';
++import 'package:elxvro_blocks/game/falling_piece_bag.dart';
++import 'package:elxvro_blocks/screens/animal_adventure_screen.dart';
++import 'package:elxvro_blocks/services/animal_match_progress.dart';
++
++class _BrokenProgress extends AnimalMatchProgress {
++  @override
++  Future<void> load() async => throw StateError('simulated device preference failure');
++}
++
++class _FlakyProgress extends AnimalMatchProgress {
++  int attempts = 0;
++  @override
++  Future<void> load() async {
++    attempts++;
++    if (attempts == 1) throw StateError('first load failed');
++    await super.load();
++  }
++}
++
++void main() {
++  TestWidgetsFlutterBinding.ensureInitialized();
++  setUp(() => SharedPreferences.setMockInitialValues(<String, Object>{}));
++
++  test('every bag draws seven distinct shapes, and boundaries never repeat', () {
++    final bag = FallingPieceBag(random: Random(17));
++    int? previous;
++    for (var bagIndex = 0; bagIndex < 150; bagIndex++) {
++      final current = List<int>.generate(7, (_) => bag.next());
++      expect(current.toSet().length, 7);
++      expect(current.toSet(), <int>{0, 1, 2, 3, 4, 5, 6});
++      if (previous != null) expect(current.first, isNot(previous));
++      previous = current.last;
++    }
++  });
++
++  testWidgets('progress load failure must not hide 100 levels', (tester) async {
++    await tester.binding.setSurfaceSize(const Size(360, 780));
++    addTearDown(() => tester.binding.setSurfaceSize(null));
++    final state = AppState();
++    await state.load();
++    await tester.pumpWidget(MaterialApp(home: AnimalAdventureScreen(
++      appState: state, progress: _BrokenProgress(),
++    )));
++    await tester.pump();
++    await tester.pump(const Duration(milliseconds: 300));
++    expect(find.textContaining('100 BÖLÜM'), findsWidgets);
++    expect(find.text('Tilki'), findsWidgets);
++    expect(find.text('Bölümler yüklenemedi'), findsNothing);
++    expect(find.textContaining('Kayıt okunamadı'), findsOneWidget);
++    expect(tester.takeException(), isNull);
++  });
++
++  testWidgets('retry restores normal progress without dropping user data', (tester) async {
++    await tester.binding.setSurfaceSize(const Size(360, 780));
++    addTearDown(() => tester.binding.setSurfaceSize(null));
++    SharedPreferences.setMockInitialValues(<String, Object>{
++      'animal_match_unlocked_v1': 4,
++      'animal_match_completed_v1': <String>['1', '2', '3'],
++    });
++    final state = AppState();
++    await state.load();
++    final flaky = _FlakyProgress();
++    await tester.pumpWidget(MaterialApp(home: AnimalAdventureScreen(
++      appState: state, progress: flaky,
++    )));
++    await tester.pump();
++    await tester.pump(const Duration(milliseconds: 300));
++    expect(find.textContaining('Kayıt okunamadı'), findsOneWidget);
++    await tester.tap(find.text('YENİLE'));
++    await tester.pump();
++    await tester.pump(const Duration(milliseconds: 300));
++    expect(find.textContaining('Kayıt okunamadı'), findsNothing);
++    expect(flaky.unlocked, 4);
++    expect(flaky.completed.length, 3);
++  });
++}
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -1,9 +1,9 @@
+ name: elxvro_blocks
+ description: Premium block puzzle game for ELXVRO.
+ publish_to: 'none'
+-version: 0.33.1+84
++version: 0.33.2+85
+ 
+ environment:
+   sdk: '>=3.4.0 <4.0.0'
+ 
+ dependencies:
