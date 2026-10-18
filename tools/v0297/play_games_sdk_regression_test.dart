@@ -7,8 +7,10 @@ void main() {
     final gradle = File('android/app/build.gradle.kts').readAsStringSync();
     expect(pubspec, contains('games_services: 5.3.0'));
     expect(pubspec, contains('games_services_platform_interface: 5.3.0'));
-    expect(pubspec, contains('version: 0.29.7+71'));
+    expect(pubspec, contains('version: 0.29.8+72'));
     expect(gradle, contains('play-services-games-v2:22.1.0'));
+    expect(gradle, contains('play-services-base:18.11.0'));
+    expect(gradle, contains('play-services-basement:18.12.0'));
   });
 
   test('Play Games sign in, leaderboards, and achievements API is preserved', () {
