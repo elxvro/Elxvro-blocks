@@ -79,7 +79,7 @@ jobs:
       - name: Restore verified v0.32.1 full source
         uses: actions/download-artifact@v4
         with:
-          name: ELXVRO-Blocks-v0.32.0-FULL-SOURCE
+          name: ELXVRO-Blocks-v0.32.1-FULL-SOURCE
           run-id: 39157687911
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: artifact-v0321
