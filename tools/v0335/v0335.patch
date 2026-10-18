@@ -1,0 +1,1343 @@
+--- a/lib/game/animal_match_engine.dart
++++ b/lib/game/animal_match_engine.dart
+@@ -39,8 +39,8 @@
+   AnimalMatchLevel(int number)
+       : assert(number >= 1 && number <= 100),
+         number = number,
+-        moves = max(16, 25 - number ~/ 12),
+-        target = 10 + number ~/ 7,
++        moves = max(23, 38 - number ~/ 7),
++        target = 26 + number + (number * number ~/ 165),
+         featuredGem = (number - 1) % animalGemAssets.length;
+ 
+   final int number;
+@@ -48,7 +48,9 @@
+   final int target;
+   final int featuredGem;
+   String get animalName => stageAnimals[number - 1];
+-  int get baseReward => 20 + number ~/ 5;
++  int get difficultyTier => 1 + (number - 1) ~/ 10;
++  String get difficultyLabel => 'KADEME $difficultyTier';
++  int get baseReward => 35 + number * 2 + difficultyTier * 5;
+ }
+ 
+ /// An immutable cascade snapshot, independent from Flutter's rendering.
+@@ -94,8 +96,8 @@
+     _createPlayableBoard();
+   }
+ 
+-  static const int width = 7;
+-  static const int height = 8;
++  static const int width = 8;
++  static const int height = 9;
+   static const int cells = width * height;
+   static const int kinds = 6;
+   final AnimalMatchLevel level;
+@@ -107,8 +109,8 @@
+   int targetProgress = 0;
+   int maxCascade = 0;
+   bool won = false;
+-  int hammers = 2;
+-  int shuffles = 2;
++  late int hammers = level.number >= 40 ? 1 : 2;
++  late int shuffles = level.number >= 70 ? 1 : 2;
+   int orbs = 1;
+ 
+   bool get lost => !won && movesLeft <= 0;
+@@ -138,6 +140,35 @@
+ 
+   Set<int> _collectMatches() {
+     final clear = <int>{};
++    final splash = <int>{};
++
++    void addRun(List<int> run, bool horizontal) {
++      if (run.length < 3) return;
++      clear.addAll(run);
++      if (run.length >= 5) {
++        // Five jewels ignite the entire row or column: a meaningful mechanic,
++        // not only a larger particle effect.
++        if (horizontal) {
++          final row = run.first ~/ width;
++          for (var c = 0; c < width; c++) splash.add(row * width + c);
++        } else {
++          final col = run.first % width;
++          for (var r = 0; r < height; r++) splash.add(r * width + col);
++        }
++      } else if (run.length == 4) {
++        // Four jewels fracture one neighbor on either side of the line.
++        for (final index in run) {
++          if (horizontal) {
++            if (index >= width) splash.add(index - width);
++            if (index < cells - width) splash.add(index + width);
++          } else {
++            if (index % width > 0) splash.add(index - 1);
++            if (index % width < width - 1) splash.add(index + 1);
++          }
++        }
++      }
++    }
++
+     for (var y = 0; y < height; y++) {
+       final start = y * width;
+       var x = 0;
+@@ -148,7 +179,7 @@
+           to++;
+         }
+         if (kind >= 0 && to - x >= 3) {
+-          for (var k = x; k < to; k++) {clear.add(start + k);}
++          addRun(List<int>.generate(to - x, (i) => start + x + i), true);
+         }
+         x = to;
+       }
+@@ -162,11 +193,12 @@
+           to++;
+         }
+         if (kind >= 0 && to - y >= 3) {
+-          for (var k = y; k < to; k++) {clear.add(k * width + x);}
++          addRun(List<int>.generate(to - y, (i) => (y + i) * width + x), false);
+         }
+         y = to;
+       }
+     }
++    clear.addAll(splash.where((i) => board[i] >= 0));
+     return clear;
+   }
+ 
+@@ -211,7 +243,7 @@
+   }
+ 
+   /// Applies gravity once and records each destination's travel distance.
+-  /// Maximum work is bounded by the fixed 7 x 8 grid.
++  /// Work is bounded by the fixed 8 x 9 grid.
+   List<int> _fallAndRefill() {
+     final distances = List<int>.filled(cells, 0);
+     for (var col = 0; col < width; col++) {
+@@ -247,7 +279,8 @@
+       }
+       targetProgress += levelHits;
+       totalCleared += positions.length;
+-      gained += positions.length * 12 * cascade;
++      // Score multiplier scales with the stage and the cascade chain.
++      gained += positions.length * (12 + level.difficultyTier * 2) * cascade;
+       for (final index in positions) {board[index] = -1;}
+       final distances = _fallAndRefill();
+       steps.add(AnimalMatchStep(
+--- a/lib/screens/animal_adventure_screen.dart
++++ b/lib/screens/animal_adventure_screen.dart
+@@ -8,6 +8,7 @@
+ import '../models/game_theme.dart';
+ import '../services/audio_service.dart';
+ import '../widgets/animal_crystal_burst.dart';
++import 'animal_match_result_screen.dart';
+ import '../services/animal_match_progress.dart';
+ import '../widgets/coin_badge.dart';
+ import '../widgets/premium_background.dart';
+@@ -99,9 +100,15 @@
+           Padding(padding: const EdgeInsets.fromLTRB(20, 5, 20, 16),
+             child: Container(padding: const EdgeInsets.all(15),
+               decoration: BoxDecoration(
+-                color: theme.board.withValues(alpha: .84),
+-                borderRadius: BorderRadius.circular(20),
+-                border: Border.all(color: theme.blockAccent.withValues(alpha:.46)),
++                gradient: LinearGradient(colors: <Color>[
++                  Color.lerp(theme.board,theme.blockAccent,.13)!,
++                  theme.board.withValues(alpha:.94),
++                ]),
++                borderRadius: BorderRadius.circular(22),
++                border: Border.all(color: theme.blockAccent.withValues(alpha:.62),
++                  width:1.3),
++                boxShadow: <BoxShadow>[BoxShadow(
++                  color:theme.blockAccent.withValues(alpha:.13),blurRadius:22)],
+               ),
+               child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                 children: <Widget>[
+@@ -166,11 +173,19 @@
+                     borderRadius: BorderRadius.circular(17),
+                     child: AnimatedContainer(duration: const Duration(milliseconds: 190),
+                       decoration: BoxDecoration(
+-                        color: theme.board.withValues(alpha: open ? .84 : .62),
+-                        borderRadius: BorderRadius.circular(17),
+-                        border: Border.all(color: open ? jewel.withValues(alpha:.82)
++                        gradient: LinearGradient(begin:Alignment.topLeft,
++                          end:Alignment.bottomRight,colors:<Color>[
++                            open ? Color.lerp(theme.board,jewel,.24)!
++                              : theme.board.withValues(alpha:.68),
++                            theme.board.withValues(alpha:open ? .97 : .66),
++                          ]),
++                        borderRadius: BorderRadius.circular(18),
++                        border: Border.all(color: open ? jewel.withValues(alpha:.81)
+                             : Colors.white.withValues(alpha:.12),
+-                          width: level == _progress.unlocked ? 1.9 : .9),
++                          width: level == _progress.unlocked ? 2.1 : 1),
++                        boxShadow: level == _progress.unlocked
++                          ? <BoxShadow>[BoxShadow(color:jewel.withValues(alpha:.23),
++                              blurRadius:13)] : null,
+                       ),
+                       child: Padding(padding: const EdgeInsets.all(3),
+                         child: Column(mainAxisAlignment: MainAxisAlignment.center,
+@@ -228,12 +243,14 @@
+   double _dragX = 0, _dragY = 0;
+   bool _hammer = false;
+   bool _finishing = false;
++  int _lastCombo = 0;
++  int _lastImpact = 0;
+ 
+   @override
+   void initState() {
+     super.initState();
+     _burstController = AnimationController(
+-      vsync: this, duration: const Duration(milliseconds: 275));
++      vsync: this, duration: const Duration(milliseconds: 540));
+     _reset();
+   }
+ 
+@@ -254,6 +271,8 @@
+     _selected = null;
+     _hammer = false;
+     _finishing = false;
++    _lastCombo = 0;
++    _lastImpact = 0;
+   }
+ 
+   Future<void> _act(AnimalMatchResult result) async {
+@@ -266,18 +285,26 @@
+     _busy = true;
+     setState(() => _selected = null);
+     try {
+-      final effects = result.steps.take(5).toList(growable: false);
++      // Keep the full cascade visible; budget only its on-screen animation.
++      // The underlying model has already resolved the entire transaction.
++      final effects = result.steps.take(12).toList(growable: false);
+       for (final step in effects) {
+         if (!mounted) return;
++        final profile = CrystalImpactProfile(
++          matched: step.clearedCells.length, chain: step.chain);
+         setState(() {
+           _visibleBoard = step.before;
+           _burstBefore = step.before;
+           _burstCells = step.clearedCells;
+           _burstChain = step.chain;
++          _lastCombo = step.chain;
++          _lastImpact = step.clearedCells.length;
+           _fallDistances = List<int>.filled(AnimalMatchEngine.cells, 0);
+         });
+         if (widget.appState.hapticsEnabled) {
+-          if (step.clearedCells.length >= 5 || step.chain >= 3) {
++          if (profile.mega) {
++            HapticFeedback.heavyImpact();
++          } else if (step.clearedCells.length >= 5) {
+             HapticFeedback.mediumImpact();
+           } else {
+             HapticFeedback.lightImpact();
+@@ -288,16 +315,20 @@
+           lineCount: (step.clearedCells.length ~/ 3).clamp(1, 4),
+           combo: step.chain,
+         ));
++        // Dramatic but bounded: the board never remains locked for minutes
++        // after a rare 20+ cascade.
++        final blastMs = profile.mega ? 460 : 365;
++        _burstController.duration = Duration(milliseconds: blastMs);
+         _burstController.forward(from: 0);
+-        await Future<void>.delayed(const Duration(milliseconds: 265));
++        await Future<void>.delayed(Duration(milliseconds: blastMs));
+         if (!mounted) return;
+         setState(() {
+           _burstCells = <int>{};
+           _visibleBoard = step.after;
+           _fallDistances = step.fallDistances;
+-                _fallTick++;
++          _fallTick++;
+         });
+-        await Future<void>.delayed(const Duration(milliseconds: 315));
++        await Future<void>.delayed(const Duration(milliseconds: 245));
+       }
+     } finally {
+       if (mounted) {
+@@ -306,7 +337,7 @@
+           _burstCells = <int>{};
+           _fallDistances = List<int>.filled(AnimalMatchEngine.cells, 0);
+           _busy = false;
+-              });
++        });
+       }
+     }
+     if (mounted && _engine.ended) await _finish();
+@@ -349,48 +380,57 @@
+     _act(_engine.swap(i, i + direction));
+   }
+ 
++  Future<int> _recordVictory() async {
++    final first = await widget.progress.recordWin(
++      widget.number, _engine.earnedStars,
++    ).timeout(const Duration(seconds: 5));
++    if (!first) return 0;
++    final prize = _level.baseReward;
++    await widget.appState.awardAnimalMatchCoins(prize)
++      .timeout(const Duration(seconds: 5));
++    return prize;
++  }
++
+   Future<void> _finish() async {
+     if (_finishing || !mounted) return;
+     _finishing = true;
+     final won = _engine.won;
+-    var prize = 0;
+-    if (won) {
+-      final first = await widget.progress.recordWin(
+-        widget.number, _engine.earnedStars);
+-      if (first) {
+-        prize = _level.baseReward;
+-        await widget.appState.awardAnimalMatchCoins(prize);
+-      }
++    // The result becomes visible at once, without awaiting disk or platform
++    // services. NEXT unlocks only after the save future completes.
++    final rewardTask = won ? _recordVictory() : Future<int>.value(0);
++    final next = await showGeneralDialog<int>(
++      context: context,
++      barrierDismissible: false,
++      barrierLabel: 'Level result',
++      barrierColor: Colors.black.withValues(alpha: .85),
++      transitionDuration: const Duration(milliseconds: 460),
++      transitionBuilder: (context, animation, secondaryAnimation, child) =>
++        FadeTransition(opacity: animation, child: ScaleTransition(
++          scale: Tween<double>(begin: .91, end: 1.0).animate(
++            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
++          child: child)),
++      pageBuilder: (context, animation, secondaryAnimation) =>
++        AnimalMatchResultScreen(
++          won: won, level: widget.number,
++          animal: _level.animalName,
++          score: _engine.score, stars: _engine.earnedStars,
++          movesLeft: _engine.movesLeft,
++          baseReward: _level.baseReward,
++          rewardTask: rewardTask,
++          retryReward: _recordVictory,
++          tr: widget.appState.languageCode == 'tr',
++        ),
++    );
++    if (!mounted) return;
++    if (next == 1 && won && widget.number < 100) {
++      Navigator.of(context).pushReplacement(MaterialPageRoute<void>(
++        builder: (_) => AnimalMatchScreen(appState: widget.appState,
++          progress: widget.progress, number: widget.number + 1)));
++    } else if (next == 2) {
++      setState(_reset);
++    } else {
++      Navigator.of(context).pop();
+     }
+-    if (!mounted) return;
+-    await showDialog<void>(context: context, barrierDismissible: false,
+-      builder: (context) => AlertDialog(
+-        backgroundColor: _currentTheme(widget.appState).board,
+-        title: Text(won ? 'BÖLÜM TAMAMLANDI!' : 'HAMLELER BİTTİ'),
+-        content: Column(mainAxisSize: MainAxisSize.min, children: <Widget>[
+-          Text(won ? '★' * _engine.earnedStars : 'Tekrar dene',
+-            style: const TextStyle(fontSize:26,color:Color(0xFFFFD67B))),
+-          Text('PUAN ${_engine.score}  •  +$prize COIN'),
+-        ]),
+-        actions: <Widget>[
+-          TextButton(onPressed: () {
+-            Navigator.pop(context);
+-            Navigator.pop(this.context);
+-          }, child: const Text('HARİTA')),
+-          FilledButton(onPressed: () {
+-            Navigator.pop(context);
+-            if (won && widget.number < 100) {
+-              Navigator.of(this.context).pushReplacement(MaterialPageRoute<void>(
+-                builder: (_) => AnimalMatchScreen(appState:widget.appState,
+-                  progress:widget.progress,number:widget.number+1)));
+-            } else {
+-              setState(_reset);
+-            }
+-          }, child: Text(won && widget.number < 100
+-              ? 'SONRAKİ BÖLÜM' : 'TEKRAR OYNA')),
+-        ],
+-      ),
+-    );
+   }
+ 
+   Future<void> _pause() async {
+@@ -438,14 +478,22 @@
+   Widget _booster(IconData icon, String label, int count,
+       VoidCallback onTap, Color color) => Expanded(
+     child: Padding(padding:const EdgeInsets.symmetric(horizontal:3),
+-      child: Material(color:color.withValues(alpha:.15),
+-        borderRadius:BorderRadius.circular(16),
++      child: Material(color:const Color(0xFF141F38),
++        borderRadius:BorderRadius.circular(17),
+         child:InkWell(onTap: count>0 && !_engine.ended && !_busy ? onTap : null,
+           borderRadius:BorderRadius.circular(16),
+           child:Container(
+             padding:const EdgeInsets.symmetric(vertical:10,horizontal:2),
+-            decoration:BoxDecoration(borderRadius:BorderRadius.circular(16),
+-              border:Border.all(color:color.withValues(alpha:.65))),
++            decoration:BoxDecoration(
++              gradient:LinearGradient(begin:Alignment.topLeft,
++                end:Alignment.bottomRight,colors:<Color>[
++                  color.withValues(alpha:.29),
++                  const Color(0xFF101B35),
++                ]),
++              borderRadius:BorderRadius.circular(17),
++              border:Border.all(color:color.withValues(alpha:.79),width:1.2),
++              boxShadow:<BoxShadow>[BoxShadow(color:color.withValues(alpha:.12),
++                blurRadius:11)]),
+             child:Column(mainAxisSize:MainAxisSize.min,children:<Widget>[
+               Icon(icon,color:color,size:25),
+               const SizedBox(height:4),
+@@ -465,58 +513,109 @@
+     final theme = _currentTheme(widget.appState);
+     final accent = theme.blockAccent;
+     final targetColor = _gemColors[_level.featuredGem];
++    final progressFraction = (_engine.targetProgress / _level.target)
++      .clamp(0.0, 1.0).toDouble();
++    final tr = widget.appState.languageCode == 'tr';
+     return Scaffold(body:PremiumBackground(
+       top:theme.backgroundTop,bottom:theme.backgroundBottom,
+       material:theme.material,accent:accent,
+       child:SafeArea(child:LayoutBuilder(builder:(context, constraints) {
+-        final width = min(constraints.maxWidth - 22,
+-          max(175.0, (constraints.maxHeight - 252) * .875));
++        final availableWidth = max(160.0, constraints.maxWidth - 8);
++        final fitHeight = max(195.0, constraints.maxHeight - 205);
++        final width = min(availableWidth,
++          max(195.0, fitHeight * AnimalMatchEngine.width /
++            AnimalMatchEngine.height));
+         return SingleChildScrollView(
+-          padding:const EdgeInsets.fromLTRB(11,4,11,12),
++          physics: const ClampingScrollPhysics(),
++          padding:const EdgeInsets.fromLTRB(4,4,4,12),
+           child:Column(children:<Widget>[
+             Row(children:<Widget>[
+               IconButton(onPressed:()=>Navigator.pop(context),
+                 icon:const Icon(Icons.arrow_back_rounded)),
+               Expanded(child:Column(children:<Widget>[
+-                Text('MACERA · ${widget.number}/100',
+-                  style:TextStyle(fontSize:16,letterSpacing:1.3,
++                Text(tr ? 'KRİSTAL MACERA · ${widget.number}/100'
++                  : 'CRYSTAL ADVENTURE · ${widget.number}/100',
++                  style:TextStyle(fontSize:14,letterSpacing:1.1,
+                     color:accent,fontWeight:FontWeight.w900)),
+-                Text(_level.animalName.toUpperCase(),
+-                  style:const TextStyle(fontSize:11,fontWeight:FontWeight.bold)),
++                Text('${_level.animalName.toUpperCase()}  •  ${_level.difficultyLabel}',
++                  style:const TextStyle(fontSize:10,fontWeight:FontWeight.bold,
++                    color:Colors.white70)),
+               ])),
+               IconButton(onPressed:_pause,
+                 icon:const Icon(Icons.pause_rounded)),
+             ]),
+-            Container(padding:const EdgeInsets.symmetric(vertical:11,horizontal:10),
++            Container(padding:const EdgeInsets.fromLTRB(12,10,12,12),
+               decoration:BoxDecoration(
+-                color:theme.board.withValues(alpha:.90),
+-                borderRadius:BorderRadius.circular(18),
+-                border:Border.all(color:accent.withValues(alpha:.55))),
+-              child:Row(mainAxisAlignment:MainAxisAlignment.spaceAround,
+-                children:<Widget>[
+-                  _stat('HAMLE', '${_engine.movesLeft}',const Color(0xFF88DEFF)),
+-                  Column(children:<Widget>[
+-                    const Text('HEDEF',style:TextStyle(fontSize:11,fontWeight:FontWeight.bold)),
+-                    _gem(_level.featuredGem,size:43),
+-                    Text('${_engine.targetProgress}/${_level.target}',
+-                      style:TextStyle(fontSize:14,fontWeight:FontWeight.w900,
+-                        color:targetColor)),
++                gradient:LinearGradient(colors:<Color>[
++                  Color.lerp(theme.board,targetColor,.13)!.withValues(alpha:.97),
++                  theme.board.withValues(alpha:.93),
++                ]),
++                borderRadius:BorderRadius.circular(23),
++                border:Border.all(color:accent.withValues(alpha:.56),width:1.3),
++                boxShadow:<BoxShadow>[BoxShadow(
++                  color:accent.withValues(alpha:.15),blurRadius:22)],
++              ),
++              child:Column(children:<Widget>[
++                Row(mainAxisAlignment:MainAxisAlignment.spaceAround,
++                  children:<Widget>[
++                    _stat(tr?'HAMLE':'MOVES', '${_engine.movesLeft}',
++                      const Color(0xFF88DEFF)),
++                    Column(children:<Widget>[
++                      Text(tr?'KRİSTAL HEDEFİ':'CRYSTAL TARGET',
++                        style:const TextStyle(fontSize:9,fontWeight:FontWeight.w900,
++                          letterSpacing:.8,color:Colors.white70)),
++                      SizedBox(width:49,height:45,child:_gem(_level.featuredGem,size:44)),
++                      Text('${_engine.targetProgress}/${_level.target}',
++                        style:TextStyle(fontSize:16,fontWeight:FontWeight.w900,
++                          color:targetColor)),
++                    ]),
++                    _stat(tr?'PUAN':'SCORE','${_engine.score}',
++                      const Color(0xFFFFD677)),
+                   ]),
+-                  _stat('PUAN','${_engine.score}',const Color(0xFFFFD677)),
+-                ])),
++                const SizedBox(height:9),
++                ClipRRect(borderRadius:BorderRadius.circular(99),
++                  child:LinearProgressIndicator(value:progressFraction,
++                    minHeight:8,
++                    backgroundColor:Colors.white.withValues(alpha:.08),
++                    valueColor:AlwaysStoppedAnimation<Color>(targetColor))),
++                const SizedBox(height:7),
++                Row(mainAxisAlignment:MainAxisAlignment.spaceBetween,
++                  children:<Widget>[
++                    Text(tr?'BÖLÜM HEDEFİ':'LEVEL GOAL',
++                      style:const TextStyle(color:Colors.white54,fontSize:9,
++                        fontWeight:FontWeight.w800)),
++                    Text(_lastImpact >= 4
++                      ? '✦ ${_lastImpact} ${tr?'KRİSTAL':'CRYSTALS'}  •  x$_lastCombo'
++                      : '${(_level.target - _engine.targetProgress).clamp(0,_level.target)} ${tr?'KALDI':'LEFT'}',
++                      style:TextStyle(color:_lastImpact>=4
++                        ? const Color(0xFFFFD66E) : Colors.white70,
++                        fontSize:10,fontWeight:FontWeight.w900)),
++                  ]),
++              ])),
+             const SizedBox(height:11),
+             Center(child:SizedBox(width:width,
+               child:RepaintBoundary(child:Container(
+                 decoration:BoxDecoration(
+-                  color:theme.board.withValues(alpha:.80),
+-                  borderRadius:BorderRadius.circular(14),
+-                  border:Border.all(color:accent.withValues(alpha:.76),width:1.6),
+-                  boxShadow:<BoxShadow>[BoxShadow(
+-                    color:accent.withValues(alpha:.19),blurRadius:18)],
++                  gradient:LinearGradient(begin:Alignment.topLeft,
++                    end:Alignment.bottomRight, colors:<Color>[
++                      Color.lerp(theme.board,accent,.19)!.withValues(alpha:.98),
++                      theme.board.withValues(alpha:.98),
++                      const Color(0xFF080F25),
++                    ]),
++                  borderRadius:BorderRadius.circular(19),
++                  border:Border.all(color:accent.withValues(alpha:.89),width:2),
++                  boxShadow:<BoxShadow>[
++                    BoxShadow(color:accent.withValues(alpha:.31),blurRadius:29,
++                      spreadRadius:2),
++                    BoxShadow(color:Colors.black.withValues(alpha:.50),
++                      blurRadius:20,offset:const Offset(0,9)),
++                  ],
+                 ),
+-                padding:const EdgeInsets.all(4),
++                padding:const EdgeInsets.all(3),
+                 child:Stack(children:<Widget>[
+-                  GridView.builder(shrinkWrap:true,
++                  AnimatedBuilder(
++                    animation:_burstController,
++                    child:                  GridView.builder(shrinkWrap:true,
+                   physics:const NeverScrollableScrollPhysics(),
+                   gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(
+                     crossAxisCount:AnimalMatchEngine.width,
+@@ -541,11 +640,20 @@
+                       child:AnimatedContainer(
+                         duration:const Duration(milliseconds:160),
+                         decoration:BoxDecoration(
+-                          color:theme.cell.withValues(alpha: selected ? .45 : .25),
+-                          borderRadius:BorderRadius.circular(7),
++                          gradient:LinearGradient(
++                            begin:Alignment.topLeft,end:Alignment.bottomRight,
++                            colors:<Color>[
++                              Color.lerp(theme.cell,_gemColors[id],.17)!
++                                .withValues(alpha:selected ? .81 : .56),
++                              theme.cell.withValues(alpha:.42),
++                            ]),
++                          borderRadius:BorderRadius.circular(8),
+                           border:Border.all(color:selected?targetColor
+-                            :Colors.white.withValues(alpha:.055),
+-                            width:selected?1.7:.5)),
++                            :_gemColors[id].withValues(alpha:.23),
++                            width:selected?2:0.7),
++                          boxShadow:selected?<BoxShadow>[BoxShadow(
++                            color:targetColor.withValues(alpha:.36),
++                            blurRadius:10,spreadRadius:1)]:null),
+                         child:Padding(padding:const EdgeInsets.all(1),
+                           child:_fallDistances[index] == 0 ? _gem(id) :
+                             TweenAnimationBuilder<double>(
+@@ -561,20 +669,37 @@
+                       ));
+                   },
+                 ),
++                    builder:(context, child){
++                      if (_burstCells.isEmpty) return child!;
++                      final profile = CrystalImpactProfile(
++                        matched:_burstCells.length, chain:_burstChain);
++                      final strength = profile.force *
++                        (1.0 - _burstController.value) * 1.5;
++                      final phase = _burstController.value * 65;
++                      return Transform.translate(offset:Offset(
++                          sin(phase) * strength,
++                          cos(phase * 1.2) * strength * .7),
++                        child:child);
++                    },
++                  ),
+                   Positioned.fill(child:IgnorePointer(child:CustomPaint(
+                     painter:AnimalCrystalBurst(
+                       animation:_burstController,
+                       cells:_burstCells,before:_burstBefore,
+                       palette:_gemColors,chain:_burstChain,
++                      boardWidth:AnimalMatchEngine.width,
+                     ),
+                   ))),
+                 ]),
+               )))),
+             const SizedBox(height:7),
+-            Text(_hammer ? 'ÇEKİÇ: KIRILACAK HAYVANA DOKUN'
+-              : 'KOMŞU HAYVANLARI DEĞİŞTİR · 3 AYNI HAYVANI EŞLEŞTİR',
++            Text(_hammer ? (tr ? 'ÇEKİÇ: KIRILACAK HAYVANA DOKUN'
++                : 'HAMMER: SELECT A GEM')
++              : (tr ? '✦ KRİSTALLERİ BİRLEŞTİR · DEV KOMBO OLUŞTUR ✦'
++                : '✦ MATCH CRYSTALS · UNLEASH MEGA COMBOS ✦'),
+               textAlign:TextAlign.center,
+-              style:const TextStyle(fontSize:9,color:Colors.white70)),
++              style:const TextStyle(fontSize:10,color:Colors.white70,
++                letterSpacing:.3,fontWeight:FontWeight.w700)),
+             const SizedBox(height:10),
+             Row(children:<Widget>[
+               _booster(Icons.gavel_rounded,'ÇEKİÇ',_engine.hammers,(){
+--- a/lib/widgets/animal_crystal_burst.dart
++++ b/lib/widgets/animal_crystal_burst.dart
+@@ -2,8 +2,25 @@
+ 
+ import 'package:flutter/material.dart';
+ 
+-/// Lightweight, GPU-friendly layered crystal feedback. Only this painter
+-/// repaints at animation-frame frequency; the 56-image board remains static.
++/// A bounded, deterministic quality budget. Stronger combos have wider,
++/// brighter, more numerous fragments, without an unbounded GPU workload.
++class CrystalImpactProfile {
++  const CrystalImpactProfile({required this.matched, required this.chain});
++
++  final int matched;
++  final int chain;
++
++  double get force => (1.0 + math.max(0, matched - 3) * .105 +
++      math.max(0, chain - 1) * .42).clamp(1.0, 5.8).toDouble();
++  int get shardsPerGem => (19 + (force * 5).round()).clamp(24, 46).toInt();
++  int get sparksPerGem => (12 + (force * 4).round()).clamp(16, 34).toInt();
++  int get maxImpactCells => 36;
++  bool get mega => matched >= 7 || chain >= 3;
++}
++
++/// Cinematic multi-layer crystal fracture. Cached deterministic trajectories
++/// avoid per-frame allocation of animation controllers and prevent lag spikes.
++/// Only this painter animates; gem images are not recreated on every frame.
+ class AnimalCrystalBurst extends CustomPainter {
+   AnimalCrystalBurst({
+     required this.animation,
+@@ -11,6 +28,7 @@
+     required this.before,
+     required this.palette,
+     required this.chain,
++    this.boardWidth = 8,
+   }) : super(repaint: animation);
+ 
+   final Animation<double> animation;
+@@ -18,108 +36,182 @@
+   final List<int> before;
+   final List<Color> palette;
+   final int chain;
++  final int boardWidth;
++
++  final Paint _scratch = Paint()..isAntiAlias = true;
+ 
+   @override
+   void paint(Canvas canvas, Size size) {
+-    if (cells.isEmpty || size.isEmpty) return;
+-    final t = animation.value.clamp(0.0, 1.0);
+-    final fade = (1.0 - t) * (1.0 - t);
+-    final side = size.width / 7;
+-    final viewport = Offset.zero & size;
++    if (cells.isEmpty || size.width <= 0 || size.height <= 0) return;
++    final t = animation.value.clamp(0.0, 1.0).toDouble();
++    final fade = math.pow(1 - t, 1.35).toDouble();
++    final cell = size.width / boardWidth;
++    final profile = CrystalImpactProfile(matched: cells.length, chain: chain);
++    final intensity = profile.force;
++    final impactCells = cells.take(profile.maxImpactCells).toList(growable: false);
++    final centroid = impactCells.fold<Offset>(Offset.zero, (sum, index) =>
++      sum + Offset(((index % boardWidth) + .5) * cell,
++          ((index ~/ boardWidth) + .5) * cell)) / impactCells.length.toDouble();
++
+     canvas.save();
+-    canvas.clipRect(viewport);
+-
+-    final active = cells.take(28).toList(growable: false);
+-    for (final index in active) {
+-      final row = index ~/ 7;
+-      final col = index % 7;
+-      final center = Offset((col + .5) * side, (row + .5) * side);
+-      final type = before[index].clamp(0, palette.length - 1).toInt();
+-      final color = palette[type];
+-      final rng = math.Random(3187 + index * 103 + chain * 111);
+-      final burst = side * (.32 + t * (chain > 2 ? 1.6 : 1.25));
+-
+-      // Expanding impact ring and secondary chromatic halo.
+-      for (var ring = 0; ring < 2; ring++) {
+-        final progress = ((t + ring * .16) / (1 + ring * .16)).clamp(0.0, 1.0);
+-        final radius = side * (.16 + progress * (ring == 0 ? .94 : 1.43));
+-        canvas.drawCircle(center, radius, Paint()
++    canvas.clipRRect(RRect.fromRectAndRadius(Offset.zero & size,
++      const Radius.circular(12)));
++
++    // Full-board chromatic blast: even a 3-match has a visible environmental
++    // response, while 5+ and cascades brighten the entire field.
++    final bloomRadius = cell * (1.6 + intensity * 2.0) * (.7 + t * 1.5);
++    canvas.drawCircle(centroid, bloomRadius, Paint()
++      ..shader = RadialGradient(colors: <Color>[
++        Colors.white.withValues(alpha: (.31 * fade * (intensity / 3)).clamp(0.0, .58).toDouble()),
++        palette[(impactCells.first < before.length ? before[impactCells.first] : 0)
++            .clamp(0, palette.length - 1).toInt()]
++          .withValues(alpha: (.33 * fade).clamp(0.0, 1.0).toDouble()),
++        Colors.transparent,
++      ], stops: const <double>[0, .35, 1])
++      .createShader(Rect.fromCircle(center: centroid, radius: bloomRadius)));
++
++    if (profile.mega) {
++      for (var ring = 0; ring < 3; ring++) {
++        final rt = ((t - ring * .105) / (1 - ring * .105)).clamp(0.0, 1.0).toDouble();
++        if (rt <= 0) continue;
++        final radius = cell * (.42 + rt * (1.4 + intensity * 1.7));
++        canvas.drawCircle(centroid, radius, _scratch
++          ..shader = null
+           ..style = PaintingStyle.stroke
+-          ..strokeWidth = (ring == 0 ? 3.2 : 1.5) * (1 - progress) + .2
+-          ..color = (ring == 0 ? Colors.white : color)
+-              .withValues(alpha: (1 - progress) * .72 * fade));
+-      }
+-      // Luminous impact core.
+-      canvas.drawCircle(center, side * (.25 + t * .22), Paint()
+-        ..color = color.withValues(alpha: .46 * fade));
+-      canvas.drawCircle(center, side * (.12 + t * .12), Paint()
+-        ..color = Colors.white.withValues(alpha: .93 * fade));
+-
+-      // Crystal shards: deterministic orientation avoids per-frame random work.
+-      for (var part = 0; part < 11; part++) {
+-        final theta = (part + rng.nextDouble() * .58) * math.pi * 2 / 11;
+-        final speed = .52 + rng.nextDouble() * .67;
+-        final dx = math.cos(theta), dy = math.sin(theta);
+-        final distance = burst * speed * (1 - (1 - t) * (1 - t));
+-        final origin = center + Offset(dx * distance, dy * distance + t * t * side * .27);
+-        final length = side * (.12 + rng.nextDouble() * .14) * (1 - t * .58);
+-        final width = length * (.32 + rng.nextDouble() * .33);
+-        final perp = Offset(-dy * width, dx * width);
+-        final tip = origin + Offset(dx * length, dy * length);
+-        final back = origin - Offset(dx * length * .45, dy * length * .45);
++          ..strokeWidth = (7 - ring * 1.4) * (1 - rt) + .25
++          ..color = (ring.isEven ? Colors.white : palette[chain % palette.length])
++            .withValues(alpha: .63 * (1 - rt) * fade));
++      }
++      for (var ray = 0; ray < 16; ray++) {
++        final angle = ray * math.pi / 8 + chain * .37;
++        final direction = Offset(math.cos(angle), math.sin(angle));
++        final start = centroid + direction * cell * (.2 + t * 1.1);
++        final end = centroid + direction * cell * (1.5 + intensity * 1.7) * t;
++        canvas.drawLine(start, end, _scratch
++          ..shader = null
++          ..style = PaintingStyle.stroke
++          ..strokeWidth = 1.1 + (ray % 3) * .7
++          ..color = Colors.white.withValues(alpha: .6 * fade));
++      }
++    }
++
++    for (final index in impactCells) {
++      if (index < 0 || index >= before.length) continue;
++      final center = Offset(((index % boardWidth) + .5) * cell,
++        ((index ~/ boardWidth) + .5) * cell);
++      final gem = before[index].clamp(0, palette.length - 1).toInt();
++      final color = palette[gem];
++      final random = math.Random(4021 + index * 1193 + chain * 277);
++      final speedScale = .8 + intensity * .26;
++
++      // Crystal fracture: white-hot core, four shock rings, and cut glass.
++      canvas.drawCircle(center, cell * (.21 + t * .85), Paint()
++        ..shader = RadialGradient(colors: <Color>[
++          Colors.white.withValues(alpha: .93 * fade),
++          color.withValues(alpha: .64 * fade),
++          Colors.transparent,
++        ]).createShader(Rect.fromCircle(center: center,
++          radius: cell * (.21 + t * .85))));
++      for (var layer = 0; layer < 4; layer++) {
++        final rt = ((t - layer * .075) / (1 - layer * .075)).clamp(0.0, 1.0).toDouble();
++        if (rt <= 0) continue;
++        canvas.drawCircle(center,
++          cell * (.18 + rt * (.9 + layer * .23) * speedScale),
++          _scratch..shader = null..style = PaintingStyle.stroke
++            ..strokeWidth = (4.3 - layer * .7) * (1 - rt) + .1
++            ..color = (layer.isEven ? Colors.white : color)
++              .withValues(alpha: .86 * (1 - rt) * fade));
++      }
++
++      // Triangular glass shards with trajectories and glints. Their distance
++      // responds to matched gem count AND cascade depth, never a fixed fade.
++      for (var part = 0; part < profile.shardsPerGem; part++) {
++        final a = (part + random.nextDouble() * .78) * 2 * math.pi /
++          profile.shardsPerGem;
++        final dir = Offset(math.cos(a), math.sin(a));
++        final speed = (.65 + random.nextDouble() * .95) * speedScale;
++        final launch = cell * (0.15 + speed * t * (1.45 + intensity * .24));
++        final tipCenter = center + dir * launch +
++          Offset(0, t * t * cell * .44);
++        final length = cell * (.1 + random.nextDouble() * .19) *
++          (1 - t * .56);
++        final breadth = length * (.22 + random.nextDouble() * .55);
++        final lateral = Offset(-dir.dy, dir.dx) * breadth;
++        final front = tipCenter + dir * length;
++        final back = tipCenter - dir * length * .64;
+         final shard = Path()
+-          ..moveTo(tip.dx, tip.dy)
+-          ..lineTo((origin + perp).dx, (origin + perp).dy)
++          ..moveTo(front.dx, front.dy)
++          ..lineTo((tipCenter + lateral).dx, (tipCenter + lateral).dy)
+           ..lineTo(back.dx, back.dy)
+-          ..lineTo((origin - perp).dx, (origin - perp).dy)
++          ..lineTo((tipCenter - lateral).dx, (tipCenter - lateral).dy)
+           ..close();
+-        canvas.drawPath(shard, Paint()
+-          ..color = Color.lerp(color, Colors.white, part.isEven ? .75 : .32)!
+-              .withValues(alpha: (.82 - .34 * t) * fade));
+-        if (part.isEven) {
+-          final streakStart = origin - Offset(dx * side * .16, dy * side * .16);
+-          canvas.drawLine(streakStart, origin, Paint()
+-            ..strokeWidth = 1.2 * (1 - t) + .3
+-            ..strokeCap = StrokeCap.round
+-            ..color = Colors.white.withValues(alpha: .65 * fade));
++        final tint = Color.lerp(color, Colors.white,
++          part.isEven ? .85 : .26)!;
++        canvas.drawPath(shard, _scratch..shader = null
++          ..style = PaintingStyle.fill
++          ..color = tint.withValues(alpha: (.96 - t * .27) * fade));
++        if (part % 3 == 0) {
++          canvas.drawLine(center + dir * (launch * .55), tipCenter,
++            _scratch..shader = null..style = PaintingStyle.stroke
++              ..strokeWidth = 1.3 * (1 - t) + .2
++              ..color = color.withValues(alpha: .73 * fade));
+         }
+       }
+ 
+-      // Fine sparks / high-frequency glints complement larger fragments.
+-      for (var spark = 0; spark < 10; spark++) {
+-        final angle = (spark + rng.nextDouble()) * math.pi * 2 / 10;
+-        final radius = burst * (.45 + rng.nextDouble() * .95);
+-        final pos = center + Offset(math.cos(angle) * radius, math.sin(angle) * radius);
+-        final sparklePaint = Paint()..color = Colors.white.withValues(alpha: .95 * fade);
+-        final length = side * .037 * (1 - t * .5);
+-        canvas.drawLine(pos.translate(-length, 0), pos.translate(length, 0), sparklePaint..strokeWidth = 1.25);
+-        canvas.drawLine(pos.translate(0, -length), pos.translate(0, length), sparklePaint);
++      // Secondary sparks provide the broad spray beyond the primary shards.
++      for (var spark = 0; spark < profile.sparksPerGem; spark++) {
++        final angle = (spark + random.nextDouble()) * 2 * math.pi /
++          profile.sparksPerGem;
++        final direction = Offset(math.cos(angle), math.sin(angle));
++        final distance = cell * (.4 + random.nextDouble() * 1.6) *
++          (1 + intensity * .3) * t;
++        final position = center + direction * distance +
++          Offset(0, cell * t * t * .24);
++        final radius = cell * (.018 + random.nextDouble() * .027) * (1 - .6 * t);
++        canvas.drawCircle(position, radius, _scratch..shader = null
++          ..style = PaintingStyle.fill
++          ..color = (spark.isEven ? Colors.white : color)
++            .withValues(alpha: .9 * fade));
++        if (spark % 5 == 0) {
++          canvas.drawLine(position.translate(-radius * 2, 0),
++            position.translate(radius * 2, 0),
++            _scratch..strokeWidth = .9..color = Colors.white.withValues(alpha: .8 * fade));
++          canvas.drawLine(position.translate(0, -radius * 2),
++            position.translate(0, radius * 2), _scratch);
++        }
+       }
+     }
+ 
+-    if (chain > 1 && t < .82) {
+-      // Compact floating cascade emphasis rather than a full-screen overlay.
+-      final point = active.first;
+-      final anchor = Offset(((point % 7) + .5) * side, ((point ~/ 7) + .5) * side);
++    // Strong central combo typography for the full animation, legible even on
++    // a small phone. Type scales with the actual cascade multiplier.
++    if (t < .9) {
++      final title = profile.mega
++          ? (chain >= 3 ? 'x$chain  KRİSTAL FIRTINASI' : 'MEGA PATLAMA!')
++          : (chain > 1 ? 'x$chain  KOMBO!' : 'KRİSTAL KIRILDI!');
++      final typeSize = (12 + intensity * 1.8).clamp(13, 21).toDouble();
+       final label = TextPainter(
+-        text: TextSpan(text: 'x$chain COMBO', style: TextStyle(
+-          color: Colors.white.withValues(alpha: (1 - t).clamp(0.0, 1.0)),
+-          fontSize: 14.0 + chain.clamp(0, 5).toDouble() * 1.2,
+-          fontWeight: FontWeight.w900, letterSpacing: 1.2,
+-          shadows: <Shadow>[Shadow(color: palette[0], blurRadius: 10)],
+-        )),
+-        textDirection: TextDirection.ltr,
+-      )..layout();
++        text: TextSpan(text: title, style: TextStyle(
++          color: Colors.white.withValues(alpha: (1 - t * .82).clamp(0.0, 1.0).toDouble()),
++          fontSize: typeSize, fontWeight: FontWeight.w900, letterSpacing: .8,
++          shadows: const <Shadow>[
++            Shadow(color: Colors.black, blurRadius: 9, offset: Offset(0, 2)),
++            Shadow(color: Color(0xFF72DCFF), blurRadius: 18),
++          ],
++        )), textDirection: TextDirection.ltr,
++      )..layout(maxWidth: size.width - 8);
+       label.paint(canvas, Offset(
+-        (anchor.dx - label.width / 2).clamp(0.0, math.max(0.0, size.width - label.width)).toDouble(),
+-        (anchor.dy - side * .85 - t * side * .8).clamp(0.0, math.max(0.0, size.height - label.height)).toDouble(),
++        ((size.width - label.width) / 2).clamp(2.0, size.width).toDouble(),
++        (centroid.dy - cell * 1.6 - t * cell * .6)
++          .clamp(4.0, math.max(4.0, size.height - label.height - 4)).toDouble(),
+       ));
+     }
+     canvas.restore();
++    _scratch..style = PaintingStyle.fill..shader = null;
+   }
+ 
+   @override
+-  bool shouldRepaint(covariant AnimalCrystalBurst old) =>
+-      old.cells != cells || old.before != before || old.chain != chain ||
+-      old.palette != palette || old.animation != animation;
++  bool shouldRepaint(covariant AnimalCrystalBurst oldDelegate) =>
++      oldDelegate.animation != animation || oldDelegate.cells != cells ||
++      oldDelegate.before != before || oldDelegate.palette != palette ||
++      oldDelegate.chain != chain || oldDelegate.boardWidth != boardWidth;
+ }
+--- /dev/null
++++ b/lib/screens/animal_match_result_screen.dart
+@@ -0,0 +1,330 @@
++import 'dart:math' as math;
++
++import 'package:flutter/material.dart';
++
++/// A separate, always-visible result route. The celebration starts immediately
++/// instead of waiting for slow preferences or rewards I/O.
++class AnimalMatchResultScreen extends StatefulWidget {
++  const AnimalMatchResultScreen({
++    super.key,
++    required this.won,
++    required this.level,
++    required this.animal,
++    required this.score,
++    required this.stars,
++    required this.movesLeft,
++    required this.baseReward,
++    required this.rewardTask,
++    required this.retryReward,
++    required this.tr,
++  });
++
++  final bool won;
++  final int level;
++  final String animal;
++  final int score;
++  final int stars;
++  final int movesLeft;
++  final int baseReward;
++  final Future<int> rewardTask;
++  final Future<int> Function() retryReward;
++  final bool tr;
++
++  @override
++  State<AnimalMatchResultScreen> createState() => _AnimalMatchResultScreenState();
++}
++
++class _AnimalMatchResultScreenState extends State<AnimalMatchResultScreen>
++    with SingleTickerProviderStateMixin {
++  late final AnimationController _controller;
++  late Future<int> _reward;
++
++  @override
++  void initState() {
++    super.initState();
++    _reward = widget.rewardTask;
++    _controller = AnimationController(
++      vsync: this, duration: const Duration(milliseconds: 1700))..forward();
++  }
++
++  @override
++  void dispose() {
++    _controller.dispose();
++    super.dispose();
++  }
++
++  void _retrySave() => setState(() => _reward = widget.retryReward());
++
++  @override
++  Widget build(BuildContext context) {
++    const sapphire = Color(0xFF69DBFF);
++    const gold = Color(0xFFFFD67A);
++    const dark = Color(0xFF070E22);
++    final accent = widget.won ? gold : sapphire;
++    final tr = widget.tr;
++    return Material(
++      color: dark,
++      child: Stack(children: <Widget>[
++        Positioned.fill(child: DecoratedBox(decoration: BoxDecoration(
++          gradient: RadialGradient(
++            center: const Alignment(0, -.6), radius: 1.4,
++            colors: <Color>[
++              (widget.won ? const Color(0xFF263E75) : const Color(0xFF193558)),
++              const Color(0xFF080D21),
++              dark,
++            ],
++            stops: const <double>[0, .65, 1],
++          ),
++        ))),
++        Positioned.fill(child: IgnorePointer(child: CustomPaint(
++          painter: _VictoryConfetti(animation: _controller,
++            enabled: widget.won),
++        ))),
++        SafeArea(child: Center(child: SingleChildScrollView(
++          padding: const EdgeInsets.symmetric(horizontal: 19, vertical: 15),
++          child: ConstrainedBox(
++            constraints: const BoxConstraints(maxWidth: 440),
++            child: Container(
++              padding: const EdgeInsets.fromLTRB(18, 24, 18, 22),
++              decoration: BoxDecoration(
++                borderRadius: BorderRadius.circular(30),
++                gradient: const LinearGradient(
++                  begin: Alignment.topLeft,
++                  end: Alignment.bottomRight,
++                  colors: <Color>[Color(0xF0243155), Color(0xF010192F)],
++                ),
++                border: Border.all(color: accent.withValues(alpha: .78), width: 1.8),
++                boxShadow: <BoxShadow>[
++                  BoxShadow(color: accent.withValues(alpha: .23),
++                    blurRadius: 42, spreadRadius: 1),
++                  const BoxShadow(color: Colors.black45, blurRadius: 32,
++                    offset: Offset(0, 13)),
++                ],
++              ),
++              child: Column(mainAxisSize: MainAxisSize.min, children: <Widget>[
++                Text(tr ? 'ELXVRO • KRİSTAL MACERASI'
++                        : 'ELXVRO • CRYSTAL ADVENTURE',
++                  textAlign: TextAlign.center,
++                  style: const TextStyle(fontSize: 11, color: Colors.white60,
++                    fontWeight: FontWeight.w900, letterSpacing: 1.7)),
++                const SizedBox(height: 18),
++                AnimatedBuilder(animation: _controller, builder: (context, _) {
++                  final t = Curves.elasticOut.transform(
++                    (_controller.value * 1.55).clamp(0.0, 1.0).toDouble());
++                  return Transform.scale(scale: .65 + t * .35,
++                    child: Container(width: 118, height: 118,
++                      decoration: BoxDecoration(shape: BoxShape.circle,
++                        gradient: RadialGradient(colors: <Color>[
++                          Colors.white.withValues(alpha: .27),
++                          accent.withValues(alpha: .25),
++                          accent.withValues(alpha: .015),
++                        ]),
++                        border: Border.all(color: accent.withValues(alpha: .85),
++                          width: 2),
++                        boxShadow: <BoxShadow>[
++                          BoxShadow(color: accent.withValues(alpha: .5),
++                            blurRadius: 38),
++                        ]),
++                      child: Icon(widget.won ? Icons.emoji_events_rounded
++                        : Icons.refresh_rounded,
++                        color: accent, size: 73)));
++                }),
++                const SizedBox(height: 17),
++                Text(widget.won
++                    ? (tr ? 'BÖLÜM TAMAMLANDI!' : 'LEVEL COMPLETED!')
++                    : (tr ? 'YENİDEN DENE' : 'TRY AGAIN'),
++                  textAlign: TextAlign.center,
++                  style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w900,
++                    letterSpacing: .65, color: Colors.white)),
++                const SizedBox(height: 6),
++                Text('${widget.level}/100  •  ${widget.animal}',
++                  textAlign: TextAlign.center,
++                  style: const TextStyle(fontSize: 13, color: Colors.white70,
++                    fontWeight: FontWeight.w600)),
++                if (widget.won) ...<Widget>[
++                  const SizedBox(height: 12),
++                  Row(mainAxisAlignment: MainAxisAlignment.center,
++                    children: List<Widget>.generate(3, (i) => Padding(
++                      padding: const EdgeInsets.symmetric(horizontal: 5),
++                      child: Icon(i < widget.stars ? Icons.star_rounded
++                        : Icons.star_border_rounded,
++                        color: i < widget.stars ? gold : Colors.white30,
++                        size: 43),
++                    ))),
++                ],
++                const SizedBox(height: 17),
++                Container(
++                  padding: const EdgeInsets.all(15),
++                  decoration: BoxDecoration(
++                    borderRadius: BorderRadius.circular(21),
++                    color: Colors.white.withValues(alpha: .065),
++                    border: Border.all(color: Colors.white.withValues(alpha: .12))),
++                  child: Row(children: <Widget>[
++                    Expanded(child: _Metric(
++                      label: tr ? 'PUAN' : 'SCORE', value: '${widget.score}',
++                      color: sapphire, icon: Icons.bolt_rounded)),
++                    Container(width: 1, height: 47,
++                      color: Colors.white.withValues(alpha: .18)),
++                    Expanded(child: _Metric(
++                      label: tr ? 'KALAN HAMLE' : 'MOVES LEFT',
++                      value: '${widget.movesLeft}',
++                      color: gold, icon: Icons.flash_on_rounded)),
++                  ]),
++                ),
++                const SizedBox(height: 14),
++                FutureBuilder<int>(future: _reward, builder: (context, snapshot) {
++                  final saving = widget.won &&
++                      snapshot.connectionState != ConnectionState.done;
++                  final error = snapshot.hasError;
++                  final granted = snapshot.data ?? 0;
++                  return Column(mainAxisSize: MainAxisSize.min,
++                    children: <Widget>[
++                      Row(mainAxisAlignment: MainAxisAlignment.center,
++                        children: <Widget>[
++                          const Icon(Icons.monetization_on_rounded, color: gold),
++                          const SizedBox(width: 8),
++                          Text(widget.won ? '+$granted' : '+0',
++                            style: const TextStyle(color: gold, fontSize: 24,
++                              fontWeight: FontWeight.w900)),
++                          const SizedBox(width: 7),
++                          Text(tr ? 'ALTIN' : 'COINS',
++                            style: const TextStyle(color: Colors.white70,
++                              fontSize: 11, fontWeight: FontWeight.w800)),
++                        ]),
++                      const SizedBox(height: 12),
++                      if (saving) ...<Widget>[
++                        const LinearProgressIndicator(minHeight: 3),
++                        const SizedBox(height: 8),
++                        Text(tr ? 'İlerleme kaydediliyor…'
++                          : 'Saving progress…',
++                          style: const TextStyle(color: Colors.white70,
++                            fontSize: 11)),
++                      ],
++                      if (error) ...<Widget>[
++                        Text(tr ? 'Kayıt başarısız. Tekrar dene.'
++                          : 'Save failed. Please retry.',
++                          style: const TextStyle(color: Color(0xFFFFB8A8),
++                            fontSize: 12)),
++                        TextButton.icon(
++                          onPressed: _retrySave,
++                          icon: const Icon(Icons.refresh_rounded),
++                          label: Text(tr ? 'KAYDI TEKRAR DENE' : 'RETRY SAVE')),
++                      ],
++                      if (widget.won && widget.level < 100) ...<Widget>[
++                        SizedBox(width: double.infinity, height: 52,
++                          child: FilledButton.icon(
++                            onPressed: saving || error ? null
++                              : () => Navigator.pop(context, 1),
++                            style: FilledButton.styleFrom(
++                              backgroundColor: gold,
++                              foregroundColor: const Color(0xFF18121D),
++                              shape: RoundedRectangleBorder(
++                                borderRadius: BorderRadius.circular(15))),
++                            icon: const Icon(Icons.arrow_forward_rounded),
++                            label: Text(tr ? 'SONRAKİ BÖLÜM' : 'NEXT LEVEL',
++                              style: const TextStyle(fontWeight: FontWeight.w900,
++                                letterSpacing: .8)),
++                          )),
++                        const SizedBox(height: 8),
++                      ],
++                      if (!widget.won) ...<Widget>[
++                        SizedBox(width: double.infinity, height: 52,
++                          child: FilledButton.icon(
++                            onPressed: () => Navigator.pop(context, 2),
++                            icon: const Icon(Icons.replay_rounded),
++                            label: Text(tr ? 'TEKRAR OYNA' : 'PLAY AGAIN'))),
++                        const SizedBox(height: 8),
++                      ],
++                      SizedBox(width: double.infinity, height: 46,
++                        child: OutlinedButton.icon(
++                          onPressed: () => Navigator.pop(context, 0),
++                          icon: const Icon(Icons.map_rounded),
++                          label: Text(tr ? 'BÖLÜMLER' : 'LEVEL MAP'),
++                          style: OutlinedButton.styleFrom(
++                            foregroundColor: Colors.white,
++                            side: BorderSide(color: accent.withValues(alpha: .52)),
++                            shape: RoundedRectangleBorder(
++                              borderRadius: BorderRadius.circular(15)),
++                          ))),
++                      if (widget.won && widget.level == 100) ...<Widget>[
++                        const SizedBox(height: 8),
++                        TextButton(onPressed: () => Navigator.pop(context, 2),
++                          child: Text(tr ? 'TEKRAR OYNA' : 'PLAY AGAIN')),
++                      ],
++                    ]);
++                }),
++              ]),
++            ),
++          ),
++        ))),
++      ]),
++    );
++  }
++}
++
++class _Metric extends StatelessWidget {
++  const _Metric({required this.label, required this.value,
++    required this.color, required this.icon});
++  final String label;
++  final String value;
++  final Color color;
++  final IconData icon;
++  @override
++  Widget build(BuildContext context) => Column(
++    mainAxisSize: MainAxisSize.min, children: <Widget>[
++    Row(mainAxisAlignment: MainAxisAlignment.center, children: <Widget>[
++      Icon(icon, size: 13, color: color),
++      const SizedBox(width: 4),
++      Flexible(child: Text(label, maxLines: 1,
++        overflow: TextOverflow.ellipsis,
++        style: const TextStyle(fontSize: 10, color: Colors.white70,
++          fontWeight: FontWeight.w800))),
++    ]),
++    const SizedBox(height: 4),
++    Text(value, style: TextStyle(fontSize: 23, color: color,
++      fontWeight: FontWeight.w900)),
++  ]);
++}
++
++class _VictoryConfetti extends CustomPainter {
++  _VictoryConfetti({required this.animation, required this.enabled})
++      : super(repaint: animation);
++  final Animation<double> animation;
++  final bool enabled;
++
++  @override
++  void paint(Canvas canvas, Size size) {
++    if (!enabled) return;
++    final t = animation.value;
++    const colors = <Color>[
++      Color(0xFFFFD674), Color(0xFF73E9FF), Color(0xFFE1A2FF),
++      Color(0xFF83F4C3), Color(0xFFFF879A),
++    ];
++    final rng = math.Random(8731);
++    for (var i = 0; i < 130; i++) {
++      final x = rng.nextDouble() * size.width;
++      final y = rng.nextDouble() * size.height * .8;
++      final speed = .38 + rng.nextDouble() * .85;
++      final theta = rng.nextDouble() * math.pi * 2;
++      final position = Offset(
++        x + math.sin(theta) * 43 * t,
++        y - 140 * (1 - t) * speed + 250 * t * t * speed,
++      );
++      final side = 2.3 + rng.nextDouble() * 5;
++      final paint = Paint()..color = colors[i % colors.length]
++        .withValues(alpha: (1 - t * .7).clamp(0.0, 1.0).toDouble());
++      canvas.save();
++      canvas.translate(position.dx, position.dy);
++      canvas.rotate(t * (2 + i % 4));
++      canvas.drawRRect(RRect.fromRectAndRadius(
++        Rect.fromCenter(center: Offset.zero,
++          width: side, height: side * 2.5),
++        const Radius.circular(1.4)), paint);
++      canvas.restore();
++    }
++  }
++
++  @override
++  bool shouldRepaint(covariant _VictoryConfetti old) =>
++      old.animation != animation || old.enabled != enabled;
++}
+--- /dev/null
++++ b/test/v0335_premium_adventure_test.dart
+@@ -0,0 +1,102 @@
++import 'dart:async';
++import 'dart:math';
++
++import 'package:elxvro_blocks/game/animal_match_engine.dart';
++import 'package:elxvro_blocks/screens/animal_match_result_screen.dart';
++import 'package:elxvro_blocks/widgets/animal_crystal_burst.dart';
++import 'package:flutter/material.dart';
++import 'package:flutter_test/flutter_test.dart';
++
++void main() {
++  test('all 100 levels increase the challenge without invalid values', () {
++    var lastTarget = 0;
++    var lastMoves = 100;
++    for (var n = 1; n <= 100; n++) {
++      final stage = AnimalMatchLevel(n);
++      expect(stage.target, greaterThan(lastTarget));
++      expect(stage.moves, lessThanOrEqualTo(lastMoves));
++      expect(stage.difficultyTier, inInclusiveRange(1, 10));
++      expect(stage.featuredGem, inInclusiveRange(0, 5));
++      lastTarget = stage.target;
++      lastMoves = stage.moves;
++    }
++    expect(AnimalMatchEngine.cells, 72);
++    expect(AnimalMatchLevel(100).baseReward,
++      greaterThan(AnimalMatchLevel(1).baseReward));
++  });
++
++  test('stronger gem unions increase particle counts and spread', () {
++    final normal = CrystalImpactProfile(matched: 3, chain: 1);
++    final multi = CrystalImpactProfile(matched: 8, chain: 1);
++    final mega = CrystalImpactProfile(matched: 16, chain: 6);
++    expect(normal.mega, false);
++    expect(multi.mega, true);
++    expect(mega.force, greaterThan(multi.force));
++    expect(multi.force, greaterThan(normal.force));
++    expect(mega.shardsPerGem, greaterThan(normal.shardsPerGem));
++    expect(mega.sparksPerGem, greaterThan(normal.sparksPerGem));
++    expect(mega.maxImpactCells, lessThanOrEqualTo(36));
++  });
++
++  test('cascades never leave an invalid or deadlocked board', () {
++    for (var seed = 0; seed < 25; seed++) {
++      final engine = AnimalMatchEngine(AnimalMatchLevel(15),
++        random: Random(seed));
++      for (var round = 0; round < 6 && !engine.ended; round++) {
++        var moved = false;
++        for (var a = 0; a < AnimalMatchEngine.cells && !moved; a++) {
++          for (final delta in <int>[1, AnimalMatchEngine.width]) {
++            final b = a + delta;
++            if (b >= AnimalMatchEngine.cells) continue;
++            if (delta == 1 && a ~/ AnimalMatchEngine.width !=
++                b ~/ AnimalMatchEngine.width) continue;
++            final result = engine.swap(a, b);
++            if (result.valid) {
++              expect(result.steps, isNotEmpty);
++              expect(engine.board.every((v) => v >= 0 && v < 6), true);
++              if (!engine.ended) {
++                expect(engine.hasExistingMatches, false);
++                expect(engine.hasPossibleSwap, true);
++              }
++              moved = true;
++              break;
++            }
++          }
++        }
++        expect(moved, true);
++      }
++    }
++  });
++
++  testWidgets('victory opens before save finishes and NEXT waits for save',
++      (tester) async {
++    await tester.binding.setSurfaceSize(const Size(390, 800));
++    addTearDown(() => tester.binding.setSurfaceSize(null));
++    final save = Completer<int>();
++    await tester.pumpWidget(MaterialApp(home: AnimalMatchResultScreen(
++      won: true,
++      level: 12,
++      animal: 'Kedi',
++      score: 3200,
++      stars: 3,
++      movesLeft: 8,
++      baseReward: 100,
++      rewardTask: save.future,
++      retryReward: () => save.future,
++      tr: true,
++    )));
++    await tester.pump();
++    expect(find.text('BÖLÜM TAMAMLANDI!'), findsOneWidget);
++    expect(find.text('İlerleme kaydediliyor…'), findsOneWidget);
++    final nextBefore = tester.widget<FilledButton>(
++      find.widgetWithText(FilledButton, 'SONRAKİ BÖLÜM'));
++    expect(nextBefore.onPressed, isNull);
++    save.complete(100);
++    await tester.pump();
++    await tester.pump(const Duration(milliseconds: 30));
++    expect(find.text('+100'), findsOneWidget);
++    final nextAfter = tester.widget<FilledButton>(
++      find.widgetWithText(FilledButton, 'SONRAKİ BÖLÜM'));
++    expect(nextAfter.onPressed, isNotNull);
++  });
++}
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -1,7 +1,7 @@
+ name: elxvro_blocks
+ description: Premium block puzzle game for ELXVRO.
+ publish_to: 'none'
+-version: 0.33.3+86
++version: 0.33.5+88
+ 
+ environment:
+   sdk: '>=3.4.0 <4.0.0'
