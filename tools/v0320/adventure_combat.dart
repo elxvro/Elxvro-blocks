@@ -49,7 +49,7 @@ class AdventureCombat {
     if (move == CombatMove.sword) {
       _swordCooldownMs = slowMs > 0 ? 800 : 460;
       _deal(80 + world * 9);
-      energy = (energy + 10).clamp(0, 100);
+      energy = (energy + 10).clamp(0, 100).toInt();
     } else if (move == CombatMove.power) {
       energy -= 25;
       _powerCooldownMs = 4200;
@@ -84,25 +84,25 @@ class AdventureCombat {
     if (finished || deltaMs <= 0) return;
     final dt = deltaMs.clamp(0, 150).toInt();
     timeMs += dt;
-    _swordCooldownMs = (_swordCooldownMs - dt).clamp(0, 99999);
-    _powerCooldownMs = (_powerCooldownMs - dt).clamp(0, 99999);
-    _ultimateCooldownMs = (_ultimateCooldownMs - dt).clamp(0, 99999);
-    _shieldCooldownMs = (_shieldCooldownMs - dt).clamp(0, 99999);
-    shieldMs = (shieldMs - dt).clamp(0, 99999);
-    slowMs = (slowMs - dt).clamp(0, 99999);
+    _swordCooldownMs = (_swordCooldownMs - dt).clamp(0, 99999).toInt();
+    _powerCooldownMs = (_powerCooldownMs - dt).clamp(0, 99999).toInt();
+    _ultimateCooldownMs = (_ultimateCooldownMs - dt).clamp(0, 99999).toInt();
+    _shieldCooldownMs = (_shieldCooldownMs - dt).clamp(0, 99999).toInt();
+    shieldMs = (shieldMs - dt).clamp(0, 99999).toInt();
+    slowMs = (slowMs - dt).clamp(0, 99999).toInt();
     if (poisonMs > 0) {
-      poisonMs = (poisonMs - dt).clamp(0, 99999);
+      poisonMs = (poisonMs - dt).clamp(0, 99999).toInt();
       _poisonTickMs -= dt;
       if (_poisonTickMs <= 0) {
-        playerHp = (playerHp - 18).clamp(0, 1000);
+        playerHp = (playerHp - 18).clamp(0, 1000).toInt();
         _poisonTickMs = 900;
       }
     }
     if (burnMs > 0) {
-      burnMs = (burnMs - dt).clamp(0, 99999);
+      burnMs = (burnMs - dt).clamp(0, 99999).toInt();
       _burnTickMs -= dt;
       if (_burnTickMs <= 0) {
-        playerHp = (playerHp - 22).clamp(0, 1000);
+        playerHp = (playerHp - 22).clamp(0, 1000).toInt();
         _burnTickMs = 900;
       }
     }
@@ -113,7 +113,7 @@ class AdventureCombat {
         _strike();
         dangerLane = -1;
         warningMs = 0;
-        _attackWaitMs = (2700 - world * 150).clamp(1700, 2700);
+        _attackWaitMs = (2700 - world * 150).clamp(1700, 2700).toInt();
       }
       return;
     }
@@ -121,7 +121,7 @@ class AdventureCombat {
     if (_attackWaitMs <= 0) {
       bossStrikes++;
       dangerLane = (bossStrikes + level) % 3;
-      warningMs = (1450 - world * 65).clamp(980, 1450);
+      warningMs = (1450 - world * 65).clamp(980, 1450).toInt();
     }
   }
   void _strike() {
@@ -133,7 +133,7 @@ class AdventureCombat {
       return;
     }
     final damage = 100 + world * 26 + (level % 10) * 5;
-    playerHp = (playerHp - damage).clamp(0, 1000);
+    playerHp = (playerHp - damage).clamp(0, 1000).toInt();
     hitsTaken++;
     if (world == 1) {
       slowMs = 2400;
@@ -142,9 +142,9 @@ class AdventureCombat {
     } else if (world == 3) {
       burnMs = 2800;
     } else if (world == 4) {
-      energy = (energy - 10).clamp(0, 100);
+      energy = (energy - 10).clamp(0, 100).toInt();
     } else if (world == 5) {
-      bossHp = (bossHp + 36).clamp(0, bossMaxHp);
+      bossHp = (bossHp + 36).clamp(0, bossMaxHp).toInt();
     }
   }
 }
