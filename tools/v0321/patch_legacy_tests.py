@@ -44,4 +44,32 @@ for p in (root/'test').glob('*.dart'):
     if 'version: 0.32.0+81' in original:
         p.write_text(original.replace('version: 0.32.0+81', 'version: 0.32.1+82'))
 
+# Keep regression coverage aligned with the surviving non-Adventure modes.
+# The arcade board now clamps its computed width to the available viewport
+# instead of using the retired old sizing formula.
+p = root / 'test/v022_language_gameplay_test.dart'
+text = p.read_text()
+if text.count("expect(falling, contains('constraints.maxWidth *'));") != 1:
+    raise RuntimeError('Expected legacy Falling Blocks board sizing assertion')
+text = text.replace(
+    "expect(falling, contains('constraints.maxWidth *'));",
+    "expect(falling, contains('constraints.maxWidth - 6'));",
+    1,
+)
+p.write_text(text)
+
+# The retired adventure_10 achievement reduces ranked achievements from 20
+# to 19; existing claimed reward state stays in SharedPreferences.
+p = root / 'test/v0280_merit_missions_test.dart'
+text = p.read_text()
+if text.count('expect(AppState.rankedAchievementIds.length, 20);') != 1:
+    raise RuntimeError('Expected old ranked achievement count')
+text = text.replace(
+    'expect(AppState.rankedAchievementIds.length, 20);',
+    "expect(AppState.rankedAchievementIds.length, 19);\n"
+    "    expect(AppState.rankedAchievementIds, isNot(contains('adventure_10')));",
+    1,
+)
+p.write_text(text)
+
 print('Retired obsolete Adventure regression tests while retaining other game tests.')
