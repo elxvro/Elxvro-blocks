@@ -878,7 +878,7 @@ jobs:
           s=Path('lib/screens/falling_blocks_screen.dart').read_text()
           assert 'RepaintBoundary(' in s
           assert 'onPanCancel: _onPanCancel' in s
-          assert 'version: 0.31.4+80' in Path('pubspec.yaml').read_text()
+          assert 'version: 0.32.0+81' in Path('pubspec.yaml').read_text()
           PY
 
       - name: Build signed Google Play AAB
