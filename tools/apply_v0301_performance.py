@@ -111,7 +111,7 @@ s=put(s,'    final targets = cells.toList()..sort();',"""    final targets = cel
     final sprites = List<Image>.generate(
       5,
       (index) => Image.asset(
-        'assets/images/material_shards/${'${material.name}'}_$index.webp',
+        'assets/images/material_shards/${material.name}_$index.webp',
         fit: BoxFit.contain,
         filterQuality: FilterQuality.low,
         gaplessPlayback: true,
@@ -123,7 +123,7 @@ s=put(s,'                _fragment(targets[n], n, shard, t, alpha, cellW, cellH)
 s=put(s,'    ));\n  }\n\n  Widget _fragment','    )));\n  }\n\n  Widget _fragment','particle close')
 s=put(s,'      double alpha, double cellW, double cellH) {','      double alpha, double cellW, double cellH, List<Image> sprites) {','sprites type')
 s=put(s,"""            child: Image.asset(
-              'assets/images/material_shards/${'${material.name}'}_${'${shard % 5}'}.webp',
+              'assets/images/material_shards/${material.name}_${shard % 5}.webp',
               fit: BoxFit.contain,
               filterQuality: FilterQuality.low,
             ),""",'            child: sprites[shard % sprites.length],','sprites reuse')
