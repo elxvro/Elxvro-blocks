@@ -265,7 +265,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
   }
 
   void _move(int delta) {
-    if (_paused || _gameOver || _finishing) return;
+    if (_paused || _gameOver || _finishing || _locking) return;
     final nextCol = _col + delta;
     if (_canPlace(_piece, _row, nextCol)) {
       setState(() => _col = nextCol);
@@ -276,7 +276,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
   }
 
   void _rotate() {
-    if (_paused || _gameOver || _finishing) return;
+    if (_paused || _gameOver || _finishing || _locking) return;
     final rotated = _piece.rotated();
     for (final kick in <int>[0, -1, 1, -2, 2]) {
       if (_canPlace(rotated, _row, _col + kick)) {
@@ -294,7 +294,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
   }
 
   void _hardDrop() {
-    if (_paused || _gameOver || _finishing) return;
+    if (_paused || _gameOver || _finishing || _locking) return;
     var distance = 0;
     while (_canPlace(_piece, _row + distance + 1, _col)) {
       distance += 1;
@@ -307,7 +307,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
   }
 
   void _onPanUpdate(DragUpdateDetails details) {
-    if (_paused || _gameOver || _finishing) return;
+    if (_paused || _gameOver || _finishing || _locking) return;
     _dragDx += details.delta.dx;
     _dragDy += details.delta.dy;
 
@@ -425,6 +425,13 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
       }
     }
 
+    if (_isAdventure && _score >= _targetScore) {
+      _locking = false;
+      if (mounted) setState(() {});
+      await _finish(success: true);
+      return;
+    }
+
     _piece = _nextPiece;
     _nextPiece = _randomPiece();
     _row = -1;
@@ -450,11 +457,13 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
 
     if (_isAdventure) {
       final level = widget.adventureLevel!;
-      await widget.appState.completeAdventureLevel(
-        level: level.number,
-        reward: 0,
-        score: _score,
-      );
+      if (success) {
+        await widget.appState.completeAdventureLevel(
+          level: level.number,
+          reward: level.reward,
+          score: _score,
+        );
+      }
 
       final playGames = PlayGamesService.production();
       unawaited(
@@ -481,7 +490,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
       barrierDismissible: false,
       builder: (dialogContext) {
         final adventure = widget.adventureLevel;
-        final canGoNext =
+        final canGoNext = success &&
             adventure != null && adventure.number < adventureLevelCount;
 
         return AlertDialog(
@@ -639,7 +648,7 @@ class _FallingBlocksScreenState extends State<FallingBlocksScreen>
                     : AppStrings.current.f('DÜŞEN BLOKLAR', 'FALLING BLOCKS'),
                 score: _score,
                 lines: _lines,
-                targetScore: _isAdventure ? 0 : _targetScore,
+                targetScore: _isAdventure ? _targetScore : 0,
                 level: _difficultyLevel,
                 accent: levelAccent,
                 paused: _paused,
