@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Adapt ELXVRO Blocks v0.29.6 for Android edge-to-edge and efficient bitmaps."""
+"""Adapt ELXVRO Blocks v0.29.7 for Android edge-to-edge and efficient bitmaps."""
 from pathlib import Path
 import argparse
 
@@ -90,11 +90,14 @@ def apply_android(root: Path) -> None:
     data += '''\n// WindowCompat edge-to-edge API (AndroidX Core 1.17+).
 dependencies {
     implementation("androidx.core:core-ktx:1.17.0")
+    // Use Google Play Games v2 SDK released September 2026.
+    implementation("com.google.android.gms:play-services-games-v2:22.1.0")
 }
 '''
     gradle.write_text(data)
     assert 'WindowCompat.setDecorFitsSystemWindows(window, false)' in kotlin.read_text()
     assert 'androidx.core:core-ktx:1.17.0' in gradle.read_text()
+    assert 'play-services-games-v2:22.1.0' in gradle.read_text()
     print('Android 15/16 edge-to-edge configured without direct bar color APIs.')
 
 if __name__ == '__main__':
