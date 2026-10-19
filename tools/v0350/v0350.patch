@@ -1,0 +1,886 @@
+--- a/lib/game/animal_match_engine.dart
++++ b/lib/game/animal_match_engine.dart
+@@ -76,7 +76,15 @@
+   int get baseReward => 35 + number * 2 + difficultyTier * 5;
+   /// Each fifth stage grants a once-only milestone chest on first completion.
+   int get milestoneBonus => number % 5 == 0 ? 50 + difficultyTier * 10 : 0;
+-  int get victoryReward => baseReward + milestoneBonus;
++  int get victoryReward => baseReward + milestoneBonus +
++      (isBoss ? 160 + difficultyTier * 25 : 0);
++
++  /// A boss appears inside the existing stage every ten levels, not on a
++  /// second map. Its attack rate and HP grow across the ten encounters.
++  bool get isBoss => number % 10 == 0;
++  int get bossMaxHealth => isBoss ? 72 + difficultyTier * 33 : 0;
++  int get bossAttackInterval => difficultyTier >= 7 ? 2 : 3;
++
+ 
+   /// Obstacles gradually enter play; this is not a replacement for the
+   /// original adventure map or the existing three collection objectives.
+@@ -102,6 +110,8 @@
+     this.blockersBefore = const <int>[],
+     this.blockersAfter = const <int>[],
+     this.fracturedBlockers = const <int>{},
++    this.specialsBefore = const <int>[],
++    this.specialsAfter = const <int>[],
+   });
+ 
+   final List<int> before;
+@@ -112,6 +122,9 @@
+   final List<int> blockersBefore;
+   final List<int> blockersAfter;
+   final Set<int> fracturedBlockers;
++  /// Immutable special-crystal snapshots for each cinematic cascade frame.
++  final List<int> specialsBefore;
++  final List<int> specialsAfter;
+ }
+ 
+ class AnimalMatchResult {
+@@ -135,6 +148,7 @@
+   AnimalMatchEngine(this.level, {Random? random})
+       : _random = random ?? Random() {
+     movesLeft = level.moves;
++    bossHealth = level.bossMaxHealth;
+     _createPlayableBoard();
+     _seedObstacles();
+     if (!_hasPossibleSwap()) _createPlayableBoard();
+@@ -150,6 +164,16 @@
+   /// 0 = clear, 1 = ice, 2 = chain, 3 = stone (2 hits), 4 = cracked stone.
+   /// These stay fixed to board coordinates as gems fall behind them.
+   final List<int> blockers = List<int>.filled(cells, 0);
++  // 0 ordinary, 1 horizontal rocket, 2 vertical rocket,
++  // 3 lightning cross, 4 color prism. Specials follow gems during gravity.
++  final List<int> specials = List<int>.filled(cells, 0);
++  int bossHealth = 0;
++  int bossAttacks = 0;
++  int _bossTurns = 0;
++  bool get bossDefeated => !level.isBoss || bossHealth == 0;
++  double get bossHealthFraction => level.isBoss
++      ? bossHealth / level.bossMaxHealth : 0;
++
+   int get remainingObstacles => blockers.where((b) => b != 0).length;
+   int get clearedObstacles => level.obstacleCount - remainingObstacles;
+   int barrierAt(int index) => blockers[index];
+@@ -196,7 +220,7 @@
+       (total, species) => total + min(_collected[species], level.targetFor(species)));
+   bool get allGoalsMet => level.targetGems.every(
+       (species) => _collected[species] >= level.targetFor(species));
+-  bool get allWinConditionsMet => allGoalsMet && remainingObstacles == 0;
++  bool get allWinConditionsMet => allGoalsMet && remainingObstacles == 0 && bossDefeated;
+   void _credit(int species, {int amount = 1}) {
+     if (level.targetFor(species) > 0) _collected[species] += amount;
+   }
+@@ -229,6 +253,7 @@
+   }
+ 
+   void _createPlayableBoard() {
++    specials.fillRange(0, cells, 0);
+     // No pre-cleared opening tiles and at least one legal move.
+     for (var attempt = 0; attempt < 400; attempt++) {
+       for (var i = 0; i < cells; i++) {
+@@ -322,18 +347,100 @@
+ 
+   void _exchange(int a, int b) {
+     final t = board[a]; board[a] = board[b]; board[b] = t;
++    final power = specials[a]; specials[a] = specials[b]; specials[b] = power;
++  }
++
++  /// Detect four/five-length runs and mint a playable special crystal after
++  /// falling has settled. Five creates a color prism; four a row/col rocket.
++  Map<int, int> _newSpecials() {
++    final result = <int, int>{};
++    void scan(List<int> indices, int rocket) {
++      var start = 0;
++      while (start < indices.length) {
++        final color = board[indices[start]];
++        var end = start + 1;
++        while (end < indices.length && color >= 0 &&
++            board[indices[end]] == color) { end++; }
++        final length = end - start;
++        if (length >= 4) {
++          final anchor = indices[start + length ~/ 2];
++          result[anchor] = length >= 6 ? 3 : length >= 5 ? 4 : rocket;
++        }
++        start = end;
++      }
++    }
++    for (var row = 0; row < height; row++) {
++      scan(List<int>.generate(width, (i) => row * width + i), 1);
++    }
++    for (var col = 0; col < width; col++) {
++      scan(List<int>.generate(height, (i) => i * width + col), 2);
++    }
++    return result;
++  }
++
++  /// Trigger active specials, including other specials hit by their blasts.
++  /// The visited guard prevents infinite lightning/prism reactions.
++  Set<int> _igniteSpecials(Set<int> initial, {int? chosenColor}) {
++    final cleared = <int>{...initial};
++    final activated = <int>{};
++    for (var pass = 0; pass < cells; pass++) {
++      final waiting = cleared.where((i) =>
++        specials[i] != 0 && !activated.contains(i)).toList(growable: false);
++      if (waiting.isEmpty) break;
++      for (final index in waiting) {
++        activated.add(index);
++        final power = specials[index];
++        specials[index] = 0;
++        final row = index ~/ width, col = index % width;
++        if (power == 1 || power == 3) {
++          for (var c = 0; c < width; c++) cleared.add(row * width + c);
++        }
++        if (power == 2 || power == 3) {
++          for (var r = 0; r < height; r++) cleared.add(r * width + col);
++        }
++        if (power == 4) {
++          final kind = chosenColor ?? board[index];
++          for (var i = 0; i < cells; i++) {
++            if (board[i] == kind) cleared.add(i);
++          }
++        }
++      }
++    }
++    return cleared;
++  }
++
++  /// Boss attacks are deterministic for a given stage/turn. They cannot
++  /// silently remove the last legal move or replace existing blockers.
++  void _bossAttack() {
++    if (!level.isBoss || bossHealth <= 0 || won || movesLeft <= 0) return;
++    _bossTurns++;
++    if (_bossTurns % level.bossAttackInterval != 0) return;
++    final candidates = List<int>.generate(cells, (i) => i)
++      ..shuffle(Random(level.number * 173 + _bossTurns * 41));
++    var added = 0;
++    for (final index in candidates) {
++      if (blockers[index] != 0 || specials[index] != 0) continue;
++      blockers[index] = level.difficultyTier >= 7 && added == 0 ? 2 : 1;
++      if (!_hasPossibleSwap()) {
++        blockers[index] = 0;
++        continue;
++      }
++      added++;
++      if (added >= (level.difficultyTier >= 6 ? 2 : 1)) break;
++    }
++    if (added > 0) bossAttacks++;
+   }
+ 
+   bool _hasPossibleSwap() {
+     for (var i = 0; i < cells; i++) {
+       for (final delta in <int>[1, width]) {
+         final j = i + delta;
+-        if (!_neighbors(i, j) || board[i] == board[j] ||
++        if (!_neighbors(i, j) || (board[i] == board[j] && specials[i] == 0 && specials[j] == 0) ||
+             blockers[i] != 0 || blockers[j] != 0) continue;
+         _exchange(i, j);
+         final possible = _collectMatches().isNotEmpty;
+         _exchange(i, j);
+-        if (possible) return true;
++        if (possible || specials[i] != 0 || specials[j] != 0) return true;
+       }
+     }
+     return false;
+@@ -343,17 +450,26 @@
+   bool get hasExistingMatches => _collectMatches().isNotEmpty;
+ 
+   AnimalMatchResult swap(int a, int b) {
+-    if (ended || !_neighbors(a, b) || board[a] == board[b] ||
++    if (ended || !_neighbors(a, b) ||
++        (board[a] == board[b] && specials[a] == 0 && specials[b] == 0) ||
+         blockers[a] != 0 || blockers[b] != 0) {
+       return AnimalMatchResult.invalid;
+     }
+     _exchange(a, b);
+-    if (_collectMatches().isEmpty) {
++    final powered = specials[a] != 0 || specials[b] != 0;
++    if (!powered && _collectMatches().isEmpty) {
+       _exchange(a, b);
+       return AnimalMatchResult.invalid;
+     }
++    final selected = specials[a] == 4 ? board[b] :
++        specials[b] == 4 ? board[a] : null;
+     movesLeft--;
+-    return _resolve();
++    final result = _resolve(
++      firstClear: powered ? <int>{a, b} : null,
++      specialColor: selected,
++    );
++    if (!won) _bossAttack();
++    return result;
+   }
+ 
+   /// Applies gravity once and records each destination's travel distance.
+@@ -366,12 +482,15 @@
+         final value = board[y * width + col];
+         if (value >= 0) {
+           board[writeY * width + col] = value;
++          specials[writeY * width + col] = specials[y * width + col];
++          if (writeY != y) specials[y * width + col] = 0;
+           distances[writeY * width + col] = writeY - y;
+           writeY--;
+         }
+       }
+       while (writeY >= 0) {
+         board[writeY * width + col] = _randomGem();
++        specials[writeY * width + col] = 0;
+         distances[writeY * width + col] = writeY + 1;
+         writeY--;
+       }
+@@ -379,15 +498,27 @@
+     return distances;
+   }
+ 
+-  AnimalMatchResult _resolve({List<AnimalMatchStep> initialSteps = const []}) {
++  AnimalMatchResult _resolve({
++    List<AnimalMatchStep> initialSteps = const [],
++    Set<int>? firstClear,
++    int? specialColor,
++  }) {
+     var totalCleared = 0, cascade = 0, gained = 0;
+     final steps = <AnimalMatchStep>[...initialSteps];
+     for (var round = 0; round < 30; round++) {
+-      final positions = _collectMatches();
++      final normalMatches = _collectMatches();
++      final spawns = _newSpecials();
++      final positions = _igniteSpecials(
++        round == 0 && firstClear != null
++            ? <int>{...normalMatches, ...firstClear}
++            : normalMatches,
++        chosenColor: round == 0 ? specialColor : null,
++      );
+       if (positions.isEmpty) break;
+       cascade++;
+       final before = List<int>.of(board);
+       final blockersBefore = List<int>.of(blockers);
++      final specialsBefore = List<int>.of(specials);
+       // Only actual collected animals count; chains multiply score and FX,
+       // never instantly complete collection quotas.
+       for (final index in positions) {
+@@ -398,8 +529,18 @@
+       gained += broken.length * 28 * cascade;
+       // Score multiplier scales with the stage and the cascade chain.
+       gained += positions.length * (12 + level.difficultyTier * 2) * cascade;
+-      for (final index in positions) {board[index] = -1;}
++      if (level.isBoss && bossHealth > 0) {
++        final damage = positions.length * (2 + min(cascade, 5)) +
++          (positions.length >= 7 ? 12 : 0);
++        bossHealth = max(0, bossHealth - damage);
++      }
++      for (final index in positions) { board[index] = -1; specials[index] = 0; }
+       final distances = _fallAndRefill();
++      // Only surviving line anchors mint power-ups; a cascade may turn a
++      // regular gem into a special on its freshly settled coordinate.
++      for (final entry in spawns.entries.take(3)) {
++        specials[entry.key] = entry.value;
++      }
+       steps.add(AnimalMatchStep(
+         before: before,
+         after: List<int>.of(board),
+@@ -409,6 +550,8 @@
+         blockersBefore: List<int>.unmodifiable(blockersBefore),
+         blockersAfter: List<int>.unmodifiable(blockers),
+         fracturedBlockers: Set<int>.unmodifiable(broken),
++        specialsBefore: List<int>.unmodifiable(specialsBefore),
++        specialsAfter: List<int>.unmodifiable(specials),
+       ));
+     }
+     score += gained;
+@@ -432,10 +575,12 @@
+     hammers--;
+     final before = List<int>.of(board);
+     final blockersBefore = List<int>.of(blockers);
++    final specialsBefore = List<int>.of(specials);
+     final fractured = _fractureBarriers(<int>{index});
+     _credit(board[index]);
+     score += 20 + fractured.length * 28;
+     board[index] = -1;
++    specials[index] = 0;
+     final distances = _fallAndRefill();
+     final step = AnimalMatchStep(
+       before: before, after: List<int>.of(board),
+@@ -444,6 +589,8 @@
+       blockersBefore: List<int>.unmodifiable(blockersBefore),
+       blockersAfter: List<int>.unmodifiable(blockers),
+       fracturedBlockers: Set<int>.unmodifiable(fractured),
++      specialsBefore: List<int>.unmodifiable(specialsBefore),
++      specialsAfter: List<int>.unmodifiable(specials),
+     );
+     if (allWinConditionsMet) won = true;
+     final followup = _resolve(initialSteps: <AnimalMatchStep>[step]);
+@@ -474,11 +621,12 @@
+     orbs--;
+     final before = List<int>.of(board);
+     final blockersBefore = List<int>.of(blockers);
++    final specialsBefore = List<int>.of(specials);
+     final fractured = _fractureBarriers(selected);
+     final cleared = selected.length;
+     _credit(chosen, amount: cleared);
+     score += cleared * 18;
+-    for (final i in selected) {board[i] = -1;}
++    for (final i in selected) {board[i] = -1; specials[i] = 0;}
+     final distances = _fallAndRefill();
+     final step = AnimalMatchStep(
+       before: before, after: List<int>.of(board),
+@@ -487,6 +635,8 @@
+       blockersBefore: List<int>.unmodifiable(blockersBefore),
+       blockersAfter: List<int>.unmodifiable(blockers),
+       fracturedBlockers: Set<int>.unmodifiable(fractured),
++      specialsBefore: List<int>.unmodifiable(specialsBefore),
++      specialsAfter: List<int>.unmodifiable(specials),
+     );
+     if (allWinConditionsMet) won = true;
+     final followup = _resolve(initialSteps: <AnimalMatchStep>[step]);
+--- a/lib/screens/animal_adventure_screen.dart
++++ b/lib/screens/animal_adventure_screen.dart
+@@ -252,6 +252,7 @@
+     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+   late final AnimationController _burstController;
+   late List<int> _visibleBoard;
++  late List<int> _visibleSpecials;
+   List<int> _fallDistances = List<int>.filled(AnimalMatchEngine.cells, 0);
+   List<int> _visibleBlockers = List<int>.filled(AnimalMatchEngine.cells, 0);
+   List<int> _burstBefore = List<int>.filled(AnimalMatchEngine.cells, 0);
+@@ -318,6 +319,7 @@
+           const Duration(seconds: 1), _tickChallenge);
+     }
+     _visibleBoard = List<int>.of(_engine.board);
++    _visibleSpecials = List<int>.of(_engine.specials);
+     _visibleBlockers = List<int>.of(_engine.blockers);
+     _selected = null;
+     _hammer = false;
+@@ -339,13 +341,15 @@
+     try {
+       // Keep the full cascade visible; budget only its on-screen animation.
+       // The underlying model has already resolved the entire transaction.
+-      final effects = result.steps.take(12).toList(growable: false);
++      final effects = result.steps.take(9).toList(growable: false);
+       for (final step in effects) {
+         if (!mounted) return;
+         final profile = CrystalImpactProfile(
+           matched: step.clearedCells.length, chain: step.chain);
+         setState(() {
+           _visibleBoard = step.before;
++          _visibleSpecials = step.specialsBefore.isNotEmpty
++              ? step.specialsBefore : List<int>.of(_engine.specials);
+           _visibleBlockers = List<int>.of(step.blockersBefore);
+           _burstBefore = step.before;
+           _burstCells = <int>{...step.clearedCells, ...step.fracturedBlockers};
+@@ -378,6 +382,8 @@
+         setState(() {
+           _burstCells = <int>{};
+           _visibleBoard = step.after;
++          _visibleSpecials = step.specialsAfter.isNotEmpty
++              ? step.specialsAfter : List<int>.of(_engine.specials);
+           _visibleBlockers = List<int>.of(step.blockersAfter);
+           _fallDistances = step.fallDistances;
+           _fallTick++;
+@@ -388,6 +394,7 @@
+       if (mounted) {
+         setState(() {
+           _visibleBoard = List<int>.of(_engine.board);
++          _visibleSpecials = List<int>.of(_engine.specials);
+           _visibleBlockers = List<int>.of(_engine.blockers);
+           _burstCells = <int>{};
+           _fallDistances = List<int>.filled(AnimalMatchEngine.cells, 0);
+@@ -399,7 +406,7 @@
+   }
+ 
+   void _tap(int index) {
+-    if (_engine.ended || _finishing || _busy) return;
++    if (_engine.ended || _finishing || _busy || _purchasing) return;
+     if (_hammer) {
+       unawaited(_applyHammer(index));
+       return;
+@@ -425,7 +432,7 @@
+   void _dragEnd() {
+     final i = _startDrag;
+     _startDrag = null;
+-    if (i == null || _engine.ended || _finishing || _busy) return;
++    if (i == null || _engine.ended || _finishing || _busy || _purchasing) return;
+     final ax = _dragX.abs(), ay = _dragY.abs();
+     final direction = ax > ay
+       ? (_dragX > 0 ? 1 : -1)
+@@ -623,6 +630,7 @@
+       _fallTick++;
+       _visibleBoard = List<int>.of(_engine.board);
+     _visibleBlockers = List<int>.of(_engine.blockers);
++    _visibleSpecials = List<int>.of(_engine.specials);
+     });
+   }
+ 
+@@ -693,6 +701,10 @@
+                 Text('${_level.animalName.toUpperCase()}  •  ${_level.difficultyLabel}',
+                   style:const TextStyle(fontSize:10,fontWeight:FontWeight.bold,
+                     color:Colors.white70)),
++                if (_level.isBoss)
++                  Text(tr ? '⚔ KRİSTAL MUHAFIZI' : '⚔ CRYSTAL GUARDIAN',
++                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900,
++                      letterSpacing: 1.0, color: Color(0xFFFF9A90))),
+                 if (_level.challengeSeconds != null)
+                   Text('${tr ? 'SÜRELİ GÖREV' : 'TIMED CHALLENGE'}  •  '
+                        '${_secondsLeft ~/ 60}:${(_secondsLeft % 60).toString().padLeft(2, '0')}',
+@@ -743,6 +755,38 @@
+                   SizedBox(width: 58, child: _stat(tr?'PUAN':'SCORE',
+                     '${_engine.score}', const Color(0xFFFFD677))),
+                 ]),
++                if (_level.isBoss) ...<Widget>[
++                  const SizedBox(height: 10),
++                  Row(children: <Widget>[
++                    const Icon(Icons.shield_moon_rounded,
++                      color: Color(0xFFFF9B8A), size: 23),
++                    const SizedBox(width: 9),
++                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
++                      children: <Widget>[
++                        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween,
++                          children: <Widget>[
++                            Text(tr ? 'BOSS · KRİSTAL MUHAFIZI' : 'BOSS · CRYSTAL GUARDIAN',
++                              style: const TextStyle(color: Color(0xFFFFA8A0),
++                                fontWeight: FontWeight.w900, fontSize: 10)),
++                            Text('${_engine.bossHealth}/${_level.bossMaxHealth} HP',
++                              style: const TextStyle(fontSize: 10,
++                                fontWeight: FontWeight.w900, color: Colors.white)),
++                          ]),
++                        const SizedBox(height: 5),
++                        ClipRRect(borderRadius: BorderRadius.circular(12),
++                          child: LinearProgressIndicator(
++                            value: _engine.bossHealthFraction,
++                            minHeight: 8,
++                            backgroundColor: Colors.white12,
++                            color: const Color(0xFFFF695F))),
++                        const SizedBox(height: 3),
++                        Text(tr
++                          ? 'Eşleştirerek saldır • Boss ${_level.bossAttackInterval} hamlede engel kurar'
++                          : 'Match to attack • Boss adds blockers every ${_level.bossAttackInterval} turns',
++                          style: const TextStyle(color: Colors.white60, fontSize: 9)),
++                      ])),
++                  ]),
++                ],
+                 if (_level.obstacleCount > 0) ...<Widget>[
+                   const SizedBox(height: 7),
+                   Row(mainAxisAlignment: MainAxisAlignment.center,
+@@ -852,6 +896,32 @@
+                               offset:Offset(0,-fall * (width-8) / AnimalMatchEngine.width),
+                               child:child),
+                             child:_gem(id))),
++                          if (_visibleSpecials[index] != 0)
++                            IgnorePointer(child: Align(
++                              alignment: Alignment.bottomRight,
++                              child: Container(
++                                margin: const EdgeInsets.all(1.5),
++                                padding: const EdgeInsets.all(1.5),
++                                decoration: BoxDecoration(
++                                  color: const Color(0xEC06142E),
++                                  shape: BoxShape.circle,
++                                  border: Border.all(color: const Color(0xFFEAD8FF), width: 1)),
++                                child: Icon(
++                                  switch (_visibleSpecials[index]) {
++                                    1 => Icons.east_rounded,
++                                    2 => Icons.south_rounded,
++                                    3 => Icons.bolt_rounded,
++                                    _ => Icons.auto_awesome_rounded,
++                                  },
++                                  size: 13,
++                                  color: switch (_visibleSpecials[index]) {
++                                    1 || 2 => const Color(0xFFFFC55B),
++                                    3 => const Color(0xFF6CE4FF),
++                                    _ => const Color(0xFFF5ADFF),
++                                  },
++                                ),
++                              ),
++                            )),
+                           if (_visibleBlockers[index] > 0)
+                             CrystalObstacleOverlay(kind: _visibleBlockers[index]),
+                         ]),
+@@ -900,8 +970,8 @@
+               Expanded(child: Text(_hammer
+                 ? (tr ? 'ÇEKİÇ: KIRILACAK HAYVANA DOKUN'
+                       : 'HAMMER: SELECT A GEM')
+-                : (tr ? '✦ KRİSTALLERİ BİRLEŞTİR ✦'
+-                      : '✦ MATCH CRYSTALS ✦'),
++                : (tr ? '✦ 4: ROKET • 5: PRİZMA • 6: YILDIRIM ✦'
++                      : '✦ 4: ROCKET • 5: PRISM • 6: LIGHTNING ✦'),
+                 textAlign: TextAlign.center,
+                 style: const TextStyle(fontSize: 10, color: Colors.white70,
+                   letterSpacing: .3, fontWeight: FontWeight.w700))),
+--- a/lib/services/animal_match_progress.dart
++++ b/lib/services/animal_match_progress.dart
+@@ -36,6 +36,21 @@
+   String lastChestDay = '';
+   String questClaimDay = '';
+   int dailyQuestWins = 0;
++  int weeklyWins = 0;
++  String weeklyClaimWeek = '';
++  static const int weeklyRewardCoins = 240;
++
++  static String get weekKey {
++    final now = DateTime.now();
++    final monday = DateTime(now.year, now.month, now.day)
++        .subtract(Duration(days: now.weekday - 1));
++    return '${monday.year.toString().padLeft(4, '0')}-'
++        '${monday.month.toString().padLeft(2, '0')}-'
++        '${monday.day.toString().padLeft(2, '0')}';
++  }
++  bool get weeklyReady => weeklyWins >= 5 && weeklyClaimWeek != weekKey;
++  int get achievementBadges => <int>[10, 25, 50, 100]
++      .where((threshold) => completed.length >= threshold).length;
+ 
+   static String get todayKey {
+     final now = DateTime.now();
+@@ -117,6 +132,10 @@
+     questClaimDay = data['questClaimDate'] is String
+         ? data['questClaimDate'] as String : '';
+     dailyQuestWins = ((data['questWins'] as num?)?.toInt() ?? 0).clamp(0, 3).toInt();
++    weeklyWins = ((data['weeklyWins'] as num?)?.toInt() ?? 0)
++        .clamp(0, 5).toInt();
++    weeklyClaimWeek = data['weeklyClaimWeek'] is String
++        ? data['weeklyClaimWeek'] as String : '';
+   }
+ 
+   Future<void> _legacyLoad() async {
+@@ -161,6 +180,9 @@
+     questClaimDay = prefs.getString('crystal_quest_claim_day') ?? '';
+     dailyQuestWins = prefs.getString('crystal_quest_day') == todayKey
+         ? (prefs.getInt('crystal_quest_wins') ?? 0).clamp(0, 3).toInt() : 0;
++    weeklyWins = prefs.getString('crystal_week_key') == weekKey
++        ? (prefs.getInt('crystal_week_wins') ?? 0).clamp(0, 5).toInt() : 0;
++    weeklyClaimWeek = prefs.getString('crystal_week_claim') ?? '';
+   }
+ 
+   /// Commit only after every local write succeeds; a failed save can be
+@@ -193,6 +215,14 @@
+       dailyQuestWins = (oldWins + 1).clamp(0, 3).toInt();
+       await prefs.setString('crystal_quest_day', today);
+       await prefs.setInt('crystal_quest_wins', dailyQuestWins);
++      final oldWeekly = prefs.getString('crystal_week_key') == weekKey
++          ? weeklyWins : 0;
++      final newWeekly = (oldWeekly + 1).clamp(0, 5).toInt();
++      if (!await prefs.setString('crystal_week_key', weekKey) ||
++          !await prefs.setInt('crystal_week_wins', newWeekly)) {
++        throw StateError('Weekly quest save failed');
++      }
++      weeklyWins = newWeekly;
+     }
+     return first;
+   }
+@@ -338,6 +368,45 @@
+     else { lastChestDay = todayKey; }
+     storedCoinBalance = previous + reward;
+     return reward;
++  }
++
++  /// Complete five distinct new stages during the local calendar week.
++  /// Rewards are idempotent across restarts and Android native save retries.
++  Future<int> claimWeeklyReward() async {
++    if (!weeklyReady) return 0;
++    if (nativeStorageEnabled && !kIsWeb &&
++        defaultTargetPlatform == TargetPlatform.android) {
++      try {
++        final raw = await _native.invokeMapMethod<String, dynamic>(
++          'claimWeekly').timeout(const Duration(seconds: 6));
++        if (raw == null) throw StateError('Empty weekly reward receipt');
++        _applyEconomy(raw);
++        storedCoinBalance = (raw['coinBalance'] as num?)?.toInt();
++        return (raw['coinsGranted'] as num?)?.toInt() ?? 0;
++      } on PlatformException catch (error) {
++        if (error.code == 'ALREADY_CLAIMED' || error.code == 'QUEST_LOCKED') {
++          return 0;
++        }
++        rethrow;
++      } on MissingPluginException {
++        // Desktop and legacy Android versions use the preference fallback.
++      }
++    }
++    final prefs = await SharedPreferences.getInstance();
++    if (prefs.getString('crystal_week_claim') == weekKey ||
++        prefs.getString('crystal_week_key') != weekKey ||
++        (prefs.getInt('crystal_week_wins') ?? 0) < 5) return 0;
++    final before = prefs.getInt('coins') ?? 0;
++    if (!await prefs.setString('crystal_week_claim', weekKey)) {
++      throw StateError('Weekly receipt failed');
++    }
++    if (!await prefs.setInt('coins', before + weeklyRewardCoins)) {
++      await prefs.remove('crystal_week_claim');
++      throw StateError('Weekly coin balance write failed');
++    }
++    weeklyClaimWeek = weekKey;
++    storedCoinBalance = before + weeklyRewardCoins;
++    return weeklyRewardCoins;
+   }
+ 
+   /// Android awards the coins and saves progress atomically. Repeating this
+--- a/lib/screens/crystal_vault_screen.dart
++++ b/lib/screens/crystal_vault_screen.dart
+@@ -148,6 +148,32 @@
+               enabled: progress.questReady && !_processing,
+               action: () => _action(() => progress.claimCrystalReward(quest: true)),
+             ),
++            const SizedBox(height: 12),
++            _panel(
++              accent: const Color(0xFFFFB965),
++              icon: Icons.workspace_premium_rounded,
++              title: _tr ? 'HAFTALIK USTA GÖREVİ' : 'WEEKLY MASTER QUEST',
++              content: _tr
++                ? 'Bu hafta 5 yeni bölüm bitir: ${progress.weeklyWins}/5'
++                : 'Complete 5 new stages this week: ${progress.weeklyWins}/5',
++              buttonLabel: progress.weeklyReady
++                ? (_tr ? '+240 ALTIN KAZAN' : 'CLAIM +240')
++                : (_tr ? 'HAFTALIK GÖREV' : 'WEEKLY QUEST'),
++              enabled: progress.weeklyReady && !_processing,
++              action: () => _action(progress.claimWeeklyReward),
++            ),
++            const SizedBox(height: 14),
++            _panel(
++              accent: const Color(0xFFAE97FF),
++              icon: Icons.military_tech_rounded,
++              title: _tr ? 'USTALIK ROZETLERİ' : 'MASTERY BADGES',
++              content: _tr
++                ? '${progress.achievementBadges}/4 rozet · 10, 25, 50, 100 tamamlanan bölüm'
++                : '${progress.achievementBadges}/4 badges · 10, 25, 50, 100 completed levels',
++              buttonLabel: _tr ? 'İLERLEMEN KAYDEDİLİYOR' : 'PROGRESS SAVED',
++              enabled: false,
++              action: () {},
++            ),
+             const SizedBox(height: 18),
+             Text(_tr ? 'GÜÇLENDİRİCİ MAĞAZASI' : 'BOOSTER STORE',
+               style: const TextStyle(color: gold, fontSize: 16,
+--- a/lib/widgets/animal_crystal_burst.dart
++++ b/lib/widgets/animal_crystal_burst.dart
+@@ -12,10 +12,10 @@
+ 
+   double get force => (1.0 + math.max(0, matched - 3) * .17 +
+       math.max(0, chain - 1) * .56).clamp(1.0, 7.2).toDouble();
+-  int get shardsPerGem => (23 + (force * 6).round()).clamp(29, 62).toInt();
+-  int get sparksPerGem => (16 + (force * 4).round()).clamp(20, 38).toInt();
++  int get shardsPerGem => (26 + (force * 7).round()).clamp(33, 66).toInt();
++  int get sparksPerGem => (18 + (force * 5).round()).clamp(23, 40).toInt();
+   // Bounded to ~2400 fragments on lower-end Android devices.
+-  int get maxImpactCells => 24;
++  int get maxImpactCells => 20;
+   bool get mega => matched >= 6 || chain >= 2;
+ }
+ 
+--- a/tool/install_animal_save_channel.py
++++ b/tool/install_animal_save_channel.py
+@@ -138,6 +138,30 @@
+                                 }
+                             }
+                         }
++                        "claimWeekly" -> {
++                            synchronized(this@MainActivity) {
++                                val week = currentWeek()
++                                val claimed = campaignPrefs.getString(
++                                    "elxvro.crystal_week_claim", "") == week
++                                val ready = campaignPrefs.getString(
++                                    "elxvro.crystal_week_key", "") == week &&
++                                    campaignPrefs.getInt("elxvro.crystal_week_wins", 0) >= 5
++                                if (claimed) {
++                                    result.error("ALREADY_CLAIMED", "Weekly chest claimed", null)
++                                } else if (!ready) {
++                                    result.error("QUEST_LOCKED", "Finish five new stages", null)
++                                } else {
++                                    val next = (readCoins().toLong() + 240L)
++                                        .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
++                                    val saved = campaignPrefs.edit()
++                                        .putString("elxvro.crystal_week_claim", week)
++                                        .putLong("flutter.coins", next.toLong()).commit()
++                                    if (saved) result.success(economySnapshot() + mapOf(
++                                        "coinsGranted" to 240, "coinBalance" to next))
++                                    else result.error("WRITE_FAILED", "Weekly award not saved", null)
++                                }
++                            }
++                        }
+                         "saveWin" -> {
+                             val level = call.argument<Int>("level") ?: 0
+                             val rating = call.argument<Int>("rating") ?: 0
+@@ -170,11 +194,20 @@
+                                             else 0
+                                         val newWins = (previousWins + if (first) 1 else 0)
+                                             .coerceAtMost(3)
++                                        val week = currentWeek()
++                                        val prevWeekly = if (campaignPrefs.getString(
++                                                "elxvro.crystal_week_key", "") == week)
++                                            campaignPrefs.getInt("elxvro.crystal_week_wins", 0)
++                                            else 0
++                                        val weekly = (prevWeekly + if (first) 1 else 0)
++                                            .coerceAtMost(5)
+                                         val persisted = campaignPrefs.edit()
+                                             .putString(snapshotKey, campaign.toJson().toString())
+                                             .putLong("flutter.coins", newBalance.toLong())
+                                             .putString("elxvro.crystal_quest_day", today)
+                                             .putInt("elxvro.crystal_quest_wins", newWins)
++                                            .putString("elxvro.crystal_week_key", week)
++                                            .putInt("elxvro.crystal_week_wins", weekly)
+                                             .commit()
+                                         if (!persisted) {
+                                             result.error("WRITE_FAILED",
+@@ -199,6 +232,13 @@
+             }
+     }
+ 
++    private fun currentWeek(): String {
++        val calendar = java.util.Calendar.getInstance()
++        calendar.firstDayOfWeek = java.util.Calendar.MONDAY
++        calendar.set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.MONDAY)
++        return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(calendar.time)
++    }
++
+     private fun currentDay(): String =
+         SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+ 
+@@ -214,6 +254,9 @@
+             "questClaimDate" to (campaignPrefs.getString("elxvro.crystal_quest_claim", "") ?: ""),
+             "questWins" to if (campaignPrefs.getString("elxvro.crystal_quest_day", "") == today)
+                 campaignPrefs.getInt("elxvro.crystal_quest_wins", 0) else 0,
++            "weeklyWins" to if (campaignPrefs.getString("elxvro.crystal_week_key", "") == currentWeek())
++                campaignPrefs.getInt("elxvro.crystal_week_wins", 0) else 0,
++            "weeklyClaimWeek" to (campaignPrefs.getString("elxvro.crystal_week_claim", "") ?: ""),
+         )
+     }
+ 
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -1,7 +1,7 @@
+ name: elxvro_blocks
+ description: Premium block puzzle game for ELXVRO.
+ publish_to: 'none'
+-version: 0.34.0+92
++version: 0.35.0+93
+ 
+ environment:
+   sdk: '>=3.4.0 <4.0.0'
+--- a/test/v0350_ultimate_adventure_test.dart
++++ b/test/v0350_ultimate_adventure_test.dart
+@@ -0,0 +1,113 @@
++import 'dart:math';
++
++import 'package:flutter_test/flutter_test.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++import 'package:elxvro_blocks/game/animal_match_engine.dart';
++import 'package:elxvro_blocks/services/animal_match_progress.dart';
++import 'package:elxvro_blocks/widgets/animal_crystal_burst.dart';
++
++AnimalMatchResult _firstLegalMove(AnimalMatchEngine game) {
++  for (var i = 0; i < AnimalMatchEngine.cells; i++) {
++    for (final delta in <int>[1, AnimalMatchEngine.width]) {
++      final to = i + delta;
++      if (to >= AnimalMatchEngine.cells ||
++          delta == 1 && i ~/ AnimalMatchEngine.width !=
++          to ~/ AnimalMatchEngine.width) continue;
++      final result = game.swap(i, to);
++      if (result.valid) return result;
++    }
++  }
++  throw StateError('Board is not playable');
++}
++
++void main() {
++  TestWidgetsFlutterBinding.ensureInitialized();
++  setUp(() {
++    AnimalMatchProgress.nativeStorageEnabled = false;
++    SharedPreferences.setMockInitialValues(<String, Object>{'coins': 120});
++  });
++
++  test('boss appears on exactly the existing ten-stage milestones', () {
++    for (var i = 1; i <= 100; i++) {
++      final level = AnimalMatchLevel(i);
++      expect(level.isBoss, i % 10 == 0);
++      expect(level.bossMaxHealth > 0, level.isBoss);
++    }
++    expect(AnimalMatchLevel(100).bossMaxHealth,
++        greaterThan(AnimalMatchLevel(10).bossMaxHealth));
++    expect(AnimalMatchLevel(10).victoryReward,
++        greaterThan(AnimalMatchLevel(10).baseReward));
++  });
++
++  test('boss takes match damage and attacks without deadlocking game', () {
++    final engine = AnimalMatchEngine(AnimalMatchLevel(10),
++        random: Random(18));
++    final initial = engine.bossHealth;
++    for (var move = 0; move < 5 && !engine.ended; move++) {
++      final result = _firstLegalMove(engine);
++      expect(result.cleared, greaterThan(0));
++      expect(engine.bossHealth, lessThan(initial));
++      expect(engine.bossHealth, greaterThanOrEqualTo(0));
++      if (!engine.ended) expect(engine.hasPossibleSwap, true);
++    }
++    expect(engine.bossAttacks, greaterThanOrEqualTo(1));
++    expect(engine.remainingObstacles,
++        greaterThanOrEqualTo(engine.level.obstacleCount));
++  });
++
++  test('special crystals trigger real clears even without a normal match', () {
++    for (final power in <int>[1, 2, 3, 4]) {
++      final engine = AnimalMatchEngine(AnimalMatchLevel(1),
++          random: Random(100 + power));
++      engine.specials[0] = power;
++      final before = engine.movesLeft;
++      final result = engine.swap(0, 1);
++      expect(result.valid, true, reason: 'Special $power did not activate');
++      expect(result.cleared, greaterThanOrEqualTo(2));
++      expect(engine.movesLeft, before - 1);
++      expect(result.steps, isNotEmpty);
++      expect(result.steps.first.specialsAfter.length,
++          AnimalMatchEngine.cells);
++      expect(engine.board.every((x) => x >= 0 && x < 6), true);
++    }
++  });
++
++  test('special-crystal frames and fragments have a strict FX budget', () {
++    const mega = CrystalImpactProfile(matched: 40, chain: 7);
++    expect(mega.mega, true);
++    expect(mega.maxImpactCells *
++        (mega.shardsPerGem + mega.sparksPerGem), lessThan(2500));
++  });
++
++  test('weekly quest pays once after five distinct new levels', () async {
++    final progress = AnimalMatchProgress();
++    await progress.load();
++    expect(progress.weeklyReady, false);
++    for (var level = 1; level <= 5; level++) {
++      expect(await progress.recordWin(level, 2), true);
++      expect(await progress.recordWin(level, 2), false);
++    }
++    expect(progress.weeklyWins, 5);
++    expect(progress.weeklyReady, true);
++    expect(await progress.claimWeeklyReward(), 240);
++    expect(await progress.claimWeeklyReward(), 0);
++    expect(progress.weeklyReady, false);
++    final restored = AnimalMatchProgress();
++    await restored.load();
++    expect(restored.weeklyWins, 5);
++    expect(restored.weeklyReady, false);
++    expect(restored.completed.length, 5);
++    expect(await restored.claimWeeklyReward(), 0);
++  });
++
++  test('mastery badge milestones depend on distinct completed stages', () async {
++    final p = AnimalMatchProgress();
++    await p.load();
++    expect(p.achievementBadges, 0);
++    for (var i = 1; i <= 10; i++) {
++      await p.recordWin(i, 1);
++    }
++    expect(p.achievementBadges, 1);
++    expect(p.completed.length, 10);
++  });
++}
+--- a/V0350_ULTIMATE_RELEASE_NOTES.md
++++ b/V0350_ULTIMATE_RELEASE_NOTES.md
+@@ -0,0 +1,16 @@
++# ELXVRO Blocks v0.35.0 — Ultimate Adventure
++
++The 100-stage map is unchanged. Every tenth existing level has a Crystal Guardian
++boss encounter: matched jewels deplete HP, and the guardian periodically places
++blockers without eliminating every legal move. Four-jewel runs mint directional
++rockets, five-jewel runs mint color prisms, and 6+ runs mint lightning crosses.
++Activated specials clear cells in real time with bounded chain reactions and
++shattered-crystal effects.
++
++Crystal Vault gains a weekly quest (five distinct newly completed stages,
+++240 coins, once per local Monday-to-Sunday week) and four mastery badges
++for 10, 25, 50 and 100 completed levels. Android weekly rewards and quest
++progress are committed in the same native preferences file as Adventure saves.
++
++Graphics and particles remain bounded, asynchronous effects block overlapping
++input, and successful APK builds must pass two Flutter test runs.
