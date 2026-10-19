@@ -79,7 +79,7 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Restore verified v0.34.0 full source and apply premium update
+      - name: Restore verified v0.33.8 full source and apply premium update
         uses: actions/download-artifact@v4
         with:
           name: ELXVRO-Blocks-v0.33.8-FULL-SOURCE
@@ -92,7 +92,7 @@ jobs:
           set -euo pipefail
           APP=extracted/elxvro-blocks
           mkdir -p "$APP"
-          test -s artifact-v0338/ELXVRO-Blocks-v0.34.0-FULL-SOURCE.zip
+          test -s artifact-v0338/ELXVRO-Blocks-v0.33.8-FULL-SOURCE.zip
           unzip -q artifact-v0338/ELXVRO-Blocks-v0.33.8-FULL-SOURCE.zip -d "$APP"
           patch -p1 -d "$APP" < tools/v0340/v0340.patch
           grep -Fx 'version: 0.34.0+92' "$APP/pubspec.yaml"
