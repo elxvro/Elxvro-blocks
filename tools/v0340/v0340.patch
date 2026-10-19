@@ -997,7 +997,8 @@ index ed5aff2..3caac5b 100644
 --- a/lib/widgets/animal_crystal_burst.dart
 +++ b/lib/widgets/animal_crystal_burst.dart
 @@ -10,12 +10,13 @@ class CrystalImpactProfile {
-   final int matched;   final int chain;
+   final int matched;
+   final int chain;
  
 -  double get force => (1.0 + math.max(0, matched - 3) * .105 +
 -      math.max(0, chain - 1) * .42).clamp(1.0, 5.8).toDouble();
