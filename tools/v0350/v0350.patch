@@ -805,7 +805,8 @@
 +      if (!engine.ended) expect(engine.hasPossibleSwap, true);
 +    }
 +    expect(engine.bossAttacks, greaterThanOrEqualTo(1));
-+    expect(engine.remainingObstacles, greaterThanOrEqualTo(0));
++    expect(engine.remainingObstacles,
++        greaterThanOrEqualTo(0));
 +  });
 +
 +  test('special crystals trigger real clears even without a normal match', () {
