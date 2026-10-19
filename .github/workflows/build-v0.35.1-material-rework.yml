@@ -96,6 +96,7 @@ jobs:
           unzip -q artifact-v0350/ELXVRO-Blocks-v0.35.0-FULL-SOURCE.zip -d "$APP"
           base64 -d tools/v0351/v0351.patch.b64 | gzip -dc > /tmp/v0351.patch
           patch -p1 -d "$APP" < /tmp/v0351.patch
+          patch -p1 -d "$APP" < tools/v0351/gesture_and_types.patch
           python - <<'PYFIX'
           from pathlib import Path
           for test in Path("extracted/elxvro-blocks/test").glob("*.dart"):
