@@ -653,7 +653,7 @@
 -  int get shardsPerGem => (23 + (force * 6).round()).clamp(29, 62).toInt();
 -  int get sparksPerGem => (16 + (force * 4).round()).clamp(20, 38).toInt();
 +  int get shardsPerGem => (26 + (force * 7).round()).clamp(33, 66).toInt();
-+  int get sparksPerGem => (18 + (force * 5).round()).clamp(23, 40).toInt();
++  int get sparksPerGem => (18 + (force * 5).round()).clamp(23, 38).toInt();
    // Bounded to ~2400 fragments on lower-end Android devices.
 -  int get maxImpactCells => 24;
 +  int get maxImpactCells => 20;

@@ -95,6 +95,14 @@ jobs:
           test -s artifact-v0340/ELXVRO-Blocks-v0.34.0-FULL-SOURCE.zip
           unzip -q artifact-v0340/ELXVRO-Blocks-v0.34.0-FULL-SOURCE.zip -d "$APP"
           patch -p1 -d "$APP" < tools/v0350/v0350.patch
+          python - <<'PYFIX'
+          from pathlib import Path
+          for test in Path("extracted/elxvro-blocks/test").glob("*.dart"):
+              old = test.read_text()
+              new = old.replace("version: 0.34.0+92", "version: 0.35.0+93")
+              if new != old:
+                  test.write_text(new)
+          PYFIX
           grep -Fx 'version: 0.35.0+93' "$APP/pubspec.yaml"
           test -s "$APP/test/v0350_ultimate_adventure_test.dart"
           test -s "$APP/lib/screens/crystal_vault_screen.dart"
