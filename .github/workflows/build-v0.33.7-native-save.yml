@@ -95,6 +95,7 @@ jobs:
           unzip -q artifact-v0336/ELXVRO-Blocks-v0.33.6-FULL-SOURCE.zip -d "$APP"
           gzip -dc tools/v0337/atomic_save.patch.gz > /tmp/v0337.patch
           patch -p1 -d "$APP" < /tmp/v0337.patch
+          patch -p1 -d "$APP" < tools/v0337/nonblocking_map.patch
           test -s "$APP/tool/install_animal_save_channel.py"
           test -s "$APP/test/v0337_native_save_regression_test.dart"
           grep -Fx 'version: 0.33.7+90' "$APP/pubspec.yaml"
