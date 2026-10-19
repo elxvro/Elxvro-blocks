@@ -1,0 +1,1514 @@
+diff --git a/V0340_PREMIUM_RELEASE_NOTES.md b/V0340_PREMIUM_RELEASE_NOTES.md
+new file mode 100644
+index 0000000..003450f
+--- /dev/null
++++ b/V0340_PREMIUM_RELEASE_NOTES.md
+@@ -0,0 +1,24 @@
++# ELXVRO Blocks 0.34.0 — Crystal Storm Premium
++
++The original 100-stage animal adventure map remains unchanged.
++
++## Gameplay
++- Three breakable obstacle types are introduced by level: ice (stage 8), chains (stage 22), stone (stage 39). Stone requires two impacts; each cell receives no more than one hit per cascade step.
++- Locked cells cannot be swapped. Adjacent matches and boosters can remove obstacles, and finishing a stage requires both all animal collection goals and all obstacles.
++- The existing 8x9 board, escalating 1/2/3 animal goals, variable moves, and 100 illustrated animal stages remain intact.
++- Every fifth newly-completed level grants a milestone coin bonus; level reward transactions are once-only.
++
++## Visual/audio
++- Higher-impact electric arcs, seven concentric shockwaves, expanded radial shards, and chromatic pulse rings. Explosions scale with match counts and cascades, with a bounded per-frame particle budget.
++- Haptics and material impact audio remain linked to match intensity.
++- Obstacles are raster-free vector overlays so rendering is independent of network/assets.
++
++## Wallet and rewards
++- Crystal Vault reachable from adventure and gameplay. Three booster types cost 100/180/130 coins and persist across levels; inventory is capped at nine each.
++- A daily 60-coin chest and a 120-coin quest after three **new** levels, with once-per-day claims.
++- Android native wallet, daily claims, booster stock, and win rewards are committed with a single SharedPreferences editor transaction per action.
++- Non-Android platforms have a SharedPreferences fallback.
++
++## Validation
++- Unit tests cover obstacle generation/fracture, level balancing and deadlock avoidance, once-only rewards, stock debit/consume/persistence, and VFX work limits.
++- Flutter analyze and test suite run in GitHub Actions before signed release APK and AAB builds.
+diff --git a/lib/game/animal_match_engine.dart b/lib/game/animal_match_engine.dart
+index a088aee..88d0a03 100644
+--- a/lib/game/animal_match_engine.dart
++++ b/lib/game/animal_match_engine.dart
+@@ -74,6 +74,19 @@ class AnimalMatchLevel {
+   int get difficultyTier => 1 + (number - 1) ~/ 10;
+   String get difficultyLabel => 'KADEME $difficultyTier';
+   int get baseReward => 35 + number * 2 + difficultyTier * 5;
++  /// Each fifth stage grants a once-only milestone chest on first completion.
++  int get milestoneBonus => number % 5 == 0 ? 50 + difficultyTier * 10 : 0;
++  int get victoryReward => baseReward + milestoneBonus;
++
++  /// Obstacles gradually enter play; this is not a replacement for the
++  /// original adventure map or the existing three collection objectives.
++  int get obstacleCount => number < 8 ? 0 :
++      (2 + (number - 8) ~/ 9).clamp(2, 12).toInt();
++  bool get hasChains => number >= 22;
++  bool get hasStone => number >= 39;
++  /// One timed challenge per ten stages; normal chapters remain untimed.
++  int? get challengeSeconds => number % 10 == 0
++      ? max(125, 185 - number ~/ 2) : null;
+ }
+ 
+ /// An immutable cascade snapshot, independent from Flutter's rendering.
+@@ -86,6 +99,9 @@ class AnimalMatchStep {
+     required this.clearedCells,
+     required this.fallDistances,
+     required this.chain,
++    this.blockersBefore = const <int>[],
++    this.blockersAfter = const <int>[],
++    this.fracturedBlockers = const <int>{},
+   });
+ 
+   final List<int> before;
+@@ -93,6 +109,9 @@ class AnimalMatchStep {
+   final Set<int> clearedCells;
+   final List<int> fallDistances;
+   final int chain;
++  final List<int> blockersBefore;
++  final List<int> blockersAfter;
++  final Set<int> fracturedBlockers;
+ }
+ 
+ class AnimalMatchResult {
+@@ -117,6 +136,8 @@ class AnimalMatchEngine {
+       : _random = random ?? Random() {
+     movesLeft = level.moves;
+     _createPlayableBoard();
++    _seedObstacles();
++    if (!_hasPossibleSwap()) _createPlayableBoard();
+   }
+ 
+   static const int width = 8;
+@@ -126,6 +147,46 @@ class AnimalMatchEngine {
+   final AnimalMatchLevel level;
+   final Random _random;
+   final List<int> board = List<int>.filled(cells, 0);
++  /// 0 = clear, 1 = ice, 2 = chain, 3 = stone (2 hits), 4 = cracked stone.
++  /// These stay fixed to board coordinates as gems fall behind them.
++  final List<int> blockers = List<int>.filled(cells, 0);
++  int get remainingObstacles => blockers.where((b) => b != 0).length;
++  int get clearedObstacles => level.obstacleCount - remainingObstacles;
++  int barrierAt(int index) => blockers[index];
++
++  void _seedObstacles() {
++    if (level.obstacleCount == 0) return;
++    final indices = List<int>.generate(cells, (i) => i)
++      ..shuffle(Random(711 + level.number * 137));
++    for (var i = 0; i < level.obstacleCount; i++) {
++      final index = indices[i];
++      blockers[index] = level.hasStone && i % 5 == 0 ? 3
++          : level.hasChains && i % 3 == 0 ? 2 : 1;
++    }
++  }
++
++  /// Adjacent matches crack barriers. A stone needs two separate hits.
++  /// Each barrier takes at most one hit per cascade to avoid over-crediting
++  /// overlapping runs, boosters or five-gem area blasts.
++  Set<int> _fractureBarriers(Set<int> cleared) {
++    final impact = <int>{};
++    for (final cell in cleared) {
++      impact.add(cell);
++      final x = cell % width;
++      final y = cell ~/ width;
++      if (x > 0) impact.add(cell - 1);
++      if (x + 1 < width) impact.add(cell + 1);
++      if (y > 0) impact.add(cell - width);
++      if (y + 1 < height) impact.add(cell + width);
++    }
++    final fractured = <int>{};
++    for (final i in impact) {
++      if (blockers[i] == 0) continue;
++      blockers[i] = blockers[i] == 3 ? 4 : 0;
++      fractured.add(i);
++    }
++    return fractured;
++  }
+   int movesLeft = 0;
+   int score = 0;
+   int matches = 0;
+@@ -135,6 +196,7 @@ class AnimalMatchEngine {
+       (total, species) => total + min(_collected[species], level.targetFor(species)));
+   bool get allGoalsMet => level.targetGems.every(
+       (species) => _collected[species] >= level.targetFor(species));
++  bool get allWinConditionsMet => allGoalsMet && remainingObstacles == 0;
+   void _credit(int species, {int amount = 1}) {
+     if (level.targetFor(species) > 0) _collected[species] += amount;
+   }
+@@ -266,7 +328,8 @@ class AnimalMatchEngine {
+     for (var i = 0; i < cells; i++) {
+       for (final delta in <int>[1, width]) {
+         final j = i + delta;
+-        if (!_neighbors(i, j) || board[i] == board[j]) continue;
++        if (!_neighbors(i, j) || board[i] == board[j] ||
++            blockers[i] != 0 || blockers[j] != 0) continue;
+         _exchange(i, j);
+         final possible = _collectMatches().isNotEmpty;
+         _exchange(i, j);
+@@ -280,7 +343,8 @@ class AnimalMatchEngine {
+   bool get hasExistingMatches => _collectMatches().isNotEmpty;
+ 
+   AnimalMatchResult swap(int a, int b) {
+-    if (ended || !_neighbors(a, b) || board[a] == board[b]) {
++    if (ended || !_neighbors(a, b) || board[a] == board[b] ||
++        blockers[a] != 0 || blockers[b] != 0) {
+       return AnimalMatchResult.invalid;
+     }
+     _exchange(a, b);
+@@ -323,12 +387,15 @@ class AnimalMatchEngine {
+       if (positions.isEmpty) break;
+       cascade++;
+       final before = List<int>.of(board);
++      final blockersBefore = List<int>.of(blockers);
+       // Only actual collected animals count; chains multiply score and FX,
+       // never instantly complete collection quotas.
+       for (final index in positions) {
+         _credit(board[index]);
+       }
+       totalCleared += positions.length;
++      final broken = _fractureBarriers(positions);
++      gained += broken.length * 28 * cascade;
+       // Score multiplier scales with the stage and the cascade chain.
+       gained += positions.length * (12 + level.difficultyTier * 2) * cascade;
+       for (final index in positions) {board[index] = -1;}
+@@ -339,12 +406,15 @@ class AnimalMatchEngine {
+         clearedCells: Set<int>.unmodifiable(positions),
+         fallDistances: List<int>.unmodifiable(distances),
+         chain: cascade,
++        blockersBefore: List<int>.unmodifiable(blockersBefore),
++        blockersAfter: List<int>.unmodifiable(blockers),
++        fracturedBlockers: Set<int>.unmodifiable(broken),
+       ));
+     }
+     score += gained;
+     matches += totalCleared;
+     maxCascade = max(maxCascade, cascade);
+-    if (allGoalsMet) won = true;
++    if (allWinConditionsMet) won = true;
+     // A pathological cascade must not leave a permanently matched or dead
+     // board. The next action always starts with a legal, settled board.
+     if (!won && (hasExistingMatches || !_hasPossibleSwap())) {
+@@ -361,16 +431,21 @@ class AnimalMatchEngine {
+     }
+     hammers--;
+     final before = List<int>.of(board);
++    final blockersBefore = List<int>.of(blockers);
++    final fractured = _fractureBarriers(<int>{index});
+     _credit(board[index]);
+-    score += 20;
++    score += 20 + fractured.length * 28;
+     board[index] = -1;
+     final distances = _fallAndRefill();
+     final step = AnimalMatchStep(
+       before: before, after: List<int>.of(board),
+       clearedCells: Set<int>.unmodifiable(<int>{index}),
+       fallDistances: List<int>.unmodifiable(distances), chain: 1,
++      blockersBefore: List<int>.unmodifiable(blockersBefore),
++      blockersAfter: List<int>.unmodifiable(blockers),
++      fracturedBlockers: Set<int>.unmodifiable(fractured),
+     );
+-    if (allGoalsMet) won = true;
++    if (allWinConditionsMet) won = true;
+     final followup = _resolve(initialSteps: <AnimalMatchStep>[step]);
+     return AnimalMatchResult(valid: true, cleared: followup.cleared,
+       cascades: followup.cascades, scoreGained: followup.scoreGained + 20,
+@@ -398,6 +473,8 @@ class AnimalMatchEngine {
+     if (selected.isEmpty) return AnimalMatchResult.invalid;
+     orbs--;
+     final before = List<int>.of(board);
++    final blockersBefore = List<int>.of(blockers);
++    final fractured = _fractureBarriers(selected);
+     final cleared = selected.length;
+     _credit(chosen, amount: cleared);
+     score += cleared * 18;
+@@ -407,8 +484,11 @@ class AnimalMatchEngine {
+       before: before, after: List<int>.of(board),
+       clearedCells: Set<int>.unmodifiable(selected),
+       fallDistances: List<int>.unmodifiable(distances), chain: 1,
++      blockersBefore: List<int>.unmodifiable(blockersBefore),
++      blockersAfter: List<int>.unmodifiable(blockers),
++      fracturedBlockers: Set<int>.unmodifiable(fractured),
+     );
+-    if (allGoalsMet) won = true;
++    if (allWinConditionsMet) won = true;
+     final followup = _resolve(initialSteps: <AnimalMatchStep>[step]);
+     return AnimalMatchResult(valid: true, cleared: followup.cleared,
+       cascades: followup.cascades, scoreGained: followup.scoreGained + cleared * 18,
+diff --git a/lib/screens/animal_adventure_screen.dart b/lib/screens/animal_adventure_screen.dart
+index e3f316f..92584bb 100644
+--- a/lib/screens/animal_adventure_screen.dart
++++ b/lib/screens/animal_adventure_screen.dart
+@@ -8,6 +8,8 @@ import '../game/animal_match_engine.dart';
+ import '../models/game_theme.dart';
+ import '../services/audio_service.dart';
+ import '../widgets/animal_crystal_burst.dart';
++import '../widgets/crystal_obstacle_overlay.dart';
++import 'crystal_vault_screen.dart';
+ import 'animal_match_result_screen.dart';
+ import '../services/animal_match_progress.dart';
+ import '../widgets/coin_badge.dart';
+@@ -101,6 +103,15 @@ class _AnimalAdventureScreenState extends State<AnimalAdventureScreen> {
+                 textAlign: TextAlign.center, style: TextStyle(
+                   fontWeight: FontWeight.w900, fontSize: 19, letterSpacing: 3,
+                   color: theme.blockAccent))),
++              IconButton(tooltip: tr ? 'Kristal kasası' : 'Crystal vault',
++                onPressed: () async {
++                  await Navigator.of(context).push<void>(MaterialPageRoute<void>(
++                    builder: (_) => CrystalVaultScreen(
++                      appState: widget.appState, progress: _progress)));
++                  if (mounted) setState(() {});
++                },
++                icon: const Icon(Icons.inventory_2_rounded,
++                  color: Color(0xFFFFD778))),
+               CoinBadge(coins: widget.appState.coins, compact: true),
+             ])),
+           Padding(padding: const EdgeInsets.fromLTRB(20, 5, 20, 16),
+@@ -238,10 +249,11 @@ class AnimalMatchScreen extends StatefulWidget {
+ }
+ 
+ class _AnimalMatchScreenState extends State<AnimalMatchScreen>
+-    with SingleTickerProviderStateMixin {
++    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+   late final AnimationController _burstController;
+   late List<int> _visibleBoard;
+   List<int> _fallDistances = List<int>.filled(AnimalMatchEngine.cells, 0);
++  List<int> _visibleBlockers = List<int>.filled(AnimalMatchEngine.cells, 0);
+   List<int> _burstBefore = List<int>.filled(AnimalMatchEngine.cells, 0);
+   Set<int> _burstCells = <int>{};
+   int _burstChain = 1;
+@@ -255,12 +267,16 @@ class _AnimalMatchScreenState extends State<AnimalMatchScreen>
+   bool _hammer = false;
+   bool _purchasing = false;
+   bool _finishing = false;
++  Timer? _challengeClock;
++  int _secondsLeft = 0;
++  bool _suspended = false;
+   int _lastCombo = 0;
+   int _lastImpact = 0;
+ 
+   @override
+   void initState() {
+     super.initState();
++    WidgetsBinding.instance.addObserver(this);
+     _burstController = AnimationController(
+       vsync: this, duration: const Duration(milliseconds: 540));
+     _reset();
+@@ -268,18 +284,41 @@ class _AnimalMatchScreenState extends State<AnimalMatchScreen>
+ 
+   @override
+   void dispose() {
++    WidgetsBinding.instance.removeObserver(this);
++    _challengeClock?.cancel();
+     _burstController.dispose();
+     super.dispose();
+   }
+ 
++  @override
++  void didChangeAppLifecycleState(AppLifecycleState state) {
++    _suspended = state != AppLifecycleState.resumed;
++  }
++
++  void _tickChallenge(Timer timer) {
++    if (!mounted || _busy || _finishing || _suspended || _engine.ended ||
++        _level.challengeSeconds == null) return;
++    if (_secondsLeft <= 0) return;
++    setState(() => _secondsLeft--);
++    if (_secondsLeft == 0) unawaited(_finish());
++  }
++
+   void _reset() {
++    _challengeClock?.cancel();
++    _suspended = false;
+     _burstController.reset();
+     _burstCells = <int>{};
+     _fallDistances = List<int>.filled(AnimalMatchEngine.cells, 0);
+     _busy = false;
+     _level = AnimalMatchLevel(widget.number);
+     _engine = AnimalMatchEngine(_level);
++    _secondsLeft = _level.challengeSeconds ?? 0;
++    if (_level.challengeSeconds != null) {
++      _challengeClock = Timer.periodic(
++          const Duration(seconds: 1), _tickChallenge);
++    }
+     _visibleBoard = List<int>.of(_engine.board);
++    _visibleBlockers = List<int>.of(_engine.blockers);
+     _selected = null;
+     _hammer = false;
+     _purchasing = false;
+@@ -307,8 +346,9 @@ class _AnimalMatchScreenState extends State<AnimalMatchScreen>
+           matched: step.clearedCells.length, chain: step.chain);
+         setState(() {
+           _visibleBoard = step.before;
++          _visibleBlockers = List<int>.of(step.blockersBefore);
+           _burstBefore = step.before;
+-          _burstCells = step.clearedCells;
++          _burstCells = <int>{...step.clearedCells, ...step.fracturedBlockers};
+           _burstChain = step.chain;
+           _lastCombo = step.chain;
+           _lastImpact = step.clearedCells.length;
+@@ -338,6 +378,7 @@ class _AnimalMatchScreenState extends State<AnimalMatchScreen>
+         setState(() {
+           _burstCells = <int>{};
+           _visibleBoard = step.after;
++          _visibleBlockers = List<int>.of(step.blockersAfter);
+           _fallDistances = step.fallDistances;
+           _fallTick++;
+         });
+@@ -347,6 +388,7 @@ class _AnimalMatchScreenState extends State<AnimalMatchScreen>
+       if (mounted) {
+         setState(() {
+           _visibleBoard = List<int>.of(_engine.board);
++          _visibleBlockers = List<int>.of(_engine.blockers);
+           _burstCells = <int>{};
+           _fallDistances = List<int>.filled(AnimalMatchEngine.cells, 0);
+           _busy = false;
+@@ -394,7 +436,7 @@ class _AnimalMatchScreenState extends State<AnimalMatchScreen>
+ 
+   Future<int> _recordVictory() async {
+     final receipt = await widget.progress.recordWinAndAward(
+-      widget.number, _engine.earnedStars, _level.baseReward,
++      widget.number, _engine.earnedStars, _level.victoryReward,
+     ).timeout(const Duration(seconds: 10));
+     if (receipt.nativeTransaction) {
+       // Android commits the level and reward in the same durable transaction.
+@@ -409,6 +451,7 @@ class _AnimalMatchScreenState extends State<AnimalMatchScreen>
+   Future<void> _finish() async {
+     if (_finishing || !mounted) return;
+     _finishing = true;
++    _challengeClock?.cancel();
+     final won = _engine.won;
+     // The result becomes visible at once, without awaiting disk or platform
+     // services. NEXT unlocks only after the save future completes.
+@@ -430,7 +473,7 @@ class _AnimalMatchScreenState extends State<AnimalMatchScreen>
+           animal: _level.animalName,
+           score: _engine.score, stars: _engine.earnedStars,
+           movesLeft: _engine.movesLeft,
+-          baseReward: _level.baseReward,
++          baseReward: _level.victoryReward,
+           rewardTask: rewardTask,
+           retryReward: _recordVictory,
+           tr: widget.appState.languageCode == 'tr',
+@@ -450,6 +493,7 @@ class _AnimalMatchScreenState extends State<AnimalMatchScreen>
+ 
+   Future<void> _pause() async {
+     if (_busy || _finishing) return;
++    _suspended = true;
+     await showDialog<void>(context:context, builder:(context)=> AlertDialog(
+       title: const Text('DURAKLATILDI'),
+       content: Text('Bölüm ${widget.number} · ${_level.animalName}'),
+@@ -460,6 +504,7 @@ class _AnimalMatchScreenState extends State<AnimalMatchScreen>
+           child:const Text('DEVAM ET')),
+       ],
+     ));
++    if (mounted) _suspended = false;
+   }
+ 
+   Widget _gem(int species, {double? size}) {
+@@ -535,7 +580,9 @@ class _AnimalMatchScreenState extends State<AnimalMatchScreen>
+   Future<void> _applyHammer(int index) async {
+     if (_busy || _finishing || _engine.ended) return;
+     if (_engine.hammers == 0) {
+-      if (!await _buyBooster(_hammerCost, 'ÇEKİÇ')) {
++      if (widget.progress.boosterStock[0] > 0) {
++        if (!await widget.progress.consumeBooster(0)) return;
++      } else if (!await _buyBooster(_hammerCost, 'ÇEKİÇ')) {
+         if (mounted) setState(() => _hammer = false);
+         return;
+       }
+@@ -547,9 +594,13 @@ class _AnimalMatchScreenState extends State<AnimalMatchScreen>
+   }
+ 
+   Future<void> _useRainbow() async {
+-    if (!_engine.canUseRainbow) return;
++    if (_busy || _finishing || _purchasing || !_engine.canUseRainbow) return;
+     if (_engine.orbs == 0) {
+-      if (!await _buyBooster(_rainbowCost, 'GÖKKUŞAĞI')) return;
++      if (widget.progress.boosterStock[1] > 0) {
++        if (!await widget.progress.consumeBooster(1)) return;
++      } else {
++        if (!await _buyBooster(_rainbowCost, 'GÖKKUŞAĞI')) return;
++      }
+       if (!mounted) return;
+       _engine.orbs++;
+     }
+@@ -557,8 +608,13 @@ class _AnimalMatchScreenState extends State<AnimalMatchScreen>
+   }
+ 
+   Future<void> _useShuffle() async {
++    if (_busy || _finishing || _purchasing || _engine.ended) return;
+     if (_engine.shuffles == 0) {
+-      if (!await _buyBooster(_shuffleCost, 'KARIŞTIR')) return;
++      if (widget.progress.boosterStock[2] > 0) {
++        if (!await widget.progress.consumeBooster(2)) return;
++      } else {
++        if (!await _buyBooster(_shuffleCost, 'KARIŞTIR')) return;
++      }
+       if (!mounted) return;
+       _engine.shuffles++;
+     }
+@@ -566,6 +622,7 @@ class _AnimalMatchScreenState extends State<AnimalMatchScreen>
+       _selected = null;
+       _fallTick++;
+       _visibleBoard = List<int>.of(_engine.board);
++    _visibleBlockers = List<int>.of(_engine.blockers);
+     });
+   }
+ 
+@@ -636,6 +693,13 @@ class _AnimalMatchScreenState extends State<AnimalMatchScreen>
+                 Text('${_level.animalName.toUpperCase()}  •  ${_level.difficultyLabel}',
+                   style:const TextStyle(fontSize:10,fontWeight:FontWeight.bold,
+                     color:Colors.white70)),
++                if (_level.challengeSeconds != null)
++                  Text('${tr ? 'SÜRELİ GÖREV' : 'TIMED CHALLENGE'}  •  '
++                       '${_secondsLeft ~/ 60}:${(_secondsLeft % 60).toString().padLeft(2, '0')}',
++                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900,
++                      color: _secondsLeft <= 30
++                        ? const Color(0xFFFF837A)
++                        : const Color(0xFFFFD37B))),
+               ])),
+               IconButton(onPressed:_pause,
+                 icon:const Icon(Icons.pause_rounded)),
+@@ -679,6 +743,20 @@ class _AnimalMatchScreenState extends State<AnimalMatchScreen>
+                   SizedBox(width: 58, child: _stat(tr?'PUAN':'SCORE',
+                     '${_engine.score}', const Color(0xFFFFD677))),
+                 ]),
++                if (_level.obstacleCount > 0) ...<Widget>[
++                  const SizedBox(height: 7),
++                  Row(mainAxisAlignment: MainAxisAlignment.center,
++                    children: <Widget>[
++                      const Icon(Icons.lock_open_rounded,
++                        size: 14, color: Color(0xFFFFD88A)),
++                      const SizedBox(width: 5),
++                      Text(tr
++                        ? 'ENGELLER: ${_engine.clearedObstacles}/${_level.obstacleCount}'
++                        : 'OBSTACLES: ${_engine.clearedObstacles}/${_level.obstacleCount}',
++                        style: const TextStyle(fontSize: 10,
++                          color: Color(0xFFFFD88A), fontWeight: FontWeight.w800)),
++                    ]),
++                ],
+                 const SizedBox(height:9),
+                 ClipRRect(borderRadius:BorderRadius.circular(99),
+                   child:LinearProgressIndicator(value:progressFraction,
+@@ -761,7 +839,8 @@ class _AnimalMatchScreenState extends State<AnimalMatchScreen>
+                           boxShadow:selected?<BoxShadow>[BoxShadow(
+                             color:targetColor.withValues(alpha:.36),
+                             blurRadius:10,spreadRadius:1)]:null),
+-                        child:Padding(padding:const EdgeInsets.all(1),
++                        child:Stack(fit: StackFit.expand, children:<Widget>[
++                          Padding(padding:const EdgeInsets.all(1),
+                           child:_fallDistances[index] == 0 ? _gem(id) :
+                             TweenAnimationBuilder<double>(
+                             key:ValueKey('animal_fall_$index-$_fallTick'),
+@@ -773,6 +852,9 @@ class _AnimalMatchScreenState extends State<AnimalMatchScreen>
+                               offset:Offset(0,-fall * (width-8) / AnimalMatchEngine.width),
+                               child:child),
+                             child:_gem(id))),
++                          if (_visibleBlockers[index] > 0)
++                            CrystalObstacleOverlay(kind: _visibleBlockers[index]),
++                        ]),
+                       ));
+                   },
+                 )),
+@@ -823,17 +905,29 @@ class _AnimalMatchScreenState extends State<AnimalMatchScreen>
+                 textAlign: TextAlign.center,
+                 style: const TextStyle(fontSize: 10, color: Colors.white70,
+                   letterSpacing: .3, fontWeight: FontWeight.w700))),
++              IconButton(tooltip: tr ? 'Kristal kasası' : 'Crystal vault',
++                onPressed: _busy || _finishing ? null : () async {
++                  _suspended = true;
++                  await Navigator.of(context).push<void>(MaterialPageRoute<void>(
++                    builder: (_) => CrystalVaultScreen(
++                      appState: widget.appState, progress: widget.progress)));
++                  if (mounted) {
++                    _suspended = false;
++                    setState(() {});
++                  }
++                }, icon: const Icon(Icons.storefront_rounded,
++                  color: Color(0xFFFFD778), size: 22)),
+               CoinBadge(coins: widget.appState.coins, compact: true),
+             ]),
+             const SizedBox(height:10),
+             Row(children:<Widget>[
+-              _booster(Icons.gavel_rounded,'ÇEKİÇ',_engine.hammers,
++              _booster(Icons.gavel_rounded,'ÇEKİÇ',_engine.hammers + widget.progress.boosterStock[0],
+                 _hammerCost, _useHammer,
+                 const Color(0xFFFFD083)),
+-              _booster(Icons.auto_awesome,'GÖKKUŞAĞI',_engine.orbs,
++              _booster(Icons.auto_awesome,'GÖKKUŞAĞI',_engine.orbs + widget.progress.boosterStock[1],
+                 _rainbowCost, () => unawaited(_useRainbow()),
+                 const Color(0xFFC690FF)),
+-              _booster(Icons.shuffle_rounded,'KARIŞTIR',_engine.shuffles,
++              _booster(Icons.shuffle_rounded,'KARIŞTIR',_engine.shuffles + widget.progress.boosterStock[2],
+                 _shuffleCost, () => unawaited(_useShuffle()),
+                 const Color(0xFF7DEFC8)),
+             ]),
+diff --git a/lib/screens/crystal_vault_screen.dart b/lib/screens/crystal_vault_screen.dart
+new file mode 100644
+index 0000000..c9ba5fa
+--- /dev/null
++++ b/lib/screens/crystal_vault_screen.dart
+@@ -0,0 +1,234 @@
++import 'package:flutter/material.dart';
++
++import '../app_state.dart';
++import '../models/game_theme.dart';
++import '../services/animal_match_progress.dart';
++import '../widgets/coin_badge.dart';
++import '../widgets/premium_background.dart';
++
++/// The existing 100-stage map remains unchanged. The Vault is an optional
++/// campaign overlay, sharing the same atomically-persisted wallet as gameplay.
++class CrystalVaultScreen extends StatefulWidget {
++  const CrystalVaultScreen({super.key, required this.appState,
++      required this.progress});
++  final AppState appState;
++  final AnimalMatchProgress progress;
++
++  @override
++  State<CrystalVaultScreen> createState() => _CrystalVaultScreenState();
++}
++
++class _CrystalVaultScreenState extends State<CrystalVaultScreen> {
++  bool _processing = false;
++  bool _claimFlash = false;
++
++  bool get _tr => widget.appState.languageCode == 'tr';
++
++  Future<void> _action(Future<int> Function() operation) async {
++    if (_processing) return;
++    setState(() => _processing = true);
++    try {
++      final change = await operation();
++      if (!mounted) return;
++      final balance = widget.progress.storedCoinBalance;
++      if (balance != null) widget.appState.syncAnimalMatchCoins(balance);
++      setState(() => _claimFlash = change > 0);
++      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
++        content: Text(change > 0
++            ? (_tr ? '+$change ALTIN KASANA EKLENDİ' : '+$change COINS CLAIMED')
++            : (_tr ? 'Bu ödül henüz alınamıyor.' : 'Reward not available yet.')),
++      ));
++    } catch (_) {
++      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
++        content: Text(_tr ? 'Kayıt başarısız. Altın değişmedi; yeniden dene.'
++            : 'Save failed. No reward granted; please retry.'),
++      ));
++    } finally {
++      if (mounted) setState(() => _processing = false);
++    }
++  }
++
++  Future<void> _buy(int type) async {
++    if (_processing) return;
++    setState(() => _processing = true);
++    try {
++      final bought = await widget.progress.purchaseBooster(type);
++      if (!mounted) return;
++      if (bought) {
++        final balance = widget.progress.storedCoinBalance;
++        if (balance != null) widget.appState.syncAnimalMatchCoins(balance);
++      }
++      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
++        bought
++          ? (_tr ? 'Güçlendirici envantere eklendi.' : 'Booster added to inventory.')
++          : (_tr ? 'Yetersiz altın veya envanter dolu.'
++                 : 'Not enough coins or inventory is full.'),
++      )));
++    } catch (_) {
++      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
++        content: Text(_tr ? 'Satın alma kaydedilemedi.'
++                          : 'Could not save purchase.'),
++      ));
++    } finally {
++      if (mounted) setState(() => _processing = false);
++    }
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    final theme = gameThemes.firstWhere((t) => t.id == widget.appState.themeId,
++        orElse: () => gameThemes.first);
++    const gold = Color(0xFFFFD27B);
++    const cyan = Color(0xFF7DEBFF);
++    final progress = widget.progress;
++    return Scaffold(body: PremiumBackground(
++      top: theme.backgroundTop, bottom: theme.backgroundBottom,
++      material: theme.material, accent: gold,
++      child: SafeArea(child: Column(children: <Widget>[
++        Row(children: <Widget>[
++          IconButton(onPressed: _processing ? null : () => Navigator.pop(context),
++            icon: const Icon(Icons.arrow_back_rounded)),
++          Expanded(child: Text(_tr ? 'KRİSTAL KASASI' : 'CRYSTAL VAULT',
++            textAlign: TextAlign.center,
++            style: const TextStyle(fontWeight: FontWeight.w900,
++                letterSpacing: 1.7, fontSize: 17, color: gold))),
++          CoinBadge(coins: widget.appState.coins, compact: true),
++          const SizedBox(width: 12),
++        ]),
++        Expanded(child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 30),
++          children: <Widget>[
++            Container(padding: const EdgeInsets.all(20),
++              decoration: BoxDecoration(
++                borderRadius: BorderRadius.circular(28),
++                gradient: const LinearGradient(colors: <Color>[
++                  Color(0xFF2D3564), Color(0xFF141D39), Color(0xFF1B2447)]),
++                border: Border.all(color: gold, width: 1.3),
++                boxShadow: <BoxShadow>[BoxShadow(
++                  color: gold.withValues(alpha: .18), blurRadius: 34)]),
++              child: Column(children: <Widget>[
++                AnimatedScale(scale: _claimFlash ? 1.12 : 1,
++                    duration: const Duration(milliseconds: 420),
++                    curve: Curves.easeOutBack,
++                  child: const Icon(Icons.inventory_2_rounded,
++                    color: gold, size: 72)),
++                const SizedBox(height: 8),
++                Text(_tr ? 'GÜNLÜK KRİSTAL SANDIĞI' : 'DAILY CRYSTAL CHEST',
++                  textAlign: TextAlign.center,
++                  style: const TextStyle(fontWeight: FontWeight.w900,
++                    fontSize: 15, letterSpacing: .7)),
++                const SizedBox(height: 5),
++                Text(_tr ? 'Her gün bir kez 60 altın. Tekrarlı alım engellenir.'
++                    : '60 coins once a day, saved securely.',
++                  textAlign: TextAlign.center,
++                  style: const TextStyle(fontSize: 11, color: Colors.white70)),
++                const SizedBox(height: 13),
++                FilledButton.icon(
++                  onPressed: _processing || !progress.chestReady ? null
++                      : () => _action(() => progress.claimCrystalReward(quest: false)),
++                  style: FilledButton.styleFrom(backgroundColor: gold,
++                    foregroundColor: const Color(0xFF121B32)),
++                  icon: const Icon(Icons.card_giftcard_rounded),
++                  label: Text(progress.chestReady
++                    ? (_tr ? '+60 ALTIN AL' : 'CLAIM +60')
++                    : (_tr ? 'YARIN TEKRAR GEL' : 'RETURN TOMORROW')),
++                ),
++              ]),
++            ),
++            const SizedBox(height: 16),
++            _panel(
++              accent: cyan,
++              icon: Icons.task_alt_rounded,
++              title: _tr ? 'GÜNLÜK MACERA GÖREVİ' : 'DAILY ADVENTURE QUEST',
++              content: _tr
++                ? 'Aynı gün 3 yeni bölüm tamamla: ${progress.dailyQuestWins}/3'
++                : 'Clear 3 new levels today: ${progress.dailyQuestWins}/3',
++              buttonLabel: progress.questReady
++                ? (_tr ? '+120 ALTIN KAZAN' : 'CLAIM +120')
++                : (_tr ? 'GÖREVİ TAMAMLA' : 'FINISH QUEST'),
++              enabled: progress.questReady && !_processing,
++              action: () => _action(() => progress.claimCrystalReward(quest: true)),
++            ),
++            const SizedBox(height: 18),
++            Text(_tr ? 'GÜÇLENDİRİCİ MAĞAZASI' : 'BOOSTER STORE',
++              style: const TextStyle(color: gold, fontSize: 16,
++                fontWeight: FontWeight.w900, letterSpacing: .6)),
++            const SizedBox(height: 4),
++            Text(_tr ? 'Satın aldıkların bölüm değişse bile kasanda kalır.'
++                : 'Purchases stay in your inventory across stages.',
++              style: const TextStyle(color: Colors.white60, fontSize: 11)),
++            const SizedBox(height: 11),
++            for (var type = 0; type < 3; type++) ...<Widget>[
++              _storeRow(type),
++              const SizedBox(height: 9),
++            ],
++            const SizedBox(height: 9),
++            const Divider(color: Colors.white24),
++            Text(_tr ? 'Her 5 bölümde bir +50 ve kademe bonusu kazan.'
++                       : 'Every fifth level grants a milestone coin bonus.',
++              textAlign: TextAlign.center,
++              style: const TextStyle(color: Colors.white70, fontSize: 11)),
++          ],
++        )),
++      ])),
++    ));
++  }
++
++  Widget _panel({required Color accent, required IconData icon,
++    required String title, required String content,
++    required String buttonLabel, required bool enabled,
++    required VoidCallback action}) => Container(
++    padding: const EdgeInsets.all(15),
++    decoration: BoxDecoration(
++      gradient: LinearGradient(colors: <Color>[
++        accent.withValues(alpha: .16), const Color(0xFF15203B)]),
++      borderRadius: BorderRadius.circular(21),
++      border: Border.all(color: accent.withValues(alpha: .58))),
++    child: Row(children: <Widget>[
++      Icon(icon, color: accent, size: 39),
++      const SizedBox(width: 12),
++      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
++        children: <Widget>[
++          Text(title, style: const TextStyle(fontSize: 12,
++            fontWeight: FontWeight.w900)),
++          Text(content, style: const TextStyle(fontSize: 10,
++            color: Colors.white70)),
++          const SizedBox(height: 7),
++          FilledButton(onPressed: enabled ? action : null,
++            child: Text(buttonLabel, style: const TextStyle(fontSize: 11))),
++        ])),
++    ]),
++  );
++
++  Widget _storeRow(int type) {
++    const labelsTr = <String>['ÇEKİÇ', 'GÖKKUŞAĞI', 'KARIŞTIR'];
++    const labelsEn = <String>['HAMMER', 'RAINBOW', 'SHUFFLE'];
++    const icons = <IconData>[Icons.gavel_rounded,
++      Icons.auto_awesome_rounded, Icons.shuffle_rounded];
++    const colors = <Color>[Color(0xFFFFD083), Color(0xFFC690FF),
++      Color(0xFF7DEFC8)];
++    final stock = widget.progress.boosterStock[type];
++    return Container(padding: const EdgeInsets.symmetric(
++        horizontal: 12, vertical: 10),
++      decoration: BoxDecoration(
++        color: const Color(0xD0182440),
++        borderRadius: BorderRadius.circular(19),
++        border: Border.all(color: colors[type].withValues(alpha: .52))),
++      child: Row(children: <Widget>[
++        Icon(icons[type], color: colors[type], size: 32),
++        const SizedBox(width: 11),
++        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
++          children: <Widget>[
++            Text(_tr ? labelsTr[type] : labelsEn[type],
++              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
++            Text(_tr ? 'Envanter: $stock/9' : 'Inventory: $stock/9',
++              style: const TextStyle(color: Colors.white60, fontSize: 11)),
++          ])),
++        FilledButton.tonalIcon(
++          onPressed: _processing || stock >= 9 ? null : () => _buy(type),
++          icon: const Icon(Icons.monetization_on_rounded, size: 15),
++          label: Text('${AnimalMatchProgress.boosterCosts[type]}'),
++        ),
++      ]),
++    );
++  }
++}
+diff --git a/lib/services/animal_match_progress.dart b/lib/services/animal_match_progress.dart
+index a520afb..9e467c0 100644
+--- a/lib/services/animal_match_progress.dart
++++ b/lib/services/animal_match_progress.dart
+@@ -31,6 +31,21 @@ class AnimalMatchProgress {
+ 
+   int unlocked = 1;
+   int? storedCoinBalance;
++  static const boosterCosts = <int>[100, 180, 130];
++  final List<int> boosterStock = <int>[0, 0, 0];
++  String lastChestDay = '';
++  String questClaimDay = '';
++  int dailyQuestWins = 0;
++
++  static String get todayKey {
++    final now = DateTime.now();
++    return '${now.year.toString().padLeft(4, '0')}-'
++        '${now.month.toString().padLeft(2, '0')}-'
++        '${now.day.toString().padLeft(2, '0')}';
++  }
++  bool get chestReady => lastChestDay != todayKey;
++  bool get questReady => dailyQuestWins >= 3 && questClaimDay != todayKey;
++
+   final Map<int, int> stars = <int, int>{};
+   final Set<int> completed = <int>{};
+   int get totalStars => stars.values.fold(0, (a, b) => a + b);
+@@ -47,6 +62,7 @@ class AnimalMatchProgress {
+         if (data != null) {
+           _applySnapshot(data);
+           storedCoinBalance = (data['coinBalance'] as num?)?.toInt();
++          _applyEconomy(data);
+           return;
+         }
+       } on MissingPluginException {
+@@ -90,6 +106,19 @@ class AnimalMatchProgress {
+     completed..clear()..addAll(nextCompleted);
+   }
+ 
++  void _applyEconomy(Map<String, dynamic> data) {
++    final stocks = data['stock'];
++    if (stocks is List && stocks.length == boosterStock.length) {
++      for (var i = 0; i < boosterStock.length; i++) {
++        boosterStock[i] = ((stocks[i] as num?)?.toInt() ?? 0).clamp(0, 9).toInt();
++      }
++    }
++    lastChestDay = data['chestDate'] is String ? data['chestDate'] as String : '';
++    questClaimDay = data['questClaimDate'] is String
++        ? data['questClaimDate'] as String : '';
++    dailyQuestWins = ((data['questWins'] as num?)?.toInt() ?? 0).clamp(0, 3).toInt();
++  }
++
+   Future<void> _legacyLoad() async {
+     final prefs = await SharedPreferences.getInstance();
+     final storedUnlocked = prefs.get(_unlockedKey);
+@@ -125,6 +154,13 @@ class AnimalMatchProgress {
+     unlocked = nextUnlocked;
+     stars..clear()..addAll(nextStars);
+     completed..clear()..addAll(nextCompleted);
++    for (var i = 0; i < boosterStock.length; i++) {
++      boosterStock[i] = (prefs.getInt('crystal_stock_$i') ?? 0).clamp(0, 9).toInt();
++    }
++    lastChestDay = prefs.getString('crystal_chest_day') ?? '';
++    questClaimDay = prefs.getString('crystal_quest_claim_day') ?? '';
++    dailyQuestWins = prefs.getString('crystal_quest_day') == todayKey
++        ? (prefs.getInt('crystal_quest_wins') ?? 0).clamp(0, 3).toInt() : 0;
+   }
+ 
+   /// Commit only after every local write succeeds; a failed save can be
+@@ -150,6 +186,14 @@ class AnimalMatchProgress {
+     unlocked = newUnlocked;
+     stars..clear()..addAll(newStars);
+     completed..clear()..addAll(newCompleted);
++    if (first) {
++      final today = todayKey;
++      final previousDay = prefs.getString('crystal_quest_day');
++      final oldWins = previousDay == today ? dailyQuestWins : 0;
++      dailyQuestWins = (oldWins + 1).clamp(0, 3).toInt();
++      await prefs.setString('crystal_quest_day', today);
++      await prefs.setInt('crystal_quest_wins', dailyQuestWins);
++    }
+     return first;
+   }
+ 
+@@ -185,6 +229,117 @@ class AnimalMatchProgress {
+     return true;
+   }
+ 
++  /// Purchased boosters survive level restarts and are not duplicated by
++  /// retrying a failed payment. Android debits coins and increments inventory
++  /// with one durable native transaction.
++  Future<bool> purchaseBooster(int type) async {
++    if (type < 0 || type >= boosterCosts.length) return false;
++    if (boosterStock[type] >= 9) return false;
++    if (nativeStorageEnabled && !kIsWeb &&
++        defaultTargetPlatform == TargetPlatform.android) {
++      try {
++        final raw = await _native.invokeMapMethod<String, dynamic>(
++          'buyStock', <String, int>{'type': type},
++        ).timeout(const Duration(seconds: 6));
++        if (raw == null) throw StateError('Empty store receipt');
++        _applyEconomy(raw);
++        storedCoinBalance = (raw['coinBalance'] as num?)?.toInt();
++        return true;
++      } on PlatformException catch (e) {
++        if (e.code == 'INSUFFICIENT_COINS' || e.code == 'STOCK_FULL') return false;
++        rethrow;
++      } on MissingPluginException {
++        // Pure Dart tests and desktop builds use shared preferences.
++      }
++    }
++    final prefs = await SharedPreferences.getInstance();
++    final balance = prefs.getInt('coins') ?? 0;
++    final cost = boosterCosts[type];
++    if (balance < cost) return false;
++    if (!await prefs.setInt('crystal_stock_$type', boosterStock[type] + 1)) {
++      throw StateError('Inventory storage rejected purchase');
++    }
++    if (!await prefs.setInt('coins', balance - cost)) {
++      // Roll back this stock item on a failed coin debit.
++      await prefs.setInt('crystal_stock_$type', boosterStock[type]);
++      throw StateError('Coin storage rejected purchase');
++    }
++    boosterStock[type]++;
++    storedCoinBalance = balance - cost;
++    return true;
++  }
++
++  /// Returns false without consuming if no stock exists.
++  Future<bool> consumeBooster(int type) async {
++    if (type < 0 || type >= boosterStock.length || boosterStock[type] == 0) {
++      return false;
++    }
++    if (nativeStorageEnabled && !kIsWeb &&
++        defaultTargetPlatform == TargetPlatform.android) {
++      try {
++        final remaining = await _native.invokeMethod<int>(
++          'useStock', <String, int>{'type': type},
++        ).timeout(const Duration(seconds: 6));
++        if (remaining == null || remaining < 0) return false;
++        boosterStock[type] = remaining;
++        return true;
++      } on PlatformException catch (e) {
++        if (e.code == 'NO_STOCK') return false;
++        rethrow;
++      } on MissingPluginException {
++        // Fallback only for older non-native versions.
++      }
++    }
++    final prefs = await SharedPreferences.getInstance();
++    final stock = prefs.getInt('crystal_stock_$type') ?? 0;
++    if (stock <= 0) return false;
++    if (!await prefs.setInt('crystal_stock_$type', stock - 1)) {
++      throw StateError('Failed to persist consumed booster');
++    }
++    boosterStock[type] = stock - 1;
++    return true;
++  }
++
++  /// Chest: 60 coins/day. Quest: 120 coins after 3 distinct new levels
++  /// completed that local day. Both are idempotent, atomically committed in
++  /// native Android storage, and never grant coins on a rejected transaction.
++  Future<int> claimCrystalReward({required bool quest}) async {
++    if (quest ? !questReady : !chestReady) return 0;
++    final method = quest ? 'claimQuest' : 'claimChest';
++    if (nativeStorageEnabled && !kIsWeb &&
++        defaultTargetPlatform == TargetPlatform.android) {
++      try {
++        final raw = await _native.invokeMapMethod<String, dynamic>(method)
++            .timeout(const Duration(seconds: 6));
++        if (raw == null) throw StateError('Empty chest receipt');
++        _applyEconomy(raw);
++        storedCoinBalance = (raw['coinBalance'] as num?)?.toInt();
++        return (raw['coinsGranted'] as num?)?.toInt() ?? 0;
++      } on PlatformException catch (e) {
++        if (e.code == 'ALREADY_CLAIMED' || e.code == 'QUEST_LOCKED') return 0;
++        rethrow;
++      } on MissingPluginException {
++        // SharedPreferences fallback for platforms without the native channel.
++      }
++    }
++    final prefs = await SharedPreferences.getInstance();
++    final key = quest ? 'crystal_quest_claim_day' : 'crystal_chest_day';
++    if (prefs.getString(key) == todayKey) return 0;
++    final reward = quest ? 120 : 60;
++    final previous = prefs.getInt('coins') ?? 0;
++    if (!await prefs.setString(key, todayKey)) {
++      throw StateError('Reward claim date could not be saved');
++    }
++    if (!await prefs.setInt('coins', previous + reward)) {
++      await prefs.remove(key);
++      throw StateError('Reward balance could not be saved');
++    }
++    if (quest) { questClaimDay = todayKey; }
++    else { lastChestDay = todayKey; }
++    storedCoinBalance = previous + reward;
++    return reward;
++  }
++
+   /// Android awards the coins and saves progress atomically. Repeating this
+   /// call for an already-completed level cannot award its coins again.
+   Future<AnimalMatchWinReceipt> recordWinAndAward(
+@@ -206,6 +361,7 @@ class AnimalMatchProgress {
+         ).timeout(const Duration(seconds: 7));
+         if (raw == null) throw StateError('Native save returned no data');
+         _applySnapshot(raw);
++        _applyEconomy(raw);
+         storedCoinBalance = (raw['coinBalance'] as num?)?.toInt();
+         return AnimalMatchWinReceipt(
+           firstWin: raw['firstWin'] == true,
+diff --git a/lib/widgets/animal_crystal_burst.dart b/lib/widgets/animal_crystal_burst.dart
+index ed5aff2..3caac5b 100644
+--- a/lib/widgets/animal_crystal_burst.dart
++++ b/lib/widgets/animal_crystal_burst.dart
+@@ -10,12 +10,13 @@ class CrystalImpactProfile {
+   final int matched;   final int chain;
+ 
+-  double get force => (1.0 + math.max(0, matched - 3) * .105 +
+-      math.max(0, chain - 1) * .42).clamp(1.0, 5.8).toDouble();
+-  int get shardsPerGem => (22 + (force * 5).round()).clamp(27, 50).toInt();
+-  int get sparksPerGem => (14 + (force * 4).round()).clamp(18, 38).toInt();
+-  int get maxImpactCells => 32;
+-  bool get mega => matched >= 7 || chain >= 3;
++  double get force => (1.0 + math.max(0, matched - 3) * .17 +
++      math.max(0, chain - 1) * .56).clamp(1.0, 7.2).toDouble();
++  int get shardsPerGem => (23 + (force * 6).round()).clamp(29, 62).toInt();
++  int get sparksPerGem => (16 + (force * 4).round()).clamp(20, 38).toInt();
++  // Bounded to ~2400 fragments on lower-end Android devices.
++  int get maxImpactCells => 24;
++  bool get mega => matched >= 6 || chain >= 2;
+ }
+ 
+ /// Cinematic multi-layer crystal fracture. Cached deterministic trajectories
+@@ -105,7 +106,7 @@ class AnimalCrystalBurst extends CustomPainter {
+       .createShader(Rect.fromCircle(center: centroid, radius: bloomRadius)));
+ 
+     if (profile.mega) {
+-      for (var ring = 0; ring < 5; ring++) {
++      for (var ring = 0; ring < 7; ring++) {
+         final rt = ((t - ring * .105) / (1 - ring * .105)).clamp(0.0, 1.0).toDouble();
+         if (rt <= 0) continue;
+         final radius = cell * (.42 + rt * (1.4 + intensity * 1.7));
+@@ -116,8 +117,8 @@ class AnimalCrystalBurst extends CustomPainter {
+           ..color = (ring.isEven ? Colors.white : palette[chain % palette.length])
+             .withValues(alpha: .63 * (1 - rt) * fade));
+       }
+-      for (var ray = 0; ray < 22; ray++) {
+-        final angle = ray * (2 * math.pi / 22) + chain * .37;
++      for (var ray = 0; ray < 32; ray++) {
++        final angle = ray * (2 * math.pi / 32) + chain * .37;
+         final direction = Offset(math.cos(angle), math.sin(angle));
+         final start = centroid + direction * cell * (.2 + t * 1.1);
+         final end = centroid + direction * cell * (1.5 + intensity * 1.7) * t;
+@@ -163,7 +164,7 @@ class AnimalCrystalBurst extends CustomPainter {
+       final gem = before[index].clamp(0, palette.length - 1).toInt();
+       final color = palette[gem];
+       final spray = _sprays[index]!;
+-      final speedScale = .8 + intensity * .26;
++      final speedScale = .78 + intensity * .31;
+ 
+       // Crystal fracture: white-hot core, four shock rings, and cut glass.
+       canvas.drawCircle(center, cell * (.21 + t * .85), Paint()
+@@ -184,6 +185,14 @@ class AnimalCrystalBurst extends CustomPainter {
+               .withValues(alpha: .86 * (1 - rt) * fade));
+       }
+ 
++      if (profile.mega) {
++        final pulse = math.sin((t * 6 + chain * .15) * math.pi).abs();
++        canvas.drawCircle(center, cell * (.3 + t * (1.6 + intensity * .3)),
++          _scratch..shader = null..style = PaintingStyle.stroke
++            ..strokeWidth = .7 + pulse * 3.4 * fade
++            ..color = Colors.white.withValues(alpha: (.48 + pulse * .28) * fade));
++      }
++
+       // Triangular glass shards with trajectories and glints. Their distance
+       // responds to matched gem count AND cascade depth, never a fixed fade.
+       for (var part = 0; part < spray.shards.length; part++) {
+diff --git a/lib/widgets/crystal_obstacle_overlay.dart b/lib/widgets/crystal_obstacle_overlay.dart
+new file mode 100644
+index 0000000..51f81ac
+--- /dev/null
++++ b/lib/widgets/crystal_obstacle_overlay.dart
+@@ -0,0 +1,77 @@
++import 'dart:math' as math;
++import 'package:flutter/material.dart';
++
++/// Lightweight vector overlays for genuine, breakable, fixed board obstacles.
++/// 1 ice, 2 chains, 3 solid stone, 4 cracked stone. No network or assets.
++class CrystalObstacleOverlay extends StatelessWidget {
++  const CrystalObstacleOverlay({super.key, required this.kind});
++  final int kind;
++
++  @override
++  Widget build(BuildContext context) {
++    if (kind == 0) return const SizedBox.shrink();
++    return IgnorePointer(child: RepaintBoundary(child: CustomPaint(
++      painter: _CrystalObstaclePainter(kind),
++      child: const SizedBox.expand(),
++    )));
++  }
++}
++
++class _CrystalObstaclePainter extends CustomPainter {
++  const _CrystalObstaclePainter(this.kind);
++  final int kind;
++
++  @override
++  void paint(Canvas canvas, Size size) {
++    final w = size.width, h = size.height;
++    if (w <= 0 || h <= 0) return;
++    final rect = Offset.zero & size;
++    final paint = Paint()..isAntiAlias = true;
++    if (kind == 1) {
++      paint.color = const Color(0xAA9AF4FF);
++      canvas.drawRRect(RRect.fromRectAndRadius(rect.deflate(w * .045),
++          Radius.circular(w * .16)), paint);
++      paint.color = const Color(0xCCFFFFFF);
++      paint.style = PaintingStyle.stroke;
++      paint.strokeWidth = math.max(.9, w * .035);
++      canvas.drawLine(Offset(w * .12, h * .23), Offset(w * .48, h * .63), paint);
++      canvas.drawLine(Offset(w * .48, h * .63), Offset(w * .78, h * .18), paint);
++      canvas.drawLine(Offset(w * .48, h * .63), Offset(w * .85, h * .81), paint);
++    } else if (kind == 2) {
++      paint.color = const Color(0xE6FFCF69);
++      paint.style = PaintingStyle.stroke;
++      paint.strokeWidth = math.max(2, w * .085);
++      for (var i = 0; i < 3; i++) {
++        canvas.drawOval(Rect.fromCenter(
++            center: Offset(w * (.25 + .25 * i), h * (.25 + .25 * i)),
++            width: w * .53, height: h * .32), paint);
++      }
++      paint.color = const Color(0xBB381D18);
++      paint.strokeWidth = w * .025;
++      canvas.drawLine(Offset(w * .18, h * .08), Offset(w * .90, h * .88), paint);
++    } else {
++      final stone = Path()
++        ..moveTo(w * .17, h * .16)..lineTo(w * .75, h * .06)
++        ..lineTo(w * .96, h * .51)..lineTo(w * .76, h * .95)
++        ..lineTo(w * .16, h * .87)..lineTo(w * .03, h * .49)..close();
++      canvas.drawPath(stone, paint..style = PaintingStyle.fill
++        ..color = kind == 3 ? const Color(0xF056627E)
++                           : const Color(0xB66E809E));
++      canvas.drawPath(stone, paint..style = PaintingStyle.stroke
++        ..strokeWidth = math.max(1, w * .05)
++        ..color = const Color(0xFFE1EAFB));
++      paint.color = const Color(0xFFF7D8A1);
++      paint.strokeWidth = math.max(1, w * .05);
++      canvas.drawLine(Offset(w * .50, h * .12), Offset(w * .38, h * .44), paint);
++      canvas.drawLine(Offset(w * .38, h * .44), Offset(w * .66, h * .57), paint);
++      if (kind == 4) {
++        canvas.drawLine(Offset(w * .38, h * .44), Offset(w * .19, h * .76), paint);
++        canvas.drawLine(Offset(w * .66, h * .57), Offset(w * .84, h * .82), paint);
++      }
++    }
++  }
++
++  @override
++  bool shouldRepaint(covariant _CrystalObstaclePainter oldDelegate) =>
++      oldDelegate.kind != kind;
++}
+diff --git a/pubspec.yaml b/pubspec.yaml
+index e2537c7..350fa07 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -1,7 +1,7 @@
+ name: elxvro_blocks
+ description: Premium block puzzle game for ELXVRO.
+ publish_to: 'none'
+-version: 0.33.8+91
++version: 0.34.0+92
+ 
+ environment:
+   sdk: '>=3.4.0 <4.0.0'
+diff --git a/test/play_games_sdk_regression_test.dart b/test/play_games_sdk_regression_test.dart
+index 1f43f1c..7eee735 100644
+--- a/test/play_games_sdk_regression_test.dart
++++ b/test/play_games_sdk_regression_test.dart
+@@ -7,7 +7,7 @@ void main() {
+     final gradle = File('android/app/build.gradle.kts').readAsStringSync();
+     expect(pubspec, contains('games_services: 5.3.0'));
+     expect(pubspec, contains('games_services_platform_interface: 5.3.0'));
+-    expect(pubspec, contains('version: 0.33.8+91'));
++    expect(pubspec, contains('version: 0.34.0+92'));
+     expect(gradle, contains('play-services-games-v2:22.1.0'));
+     expect(gradle, contains('play-services-base:18.11.0'));
+     expect(gradle, contains('play-services-basement:18.12.0'));
+diff --git a/test/real_material_audio_test.dart b/test/real_material_audio_test.dart
+index ac893a7..95f9d9d 100644
+--- a/test/real_material_audio_test.dart
++++ b/test/real_material_audio_test.dart
+@@ -7,6 +7,6 @@ void main() {
+     expect(File('tool/fetch_real_material_audio.sh').existsSync(), isTrue);
+     expect(File('REAL_AUDIO_CREDITS.md').existsSync(), isTrue);
+     final pubspec = File('pubspec.yaml').readAsStringSync();
+-    expect(pubspec, contains('version: 0.33.8+91'));
++    expect(pubspec, contains('version: 0.34.0+92'));
+   });
+ }
+diff --git a/test/remove_adventure_test.dart b/test/remove_adventure_test.dart
+index 7f81369..749e555 100644
+--- a/test/remove_adventure_test.dart
++++ b/test/remove_adventure_test.dart
+@@ -28,7 +28,7 @@ void main() {
+     expect(Directory('assets/images/adventure_battles').existsSync(), isFalse);
+     expect(Directory('assets/images/adventure_worlds').existsSync(), isFalse);
+     expect(assets, isNot(contains('assets/images/adventure_')));
+-    expect(assets, contains('version: 0.33.8+91'));
++    expect(assets, contains('version: 0.34.0+92'));
+     expect(assets, contains('assets/images/animal_gems/'));
+   });
+ 
+diff --git a/test/v0240_features_test.dart b/test/v0240_features_test.dart
+index 0e69a56..de9eadb 100644
+--- a/test/v0240_features_test.dart
++++ b/test/v0240_features_test.dart
+@@ -38,7 +38,7 @@ void main() {
+         File('lib/screens/daily_missions_screen.dart').readAsStringSync();
+     final game = File('lib/screens/game_screen.dart').readAsStringSync();
+ 
+-    expect(pubspec, contains('version: 0.33.8+91'));
++    expect(pubspec, contains('version: 0.34.0+92'));
+     expect(pubspec, contains('share_plus: 10.1.4'));
+     expect(home, contains('TutorialScreen'));
+     expect(home, contains('ShareService.shareGame'));
+diff --git a/test/v0287_support_test.dart b/test/v0287_support_test.dart
+index 147eb36..703b747 100644
+--- a/test/v0287_support_test.dart
++++ b/test/v0287_support_test.dart
+@@ -10,7 +10,7 @@ void main() {
+   expect(billing,isNot(contains('http')));
+   expect(billing,isNot(contains('buyConsumable(')));
+   final pubspec=File('pubspec.yaml').readAsStringSync();
+-  expect(pubspec,contains('version: 0.33.8+91'));
++  expect(pubspec,contains('version: 0.34.0+92'));
+   expect(pubspec,contains('in_app_purchase:'));
+   expect(pubspec,isNot(contains('google_sign_in:')));
+  });
+diff --git a/test/v0340_crystal_premium_test.dart b/test/v0340_crystal_premium_test.dart
+new file mode 100644
+index 0000000..7554f5c
+--- /dev/null
++++ b/test/v0340_crystal_premium_test.dart
+@@ -0,0 +1,136 @@
++import 'dart:math';
++
++import 'package:flutter_test/flutter_test.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++import 'package:elxvro_blocks/game/animal_match_engine.dart';
++import 'package:elxvro_blocks/services/animal_match_progress.dart';
++import 'package:elxvro_blocks/widgets/animal_crystal_burst.dart';
++
++void main() {
++  TestWidgetsFlutterBinding.ensureInitialized();
++
++  setUp(() {
++    AnimalMatchProgress.nativeStorageEnabled = false;
++    SharedPreferences.setMockInitialValues(<String, Object>{'coins': 800});
++  });
++
++  test('obstacles begin gradually and mature into stone and chains', () {
++    expect(AnimalMatchLevel(1).obstacleCount, 0);
++    expect(AnimalMatchLevel(7).obstacleCount, 0);
++    expect(AnimalMatchLevel(8).obstacleCount, greaterThan(0));
++    expect(AnimalMatchLevel(21).hasChains, false);
++    expect(AnimalMatchLevel(22).hasChains, true);
++    expect(AnimalMatchLevel(39).hasStone, true);
++    expect(AnimalMatchLevel(100).obstacleCount,
++        greaterThan(AnimalMatchLevel(8).obstacleCount));
++    expect(AnimalMatchLevel(5).milestoneBonus, greaterThan(0));
++    expect(AnimalMatchLevel(4).milestoneBonus, 0);
++  });
++
++  test('locked gems cannot be swapped; breaking barrier requires impact', () {
++    final game = AnimalMatchEngine(AnimalMatchLevel(44), random: Random(71));
++    expect(game.remainingObstacles, game.level.obstacleCount);
++    final locked = game.blockers.indexWhere((x) => x != 0);
++    expect(locked, isNonNegative);
++    final neighbor = locked % AnimalMatchEngine.width == 0 ? locked + 1 : locked - 1;
++    final remainingMoves = game.movesLeft;
++    expect(game.swap(locked, neighbor).valid, false);
++    expect(game.movesLeft, remainingMoves);
++    // Every hammer hit is real and fractures the obstruction without
++    // charging an extra move. Solid stone needs a second hit.
++    game.hammers = 2;
++    final first = game.barrierAt(locked);
++    final action = game.hammer(locked);
++    expect(action.valid, true);
++    expect(action.steps.first.fracturedBlockers, contains(locked));
++    expect(game.barrierAt(locked), isNot(first));
++    if (first == 3) {
++      game.hammer(locked);
++      expect(game.barrierAt(locked), 0);
++    }
++    expect(game.movesLeft, remainingMoves);
++  });
++
++  test('all 100 levels are playable and avoid matched / deadlocked states', () {
++    for (final levelNumber in <int>[1, 8, 22, 39, 65, 100]) {
++      for (var seed = 0; seed < 8; seed++) {
++        final game = AnimalMatchEngine(AnimalMatchLevel(levelNumber),
++            random: Random(seed + 104));
++        expect(game.remainingObstacles, game.level.obstacleCount);
++        expect(game.hasPossibleSwap, isTrue);
++        expect(game.hasExistingMatches, isFalse);
++        for (var move = 0; move < 3 && !game.ended; move++) {
++          AnimalMatchResult? completed;
++          for (var i = 0; i < AnimalMatchEngine.cells && completed == null; i++) {
++            for (final delta in <int>[1, AnimalMatchEngine.width]) {
++              final j = i + delta;
++              if (j >= AnimalMatchEngine.cells) continue;
++              if (delta == 1 && i ~/ AnimalMatchEngine.width !=
++                  j ~/ AnimalMatchEngine.width) continue;
++              final action = game.swap(i, j);
++              if (action.valid) {
++                completed = action;
++                break;
++              }
++            }
++          }
++          expect(completed, isNotNull, reason: 'No move: $levelNumber/$seed');
++          for (final step in completed!.steps) {
++            expect(step.blockersBefore.length, AnimalMatchEngine.cells);
++            expect(step.blockersAfter.length, AnimalMatchEngine.cells);
++          }
++          if (!game.ended) {
++            expect(game.hasExistingMatches, isFalse);
++            expect(game.hasPossibleSwap, isTrue);
++          }
++        }
++      }
++    }
++  });
++
++  test('booster purchases survive reloading and are single-use', () async {
++    final p = AnimalMatchProgress();
++    await p.load();
++    expect(await p.purchaseBooster(1), true);
++    expect(p.boosterStock[1], 1);
++    expect(p.storedCoinBalance, 620);
++    final reloaded = AnimalMatchProgress();
++    await reloaded.load();
++    expect(reloaded.boosterStock[1], 1);
++    expect(await reloaded.consumeBooster(1), true);
++    expect(await reloaded.consumeBooster(1), false);
++    expect(reloaded.boosterStock[1], 0);
++    expect(await reloaded.purchaseBooster(99), false);
++  });
++
++  test('daily chest rewards once, and quest waits for 3 first-time wins', () async {
++    final p = AnimalMatchProgress();
++    await p.load();
++    expect(p.questReady, false);
++    expect(p.chestReady, true);
++    expect(await p.claimCrystalReward(quest: false), 60);
++    expect(await p.claimCrystalReward(quest: false), 0);
++    expect(p.chestReady, false);
++    expect(await p.claimCrystalReward(quest: true), 0);
++    await p.recordWin(1, 1);
++    await p.recordWin(2, 1);
++    await p.recordWin(3, 2);
++    expect(p.dailyQuestWins, 3);
++    expect(p.questReady, true);
++    expect(await p.claimCrystalReward(quest: true), 120);
++    expect(await p.claimCrystalReward(quest: true), 0);
++    final reloaded = AnimalMatchProgress();
++    await reloaded.load();
++    expect(reloaded.chestReady, false);
++    expect(reloaded.questReady, false);
++  });
++
++  test('crystal storm intensity increases without an unbounded work budget', () {
++    const small = CrystalImpactProfile(matched: 3, chain: 1);
++    const large = CrystalImpactProfile(matched: 24, chain: 5);
++    expect(large.force, greaterThan(small.force));
++    expect(large.shardsPerGem, greaterThan(small.shardsPerGem));
++    expect(large.maxImpactCells *
++      (large.shardsPerGem + large.sparksPerGem), lessThan(2500));
++  });
++}
+diff --git a/tool/install_animal_save_channel.py b/tool/install_animal_save_channel.py
+index ccda7c5..9d99c07 100644
+--- a/tool/install_animal_save_channel.py
++++ b/tool/install_animal_save_channel.py
+@@ -23,6 +23,9 @@ import io.flutter.embedding.engine.FlutterEngine
+ import io.flutter.plugin.common.MethodChannel
+ import org.json.JSONArray
+ import org.json.JSONObject
++import java.text.SimpleDateFormat
++import java.util.Date
++import java.util.Locale
+ import io.flutter.embedding.android.FlutterActivity''', 1)
+ # Insert inside the existing MainActivity (and retain Android 15/16 insets).
+ start = s.index('class MainActivity : FlutterActivity()')
+@@ -43,7 +46,7 @@ channel = '''
+                         "loadSnapshot" -> {
+                             synchronized(this@MainActivity) {
+                                 result.success(readCampaign().toResultMap() + mapOf(
+-                                    "coinBalance" to readCoins()))
++                                    "coinBalance" to readCoins()) + economySnapshot())
+                             }
+                         }
+                         "spendCoins" -> {
+@@ -65,6 +68,76 @@ channel = '''
+                                 }
+                             }
+                         }
++                        "buyStock" -> {
++                            val type = call.argument<Int>("type") ?: -1
++                            synchronized(this@MainActivity) {
++                                if (type !in 0..2) {
++                                    result.error("INVALID_BOOSTER", "Unknown item", null)
++                                } else {
++                                    val inventory = readStock(type)
++                                    val cost = listOf(100, 180, 130)[type]
++                                    val current = readCoins()
++                                    if (inventory >= 9) {
++                                        result.error("STOCK_FULL", "Inventory full", null)
++                                    } else if (current < cost) {
++                                        result.error("INSUFFICIENT_COINS", "Not enough coins", null)
++                                    } else {
++                                        val next = current - cost
++                                        val ok = campaignPrefs.edit()
++                                            .putInt("elxvro.crystal_stock_$type", inventory + 1)
++                                            .putLong("flutter.coins", next.toLong())
++                                            .commit()
++                                        if (ok) result.success(economySnapshot() + mapOf(
++                                            "coinBalance" to next))
++                                        else result.error("WRITE_FAILED", "Purchase not saved", null)
++                                    }
++                                }
++                            }
++                        }
++                        "useStock" -> {
++                            val type = call.argument<Int>("type") ?: -1
++                            synchronized(this@MainActivity) {
++                                if (type !in 0..2) {
++                                    result.error("INVALID_BOOSTER", "Unknown item", null)
++                                } else {
++                                    val stock = readStock(type)
++                                    if (stock == 0) result.error("NO_STOCK", "No stock", null)
++                                    else {
++                                        val saved = campaignPrefs.edit()
++                                            .putInt("elxvro.crystal_stock_$type", stock - 1)
++                                            .commit()
++                                        if (saved) result.success(stock - 1)
++                                        else result.error("WRITE_FAILED", "Use not saved", null)
++                                    }
++                                }
++                            }
++                        }
++                        "claimChest", "claimQuest" -> {
++                            synchronized(this@MainActivity) {
++                                val today = currentDay()
++                                val quest = call.method == "claimQuest"
++                                val claimKey = if (quest) "elxvro.crystal_quest_claim"
++                                               else "elxvro.crystal_chest_claim"
++                                val alreadyClaimed = campaignPrefs.getString(claimKey, "") == today
++                                val enoughWins = !quest ||
++                                    (campaignPrefs.getString("elxvro.crystal_quest_day", "") == today &&
++                                     campaignPrefs.getInt("elxvro.crystal_quest_wins", 0) >= 3)
++                                if (alreadyClaimed) {
++                                    result.error("ALREADY_CLAIMED", "Reward already claimed", null)
++                                } else if (!enoughWins) {
++                                    result.error("QUEST_LOCKED", "Complete 3 new levels", null)
++                                } else {
++                                    val coins = if (quest) 120 else 60
++                                    val next = (readCoins().toLong() + coins)
++                                        .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
++                                    val saved = campaignPrefs.edit().putString(claimKey, today)
++                                        .putLong("flutter.coins", next.toLong()).commit()
++                                    if (saved) result.success(economySnapshot() + mapOf(
++                                        "coinsGranted" to coins, "coinBalance" to next))
++                                    else result.error("WRITE_FAILED", "Reward not saved", null)
++                                }
++                            }
++                        }
+                         "saveWin" -> {
+                             val level = call.argument<Int>("level") ?: 0
+                             val rating = call.argument<Int>("rating") ?: 0
+@@ -90,15 +163,24 @@ channel = '''
+                                             .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                                         // Both values live in the SAME Android XML file and
+                                         // are durably committed with one Editor transaction.
++                                        val today = currentDay()
++                                        val previousWins = if (campaignPrefs.getString(
++                                                "elxvro.crystal_quest_day", "") == today)
++                                            campaignPrefs.getInt("elxvro.crystal_quest_wins", 0)
++                                            else 0
++                                        val newWins = (previousWins + if (first) 1 else 0)
++                                            .coerceAtMost(3)
+                                         val persisted = campaignPrefs.edit()
+                                             .putString(snapshotKey, campaign.toJson().toString())
+                                             .putLong("flutter.coins", newBalance.toLong())
++                                            .putString("elxvro.crystal_quest_day", today)
++                                            .putInt("elxvro.crystal_quest_wins", newWins)
+                                             .commit()
+                                         if (!persisted) {
+                                             result.error("WRITE_FAILED",
+                                                 "Device could not persist progress", null)
+                                         } else {
+-                                            result.success(campaign.toResultMap() + mapOf(
++                                            result.success(campaign.toResultMap() + economySnapshot() + mapOf(
+                                                 "firstWin" to first,
+                                                 "coinsGranted" to awarded,
+                                                 "coinBalance" to newBalance,
+@@ -117,6 +199,24 @@ channel = '''
+             }
+     }
+ 
++    private fun currentDay(): String =
++        SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
++
++    private fun readStock(type: Int): Int =
++        ((campaignPrefs.all["elxvro.crystal_stock_$type"] as? Number)?.toInt() ?: 0)
++            .coerceIn(0, 9)
++
++    private fun economySnapshot(): Map<String, Any> {
++        val today = currentDay()
++        return mapOf(
++            "stock" to (0..2).map { readStock(it) },
++            "chestDate" to (campaignPrefs.getString("elxvro.crystal_chest_claim", "") ?: ""),
++            "questClaimDate" to (campaignPrefs.getString("elxvro.crystal_quest_claim", "") ?: ""),
++            "questWins" to if (campaignPrefs.getString("elxvro.crystal_quest_day", "") == today)
++                campaignPrefs.getInt("elxvro.crystal_quest_wins", 0) else 0,
++        )
++    }
++
+     private fun readCoins(): Int =
+         ((campaignPrefs.all["flutter.coins"] as? Number)?.toInt() ?: 0)
+             .coerceAtLeast(0)
