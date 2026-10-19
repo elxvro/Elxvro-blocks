@@ -1,0 +1,32 @@
+--- a/lib/game/animal_match_engine.dart
++++ b/lib/game/animal_match_engine.dart
+@@ -184,7 +184,7 @@
+   int get remainingObstacles => blockers.where((b) => b != 0).length;
+   int get clearedObstacles =>
+       (level.obstacleCount + spawnedBossBarriers - remainingObstacles)
+-          .clamp(0, level.obstacleCount + spawnedBossBarriers);
++          .clamp(0, level.obstacleCount + spawnedBossBarriers).toInt();
+   int barrierAt(int index) => blockers[index];
+ 
+   /// Every material has a deterministic number of hits before it disappears.
+--- a/lib/screens/animal_adventure_screen.dart
++++ b/lib/screens/animal_adventure_screen.dart
+@@ -451,7 +451,8 @@
+     if (start == null) return;
+     _boardPointer = event.pointer;
+     _pointerStartCell = start;
+-    _pointerStartPosition = event.localPosition;
++    // Screen coordinates stay stable even if the outer viewport scrolls.
++    _pointerStartPosition = event.position;
+   }
+ 
+   void _boardPointerUp(PointerUpEvent event) {
+@@ -463,7 +464,7 @@
+     _pointerStartPosition = null;
+     if (start == null || down == null || _busy || _finishing ||
+         _purchasing || _engine.ended) return;
+-    final delta = event.localPosition - down;
++    final delta = event.position - down;
+     final dest = AnimalBoardInput.swipeTarget(start, delta.dx, delta.dy);
+     if (dest != null) {
+       // Locked cells are never draggable. The model checks both ends again.
