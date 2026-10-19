@@ -1,0 +1,62 @@
+--- a/lib/main.dart
++++ b/lib/main.dart
+@@ -9,11 +9,13 @@
+ import 'models/game_theme.dart';
+ import 'screens/launch_screen.dart';
+ import 'services/audio_service.dart';
++import 'services/animal_match_progress.dart';
+ 
+ void main() {
+   runZonedGuarded(
+     () {
+       WidgetsFlutterBinding.ensureInitialized();
++      AnimalMatchProgress.nativeStorageEnabled = true;
+       // Android 15+ uses edge-to-edge; opt in on earlier Android too.
+       unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+       SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+--- a/lib/services/animal_match_progress.dart
++++ b/lib/services/animal_match_progress.dart
+@@ -25,6 +25,10 @@
+   static const MethodChannel _native =
+       MethodChannel('com.elxvro.blocks/animal_save');
+ 
++  // Enabled during actual app startup, not by isolated widget tests.
++  // Tests can explicitly enable it when they install a mock native handler.
++  static bool nativeStorageEnabled = false;
++
+   int unlocked = 1;
+   int? storedCoinBalance;
+   final Map<int, int> stars = <int, int>{};
+@@ -34,7 +38,8 @@
+   /// Read the platform save first on Android: it migrates older progression
+   /// without depending on a potentially corrupted shared_preferences cache.
+   Future<void> load() async {
+-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
++    if (nativeStorageEnabled && !kIsWeb &&
++        defaultTargetPlatform == TargetPlatform.android) {
+       try {
+         final data = await _native.invokeMapMethod<String, dynamic>(
+           'loadSnapshot',
+@@ -157,7 +162,8 @@
+         rating < 1 || rating > 3 || reward < 0 || reward > 10000) {
+       throw ArgumentError('Invalid or locked adventure completion');
+     }
+-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
++    if (nativeStorageEnabled && !kIsWeb &&
++        defaultTargetPlatform == TargetPlatform.android) {
+       try {
+         final raw = await _native.invokeMapMethod<String, dynamic>(
+           'saveWin', <String, int>{
+--- a/test/v0337_native_save_regression_test.dart
++++ b/test/v0337_native_save_regression_test.dart
+@@ -7,9 +7,11 @@
+   TestWidgetsFlutterBinding.ensureInitialized();
+   const channel = MethodChannel('com.elxvro.blocks/animal_save');
+   setUp(() {
++    AnimalMatchProgress.nativeStorageEnabled = true;
+     SharedPreferences.setMockInitialValues(<String, Object>{});
+   });
+   tearDown(() async {
++    AnimalMatchProgress.nativeStorageEnabled = false;
+     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+         .setMockMethodCallHandler(channel, null);
