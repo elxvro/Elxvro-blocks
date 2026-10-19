@@ -91,8 +91,8 @@ jobs:
           set -euo pipefail
           APP=extracted/elxvro-blocks
           mkdir -p "$APP"
-          test -s artifact-v0336/ELXVRO-Blocks-v0.33.5-FULL-SOURCE.zip
-          unzip -q artifact-v0336/ELXVRO-Blocks-v0.33.5-FULL-SOURCE.zip -d "$APP"
+          test -s artifact-v0336/ELXVRO-Blocks-v0.33.6-FULL-SOURCE.zip
+          unzip -q artifact-v0336/ELXVRO-Blocks-v0.33.6-FULL-SOURCE.zip -d "$APP"
           gzip -dc tools/v0337/atomic_save.patch.gz > /tmp/v0337.patch
           patch -p1 -d "$APP" < /tmp/v0337.patch
           test -s "$APP/tool/install_animal_save_channel.py"
