@@ -42,7 +42,6 @@ on:
       - ".github/v0284-code/**"
       - ".github/v0283-code/**"
       - "hosting/**"
-      - ".github/workflows/build-v0.33.6-premium.yml"
   workflow_dispatch:
 # Manual workflow rerun requested 2026-10-14.
 
@@ -78,11 +77,11 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Restore verified v0.33.1 full source
+      - name: Restore v0.33.5 complete premium source
         uses: actions/download-artifact@v4
         with:
-          name: ELXVRO-Blocks-v0.33.3-FULL-SOURCE
-          run-id: 39173613350
+          name: ELXVRO-Blocks-v0.33.5-FULL-SOURCE
+          run-id: 39176732692
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: artifact-v0335
 
@@ -95,7 +94,7 @@ jobs:
           unzip -q artifact-v0335/ELXVRO-Blocks-v0.33.5-FULL-SOURCE.zip -d "$APP"
           base64 --decode tools/v0336/cinematic_patch.b64 | gzip -dc > /tmp/v0336.patch
           patch -p1 -d "$APP" < /tmp/v0336.patch
-          grep -Fx 'version: 0.33.6+88' "$APP/pubspec.yaml"
+          grep -Fx 'version: 0.33.6+89' "$APP/pubspec.yaml"
           grep -F 'class CrystalImpactProfile' "$APP/lib/widgets/animal_crystal_burst.dart"
           grep -F 'class AnimalMatchResultScreen' "$APP/lib/screens/animal_match_result_screen.dart"
           python - <<'PYFIX'
@@ -103,7 +102,7 @@ jobs:
           root=Path("extracted/elxvro-blocks")
           for p in (root/"test").glob("*.dart"):
               s=p.read_text()
-              t=s.replace("version: 0.33.3+86","version: 0.33.6+88")
+              t=s.replace("version: 0.33.5+88","version: 0.33.6+89")
               if t!=s: p.write_text(t)
           PYFIX
           test -s "$APP/test/v0335_premium_adventure_test.dart"
@@ -114,7 +113,7 @@ jobs:
           set -euo pipefail
           APP=extracted/elxvro-blocks
           mkdir -p "$APP/.github/workflows"
-          cp .github/workflows/build-v0.33.6-premium.yml "$APP/.github/workflows/build-v0.33.6-premium.yml"
+          cp .github/workflows/build-v0.33.6-cinematic.yml "$APP/.github/workflows/build-v0.33.6-cinematic.yml"
           cp -R .github/v0287-code "$APP/.github/"
           cp tools/apply_android_compat.py "$APP/tool/apply_android_compat.py"
           cp tools/apply_play_games_sdk_update.py "$APP/tool/apply_play_games_sdk_update.py"
@@ -133,7 +132,7 @@ jobs:
           unzip -q ELXVRO-Blocks-v0.33.6-FULL-SOURCE.zip -d build_source
           test -f build_source/pubspec.yaml
           test -f build_source/lib/app_state.dart
-          test -f build_source/.github/workflows/build-v0.33.6-premium.yml
+          test -f build_source/.github/workflows/build-v0.33.6-cinematic.yml
 
       - name: Upload complete source ZIP
         uses: actions/upload-artifact@v4
@@ -567,7 +566,7 @@ jobs:
           s=Path('lib/screens/falling_blocks_screen.dart').read_text()
           assert 'RepaintBoundary(' in s
           assert 'onPanCancel: _onPanCancel' in s
-          assert 'version: 0.33.6+88' in Path('pubspec.yaml').read_text()
+          assert 'version: 0.33.6+89' in Path('pubspec.yaml').read_text()
           assert Path('lib/game/animal_match_engine.dart').is_file()
           assert Path('lib/game/falling_piece_bag.dart').is_file()
           assert Path('lib/services/animal_match_progress.dart').is_file()
