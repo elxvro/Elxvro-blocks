@@ -96,6 +96,7 @@ jobs:
           gzip -dc tools/v0337/atomic_save.patch.gz > /tmp/v0337.patch
           patch -p1 -d "$APP" < /tmp/v0337.patch
           patch -p1 -d "$APP" < tools/v0337/nonblocking_map.patch
+          patch -p1 -d "$APP" < tools/v0337/opt_in_native.patch
           test -s "$APP/tool/install_animal_save_channel.py"
           test -s "$APP/test/v0337_native_save_regression_test.dart"
           grep -Fx 'version: 0.33.7+90' "$APP/pubspec.yaml"
