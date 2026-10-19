@@ -94,8 +94,7 @@ jobs:
           mkdir -p "$APP"
           test -s artifact-v0340/ELXVRO-Blocks-v0.34.0-FULL-SOURCE.zip
           unzip -q artifact-v0340/ELXVRO-Blocks-v0.34.0-FULL-SOURCE.zip -d "$APP"
-          gzip -dc tools/v0350/v0350.patch.gz > /tmp/v0350.patch
-          patch -p1 -d "$APP" < /tmp/v0350.patch
+          patch -p1 -d "$APP" < tools/v0350/v0350.patch
           grep -Fx 'version: 0.35.0+93' "$APP/pubspec.yaml"
           test -s "$APP/test/v0350_ultimate_adventure_test.dart"
           test -s "$APP/lib/screens/crystal_vault_screen.dart"
@@ -103,7 +102,7 @@ jobs:
           grep -F 'claimWeekly' "$APP/tool/install_animal_save_channel.py"
           grep -F 'bossMaxHealth' "$APP/lib/game/animal_match_engine.dart"
           test "$(find "$APP/assets/images/animal_stage" -name 'stage_*.png' -type f | wc -l)" -eq 100
-          cp tools/v0350/v0350.patch.gz "$APP/tool/v0350.patch.gz"
+          cp tools/v0350/v0350.patch "$APP/tool/v0350.patch"
 
       - name: Create complete v0.35.0 source ZIP
         run: |
