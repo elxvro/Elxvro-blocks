@@ -490,7 +490,9 @@ jobs:
 
       - name: Test
         working-directory: build_source
-        run: flutter test
+        run: |
+          set -euo pipefail
+          timeout 180s flutter test --reporter expanded --concurrency=1
 
       - name: Verify one-time developer support
         working-directory: build_source
