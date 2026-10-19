@@ -1,0 +1,12 @@
+--- a/test/v0351_material_swipe_test.dart
++++ b/test/v0351_material_swipe_test.dart
+@@ -76,6 +76,9 @@
+       }
+       for (var col=0; col<count-1; col++) engine.board[3*8+col]=2;
+       engine.board[3*8+count-1]=1;
++      // Block accidental same-color continuation in the source pattern.
++      // Otherwise an intended 5-run becomes a 6-run and yields lightning.
++      if (count < 8) engine.board[3*8+count]=5;
+       engine.board[4*8+count-1]=2;
+       final result=engine.swap(3*8+count-1,4*8+count-1);
+       expect(result.valid,true,reason:'Failed special: $count');
