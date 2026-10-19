@@ -1,0 +1,17 @@
+--- a/lib/screens/animal_adventure_screen.dart
++++ b/lib/screens/animal_adventure_screen.dart
+@@ -155,9 +155,11 @@
+                 ]),
+               ),
+             ),
+-          Expanded(child: _loading
+-            ? const Center(child: CircularProgressIndicator())
+-            : GridView.builder(
++          // Never block the level map behind a platform-storage operation.
++          // Level 1 remains playable while existing progress is recovered.
++          if (_loading)
++            const LinearProgressIndicator(minHeight: 2),
++          Expanded(child: GridView.builder(
+               padding: const EdgeInsets.fromLTRB(17, 0, 17, 28),
+               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                 crossAxisCount: 3, childAspectRatio: .79,
