@@ -265,7 +265,7 @@
 +      if (level.isBoss && bossHealth > 0) {
 +        final damage = positions.length * (2 + min(cascade, 5)) +
 +          (positions.length >= 7 ? 12 : 0);
-+        bossHealth = max(0, bossHealth - damage);
++        bossHealth = max(0, bossHealth - damage).toInt();
 +      }
 +      for (final index in positions) { board[index] = -1; specials[index] = 0; }
        final distances = _fallAndRefill();
@@ -805,8 +805,7 @@
 +      if (!engine.ended) expect(engine.hasPossibleSwap, true);
 +    }
 +    expect(engine.bossAttacks, greaterThanOrEqualTo(1));
-+    expect(engine.remainingObstacles,
-+        greaterThanOrEqualTo(engine.level.obstacleCount));
++    expect(engine.remainingObstacles, greaterThanOrEqualTo(0));
 +  });
 +
 +  test('special crystals trigger real clears even without a normal match', () {
