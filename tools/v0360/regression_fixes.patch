@@ -1,0 +1,35 @@
+--- a/lib/game/animal_match_engine.dart
++++ b/lib/game/animal_match_engine.dart
+@@ -45,7 +45,7 @@
+         number = number,
+         moves = (32 - (number - 1) ~/ 11 + ((number * 3) % 5) - 2 -
+                 (world == AdventureWorld.monsters ? 2 : 0))
+-            .clamp(24, 34).toInt(),
++            .clamp(26, 34).toInt(),
+         target = 26 + (number * 2 ~/ 3) + number ~/ 12 +
+             (world == AdventureWorld.fruits ? 4 : 0),
+         featuredGem = (number - 1) % animalGemAssets.length;
+--- a/lib/screens/animal_adventure_screen.dart
++++ b/lib/screens/animal_adventure_screen.dart
+@@ -868,8 +868,8 @@
+               IconButton(onPressed:()=>Navigator.pop(context),
+                 icon:const Icon(Icons.arrow_back_rounded)),
+               Expanded(child:Column(children:<Widget>[
+-                Text(tr ? '${widget.world.labelTr} · ${widget.number}/${widget.world.stageCount}'
+-                  : '${widget.world.labelEn} · ${widget.number}/${widget.world.stageCount}',
++                Text(tr ? 'KRİSTAL MACERA · ${widget.world.labelTr} · ${widget.number}/${widget.world.stageCount}'
++                  : 'CRYSTAL ADVENTURE · ${widget.world.labelEn} · ${widget.number}/${widget.world.stageCount}',
+                   style:TextStyle(fontSize:14,letterSpacing:1.1,
+                     color:accent,fontWeight:FontWeight.w900)),
+                 Text('${_level.animalName.toUpperCase()}  •  ${_level.difficultyLabel}',
+--- a/test/remove_adventure_test.dart
++++ b/test/remove_adventure_test.dart
+@@ -18,7 +18,7 @@
+     expect(modes, isNot(contains("'adventure_screen.dart'")));
+     expect(modes, isNot(contains("modes.adventure")));
+     expect(modes, contains('GameMode.values.length + 3'));
+-    expect(modes, contains('AnimalAdventureScreen'));
++    expect(modes, contains('AdventureWorldMenuScreen')); 
+     expect(File('lib/screens/animal_adventure_screen.dart').existsSync(), isTrue);
+     expect(arcade, isNot(contains('_isAdventure')));
+     expect(arcade, isNot(contains('AdventureResultDialog')));
