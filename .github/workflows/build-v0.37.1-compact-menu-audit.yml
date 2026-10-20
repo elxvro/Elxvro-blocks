@@ -107,6 +107,20 @@ jobs:
           patch --batch -p1 -d "$APP" < /tmp/v0371.patch
           test -s "$APP/test/v0371_compact_menu_audit_test.dart"
           test -s "$APP/V0371_RELEASE_NOTES.md"
+          python - <<'PYTESTFIX'
+          from pathlib import Path
+          root=Path('extracted/elxvro-blocks/test')
+          updated=0
+          for path in root.glob('*.dart'):
+              before=path.read_text()
+              after=before.replace('version: 0.37.0+98', 'version: 0.37.1+99')
+              if path.name == 'v0370_reference_navigation_test.dart':
+                  after=after.replace("'SES VE MÜZİK'", "'SES VE TİTREŞİM'")
+              if before != after:
+                  path.write_text(after)
+                  updated += 1
+          print(f'Updated {updated} carried-over version/UI test expectations.')
+          PYTESTFIX
           grep -Fx 'version: 0.37.1+99' "$APP/pubspec.yaml"
           test -s "$APP/lib/screens/premium_navigation_shell.dart"
           test -s "$APP/test/v0370_reference_navigation_test.dart"
