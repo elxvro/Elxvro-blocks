@@ -1,9 +1,10 @@
 --- a/V0373_RELEASE_NOTES.md
 +++ b/V0373_RELEASE_NOTES.md
-@@ -0,0 +1,10 @@
+@@ -0,0 +1,11 @@
 +# ELXVRO Blocks v0.37.3 — Play Console Compatibility Audit
 +
-+- AndroidX Core 1.17 `WindowCompat.enableEdgeToEdge(window)` is used for system bars on Android 15/16 and earlier Android versions. Flutter widgets retain `SafeArea` layout.
++- Android 15/16 edge-to-edge remains explicitly enabled via Flutter `SystemUiMode.edgeToEdge` and native `WindowCompat.setDecorFitsSystemWindows(window, false)`; no deprecated status/navigation bar color setters in the compiled MainActivity.
++- A high-level AndroidX edge-to-edge helper was tested and REJECTED: R8 inlined deprecated system bar color setters into the compiled MainActivity. The release retains the verified-safe path.
 +- Reduced decode sizes for animal/world icons, board special gems, material tiles, and material shards to lower image-cache memory usage. No images or gameplay assets were removed.
 +- Verified normal game, falling blocks, all 300 Adventure levels and original classic-theme menus remain in the release source.
 +- Includes new regression tests for edge-to-edge, display-size decoding and progression/service preservation.
@@ -98,17 +99,6 @@
  
  environment:
    sdk: '>=3.4.0 <4.0.0'
---- a/test/android15_system_bars_test.dart
-+++ b/test/android15_system_bars_test.dart
-@@ -15,7 +15,7 @@
-     final activity = File(
-       'android/app/src/main/kotlin/com/elxvro/elxvro_blocks/MainActivity.kt',
-     ).readAsStringSync();
--    expect(activity, contains('WindowCompat.setDecorFitsSystemWindows(window, false)'));
-+    expect(activity, contains('WindowCompat.enableEdgeToEdge(window)'));
-     expect(activity, contains('isAppearanceLightStatusBars = false'));
-     expect(activity, contains('isAppearanceLightNavigationBars = false'));
-     expect(activity, isNot(contains('window.setStatusBarColor(')));
 --- a/test/play_games_sdk_regression_test.dart
 +++ b/test/play_games_sdk_regression_test.dart
 @@ -7,7 +7,7 @@
@@ -186,8 +176,8 @@
 +    expect(pubspec, contains('version: 0.37.3+101'));
 +    final android = File('tool/apply_android_compat.py').readAsStringSync();
 +    expect(android, contains('compileSdk = 36'));
-+    expect(android, contains('WindowCompat.enableEdgeToEdge(window)'));
-+    expect(android, isNot(contains('WindowCompat.setDecorFitsSystemWindows(window, false)')));
++    expect(android, contains('WindowCompat.setDecorFitsSystemWindows(window, false)')); 
++    expect(android, isNot(contains('WindowCompat.enableEdgeToEdge(window)')));
 +  });
 +
 +  test('Flutter declares edge-to-edge and screens handle inset areas', () {
@@ -222,23 +212,12 @@
 +}
 --- a/tool/apply_android_compat.py
 +++ b/tool/apply_android_compat.py
-@@ -71,8 +71,8 @@
+@@ -71,7 +71,7 @@
      override fun onCreate(savedInstanceState: Bundle?) {
          super.onCreate(savedInstanceState)
          // Draw behind both system bars. No deprecated bar color setters:
 -        // WindowCompat.enableEdgeToEdge would inline them under R8.
--        WindowCompat.setDecorFitsSystemWindows(window, false)
-+        // AndroidX Core 1.17 enables edge-to-edge while Flutter handles SafeArea insets.
-+        WindowCompat.enableEdgeToEdge(window)
++        // Do not inline AndroidX high-level helpers that invoke deprecated system bar color setters.
+         WindowCompat.setDecorFitsSystemWindows(window, false)
          val insets = WindowCompat.getInsetsController(window, window.decorView)
          insets.isAppearanceLightStatusBars = false
-         insets.isAppearanceLightNavigationBars = false
-@@ -97,7 +97,7 @@
- }
- '''
-     gradle.write_text(data)
--    assert 'WindowCompat.setDecorFitsSystemWindows(window, false)' in kotlin.read_text()
-+    assert 'WindowCompat.enableEdgeToEdge(window)' in kotlin.read_text()
-     assert 'androidx.core:core-ktx:1.17.0' in gradle.read_text()
-     assert 'play-services-games-v2:22.1.0' in gradle.read_text()
-     assert 'play-services-base:18.11.0' in gradle.read_text()
