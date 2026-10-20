@@ -97,6 +97,14 @@ jobs:
           base64 -d tools/v0375/v0375.patch.gz.b64 | gzip -dc > /tmp/v0375.patch
           patch --batch -p1 -d "$APP" < /tmp/v0375.patch
           sed -i 's/item.scoreHolderDisplayName/item.scoreHolder.displayName/g' "$APP/lib/services/play_games_service.dart"
+          python - <<'PYVERS'
+          from pathlib import Path
+          for p in Path('extracted/elxvro-blocks/test').rglob('*.dart'):
+              old = p.read_text()
+              new = old.replace('version: 0.37.4+102', 'version: 0.37.5+103')
+              if old != new:
+                  p.write_text(new)
+          PYVERS
           grep -Fx 'version: 0.37.5+103' "$APP/pubspec.yaml"
           test -s "$APP/lib/widgets/three_game_rankings.dart"
           test -s "$APP/test/v0375_three_mode_leaderboards_test.dart"
