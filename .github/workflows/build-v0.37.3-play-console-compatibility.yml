@@ -114,7 +114,7 @@ jobs:
           cp tools/v0296/verify_system_bar_dex.py "$APP/tool/verify_system_bar_dex.py"
           patch --batch --forward -p1 -d "$APP" < tools/v0373/play_console_compat.patch
           grep -Fx 'version: 0.37.3+101' "$APP/pubspec.yaml"
-          grep -F 'WindowCompat.enableEdgeToEdge(window)' "$APP/tool/apply_android_compat.py"
+          grep -F 'WindowCompat.setDecorFitsSystemWindows(window, false)' "$APP/tool/apply_android_compat.py"
           test -s "$APP/test/v0373_play_console_checks_test.dart"
           test -s "$APP/V0373_RELEASE_NOTES.md"
           rm -f ELXVRO-Blocks-v0.37.3-FULL-SOURCE.zip
@@ -155,7 +155,7 @@ jobs:
         working-directory: build_source
         run: |
           python tool/apply_android_compat.py --android .
-          grep -F 'WindowCompat.enableEdgeToEdge(window)' android/app/src/main/kotlin/com/elxvro/elxvro_blocks/MainActivity.kt
+          grep -F 'WindowCompat.setDecorFitsSystemWindows(window, false)' android/app/src/main/kotlin/com/elxvro/elxvro_blocks/MainActivity.kt
           grep -F 'androidx.core:core-ktx:1.17.0' android/app/build.gradle.kts
           grep -F 'play-services-games-v2:22.1.0' android/app/build.gradle.kts
           grep -F 'play-services-base:18.11.0' android/app/build.gradle.kts
