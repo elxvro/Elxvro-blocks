@@ -612,7 +612,7 @@ jobs:
           s=Path('lib/screens/falling_blocks_screen.dart').read_text()
           assert 'RepaintBoundary(' in s
           assert 'onPanCancel: _onPanCancel' in s
-          assert 'version: 0.37.2+100' in Path('pubspec.yaml').read_text()
+          assert 'version: 0.37.3+101' in Path('pubspec.yaml').read_text()
           assert Path('lib/game/animal_match_engine.dart').is_file()
           assert Path('lib/game/falling_piece_bag.dart').is_file()
           assert Path('lib/services/animal_match_progress.dart').is_file()
