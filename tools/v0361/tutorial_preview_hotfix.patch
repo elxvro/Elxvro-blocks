@@ -1,0 +1,15 @@
+--- a/lib/screens/tutorial_screen.dart
++++ b/lib/screens/tutorial_screen.dart
+@@ -265,8 +265,11 @@
+       <int>{5, 6, 7, 8, 9, 12, 17, 22},
+       <int>{1, 6, 11, 16, 21},
+       <int>{2, 7, 12, 17, 22},
++      <int>{1, 7, 13, 17, 23},
++      <int>{5, 6, 7, 12, 17, 22},
++      <int>{0, 4, 12, 20, 24},
+     ];
+-    final active = activeByStep[step];
++    final active = activeByStep[step.clamp(0, activeByStep.length - 1)];
+ 
+     return SizedBox(
+       width: 180,
