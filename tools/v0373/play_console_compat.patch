@@ -1,0 +1,244 @@
+--- a/V0373_RELEASE_NOTES.md
++++ b/V0373_RELEASE_NOTES.md
+@@ -0,0 +1,10 @@
++# ELXVRO Blocks v0.37.3 — Play Console Compatibility Audit
++
++- AndroidX Core 1.17 `WindowCompat.enableEdgeToEdge(window)` is used for system bars on Android 15/16 and earlier Android versions. Flutter widgets retain `SafeArea` layout.
++- Reduced decode sizes for animal/world icons, board special gems, material tiles, and material shards to lower image-cache memory usage. No images or gameplay assets were removed.
++- Verified normal game, falling blocks, all 300 Adventure levels and original classic-theme menus remain in the release source.
++- Includes new regression tests for edge-to-edge, display-size decoding and progression/service preservation.
++- Preserves package identity and Play Games/billing integration, with an incremented Android versionCode (101).
++
++## Google Play Console note
++The supplied screenshot shows production versionCode 70 (v0.29.6), not versionCode 100 (v0.37.2) or this release. Play Console recommendations for old production releases remain visible until a newer bundle is uploaded to a track and analyzed. Android Play Services may embed its own BitmapFactory image loader; the app's Flutter image-cache changes do not guarantee that Play Console's warning for third-party code will disappear. Inspect the refreshed report after uploading v0.37.3 AAB.
+--- a/lib/screens/animal_adventure_screen.dart
++++ b/lib/screens/animal_adventure_screen.dart
+@@ -170,7 +170,7 @@
+                   child: Opacity(opacity: unlocked ? 1 : .58,
+                   child: Column(mainAxisAlignment: MainAxisAlignment.center,
+                     children: <Widget>[
+-                      Image.asset(world.stageImage(1),
++                      Image.asset(world.stageImage(1), cacheWidth: 192,
+                         width: 64, height: 58, fit: BoxFit.contain,
+                         errorBuilder: (_, __, ___) => Text(world.emoji,
+                           style: const TextStyle(fontSize: 48))),
+@@ -391,7 +391,7 @@
+                         child: Column(mainAxisAlignment: MainAxisAlignment.center,
+                           children: <Widget>[
+                             Opacity(opacity: open ? 1 : .46,
+-                              child: Image.asset(widget.world.stageImage(level),
++                              child: Image.asset(widget.world.stageImage(level), cacheWidth: 192,
+                                 width: 52, height: 52, fit: BoxFit.contain,
+                                 errorBuilder: (context, error, trace) =>
+                                   Text(widget.world == AdventureWorld.animals
+@@ -751,7 +751,7 @@
+ 
+   Widget _gem(int species, {double? size}) {
+     if (widget.world != AdventureWorld.animals) {
+-      return Image.asset(widget.world.gemImage(species),
++      return Image.asset(widget.world.gemImage(species), cacheWidth: 192,
+         width: size, height: size, fit: BoxFit.contain,
+         filterQuality: FilterQuality.medium,
+         errorBuilder: (_, __, ___) => Icon(Icons.auto_awesome_rounded,
+@@ -760,13 +760,13 @@
+     // Every collected animal has a bundled illustration. The same stage
+     // picture appears in the map, target indicator and matching board.
+     if (widget.number > 6 && _level.targetGems.contains(species)) {
+-      return Image.asset(_stageIcon(_level.mascotStageFor(species)),
++      return Image.asset(_stageIcon(_level.mascotStageFor(species)), cacheWidth: 192,
+         width: size, height: size, fit: BoxFit.contain,
+         filterQuality: FilterQuality.medium,
+-        errorBuilder: (_, __, ___) => Image.asset(animalGemAssets[species],
++        errorBuilder: (_, __, ___) => Image.asset(animalGemAssets[species], cacheWidth: 192,
+           width: size, height: size, fit: BoxFit.contain));
+     }
+-    return Image.asset(animalGemAssets[species], fit: BoxFit.contain,
++    return Image.asset(animalGemAssets[species], cacheWidth: 192, fit: BoxFit.contain,
+       width: size, height: size, filterQuality: FilterQuality.medium,
+       errorBuilder: (_, __, ___) => Icon(Icons.pets,
+         color: _gemColors[species], size: size ?? 28));
+@@ -782,7 +782,7 @@
+       'assets/images/special_materials/rainbow_prism.png',
+     ];
+     if (special < 1 || special >= specialImages.length) return _gem(species);
+-    return Image.asset(specialImages[special], fit: BoxFit.contain,
++    return Image.asset(specialImages[special], cacheWidth: 192, fit: BoxFit.contain,
+       filterQuality: FilterQuality.medium,
+       errorBuilder: (_, __, ___) => _gem(species));
+   }
+--- a/lib/widgets/material_fragment_fx.dart
++++ b/lib/widgets/material_fragment_fx.dart
+@@ -41,7 +41,7 @@
+       child:Opacity(opacity:opacity.toDouble(),child:Transform.rotate(
+         angle:(i%2==0?1:-1)*lifetime*(1.5+i*.2),
+         child:Image.asset('assets/images/material_shards/${widget.material.name}_${i%5}.webp',
+-          fit:BoxFit.contain,filterQuality:FilterQuality.low,gaplessPlayback:true)
++          cacheWidth: 48, fit:BoxFit.contain,filterQuality:FilterQuality.low,gaplessPlayback:true)
+       )));
+   }
+ }
+--- a/lib/widgets/themed_block_tile.dart
++++ b/lib/widgets/themed_block_tile.dart
+@@ -32,6 +32,7 @@
+             colorFilter: ColorFilter.mode(base, BlendMode.modulate),
+             child: Image.asset(
+               artworkPath(material),
++              cacheWidth: 192,
+               fit: BoxFit.fill,
+               filterQuality: FilterQuality.medium,
+               gaplessPlayback: true,
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -1,7 +1,7 @@
+ name: elxvro_blocks
+ description: Premium block puzzle game for ELXVRO.
+ publish_to: 'none'
+-version: 0.37.2+100
++version: 0.37.3+101
+ 
+ environment:
+   sdk: '>=3.4.0 <4.0.0'
+--- a/test/android15_system_bars_test.dart
++++ b/test/android15_system_bars_test.dart
+@@ -15,7 +15,7 @@
+     final activity = File(
+       'android/app/src/main/kotlin/com/elxvro/elxvro_blocks/MainActivity.kt',
+     ).readAsStringSync();
+-    expect(activity, contains('WindowCompat.setDecorFitsSystemWindows(window, false)'));
++    expect(activity, contains('WindowCompat.enableEdgeToEdge(window)'));
+     expect(activity, contains('isAppearanceLightStatusBars = false'));
+     expect(activity, contains('isAppearanceLightNavigationBars = false'));
+     expect(activity, isNot(contains('window.setStatusBarColor(')));
+--- a/test/play_games_sdk_regression_test.dart
++++ b/test/play_games_sdk_regression_test.dart
+@@ -7,7 +7,7 @@
+     final gradle = File('android/app/build.gradle.kts').readAsStringSync();
+     expect(pubspec, contains('games_services: 5.3.0'));
+     expect(pubspec, contains('games_services_platform_interface: 5.3.0'));
+-    expect(pubspec, contains('version: 0.37.2+100'));
++    expect(pubspec, contains('version: 0.37.3+101'));
+     expect(gradle, contains('play-services-games-v2:22.1.0'));
+     expect(gradle, contains('play-services-base:18.11.0'));
+     expect(gradle, contains('play-services-basement:18.12.0'));
+--- a/test/real_material_audio_test.dart
++++ b/test/real_material_audio_test.dart
+@@ -7,6 +7,6 @@
+     expect(File('tool/fetch_real_material_audio.sh').existsSync(), isTrue);
+     expect(File('REAL_AUDIO_CREDITS.md').existsSync(), isTrue);
+     final pubspec = File('pubspec.yaml').readAsStringSync();
+-    expect(pubspec, contains('version: 0.37.2+100'));
++    expect(pubspec, contains('version: 0.37.3+101'));
+   });
+ }
+--- a/test/remove_adventure_test.dart
++++ b/test/remove_adventure_test.dart
+@@ -28,7 +28,7 @@
+     expect(Directory('assets/images/adventure_battles').existsSync(), isFalse);
+     expect(Directory('assets/images/adventure_worlds').existsSync(), isFalse);
+     expect(assets, isNot(contains('assets/images/adventure_')));
+-    expect(assets, contains('version: 0.37.2+100'));
++    expect(assets, contains('version: 0.37.3+101'));
+     expect(assets, contains('assets/images/animal_gems/'));
+   });
+ 
+--- a/test/v0240_features_test.dart
++++ b/test/v0240_features_test.dart
+@@ -38,7 +38,7 @@
+         File('lib/screens/daily_missions_screen.dart').readAsStringSync();
+     final game = File('lib/screens/game_screen.dart').readAsStringSync();
+ 
+-    expect(pubspec, contains('version: 0.37.2+100'));
++    expect(pubspec, contains('version: 0.37.3+101'));
+     expect(pubspec, contains('share_plus: 10.1.4'));
+     expect(home, contains('TutorialScreen'));
+     expect(home, contains('ShareService.shareGame'));
+--- a/test/v0287_support_test.dart
++++ b/test/v0287_support_test.dart
+@@ -10,7 +10,7 @@
+   expect(billing,isNot(contains('http')));
+   expect(billing,isNot(contains('buyConsumable(')));
+   final pubspec=File('pubspec.yaml').readAsStringSync();
+-  expect(pubspec,contains('version: 0.37.2+100'));
++  expect(pubspec,contains('version: 0.37.3+101'));
+   expect(pubspec,contains('in_app_purchase:'));
+   expect(pubspec,isNot(contains('google_sign_in:')));
+  });
+--- a/test/v0372_classic_theme_restoration_test.dart
++++ b/test/v0372_classic_theme_restoration_test.dart
+@@ -13,7 +13,7 @@
+     final pubspec = File('${root.path}/pubspec.yaml').readAsStringSync();
+     expect(main, contains('home: LaunchScreen(appState: widget.appState)'));
+     expect(main, isNot(contains('PremiumNavigationShell')));
+-    expect(pubspec, contains('version: 0.37.2+100'));
++    expect(pubspec, contains('version: 0.37.3+101'));
+     expect(File('${root.path}/lib/screens/animal_adventure_screen.dart').existsSync(), isTrue);
+     expect(File('${root.path}/lib/services/world_match_progress.dart').existsSync(), isTrue);
+     expect(File('${root.path}/tool/install_animal_save_channel.py').existsSync(), isTrue);
+--- a/test/v0373_play_console_checks_test.dart
++++ b/test/v0373_play_console_checks_test.dart
+@@ -0,0 +1,43 @@
++import 'dart:io';
++import 'package:flutter_test/flutter_test.dart';
++
++void main() {
++  test('release has a monotonic Play version and keeps the original app id', () {
++    final pubspec = File('pubspec.yaml').readAsStringSync();
++    expect(pubspec, contains('version: 0.37.3+101'));
++    final android = File('tool/apply_android_compat.py').readAsStringSync();
++    expect(android, contains('compileSdk = 36'));
++    expect(android, contains('WindowCompat.enableEdgeToEdge(window)'));
++    expect(android, isNot(contains('WindowCompat.setDecorFitsSystemWindows(window, false)')));
++  });
++
++  test('Flutter declares edge-to-edge and screens handle inset areas', () {
++    final main = File('lib/main.dart').readAsStringSync();
++    expect(main, contains('SystemUiMode.edgeToEdge'));
++    expect(main, contains('SafeArea('));
++    for (final name in <String>['home_screen', 'launch_screen', 'animal_adventure_screen']) {
++      final source = File('lib/screens/$name.dart').readAsStringSync();
++      expect(source, contains('SafeArea('), reason: '$name must protect system insets');
++    }
++  });
++
++  test('animal sprites and material textures are decoded at display sizes', () {
++    final world = File('lib/screens/animal_adventure_screen.dart').readAsStringSync();
++    expect(world, contains('Image.asset(world.stageImage(1), cacheWidth: 192'));
++    expect(world, contains('Image.asset(widget.world.stageImage(level), cacheWidth: 192'));
++    expect(world, contains('Image.asset(widget.world.gemImage(species), cacheWidth: 192'));
++    final tiles = File('lib/widgets/themed_block_tile.dart').readAsStringSync();
++    expect(tiles, contains('cacheWidth: 192'));
++    final fragments = File('lib/widgets/material_fragment_fx.dart').readAsStringSync();
++    expect(fragments, contains('cacheWidth: 48'));
++  });
++
++  test('progress persistence, in-app purchases and Play Games remain', () {
++    expect(File('lib/services/animal_match_progress.dart').existsSync(), isTrue);
++    expect(File('lib/services/world_match_progress.dart').existsSync(), isTrue);
++    expect(File('lib/services/developer_support_service.dart').existsSync(), isTrue);
++    expect(File('lib/services/play_games_service.dart').existsSync(), isTrue);
++    expect(Directory('assets/images/world_stages/animals').existsSync(), isTrue);
++    expect(Directory('assets/images/world_stages/vehicles').existsSync(), isTrue);
++  });
++}
+--- a/tool/apply_android_compat.py
++++ b/tool/apply_android_compat.py
+@@ -71,8 +71,8 @@
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+         // Draw behind both system bars. No deprecated bar color setters:
+-        // WindowCompat.enableEdgeToEdge would inline them under R8.
+-        WindowCompat.setDecorFitsSystemWindows(window, false)
++        // AndroidX Core 1.17 enables edge-to-edge while Flutter handles SafeArea insets.
++        WindowCompat.enableEdgeToEdge(window)
+         val insets = WindowCompat.getInsetsController(window, window.decorView)
+         insets.isAppearanceLightStatusBars = false
+         insets.isAppearanceLightNavigationBars = false
+@@ -97,7 +97,7 @@
+ }
+ '''
+     gradle.write_text(data)
+-    assert 'WindowCompat.setDecorFitsSystemWindows(window, false)' in kotlin.read_text()
++    assert 'WindowCompat.enableEdgeToEdge(window)' in kotlin.read_text()
+     assert 'androidx.core:core-ktx:1.17.0' in gradle.read_text()
+     assert 'play-services-games-v2:22.1.0' in gradle.read_text()
+     assert 'play-services-base:18.11.0' in gradle.read_text()
