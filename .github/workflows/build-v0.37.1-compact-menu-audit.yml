@@ -107,10 +107,9 @@ jobs:
           patch --batch -p1 -d "$APP" < /tmp/v0371.patch
           test -s "$APP/test/v0371_compact_menu_audit_test.dart"
           test -s "$APP/V0371_RELEASE_NOTES.md"
-          python tools/v0371/apply_v0371_hotfix.py "$APP"
           grep -Fx 'version: 0.37.1+99' "$APP/pubspec.yaml"
           test -s "$APP/lib/screens/premium_navigation_shell.dart"
-          test -s "$APP/test/v0371_reference_navigation_test.dart"
+          test -s "$APP/test/v0370_reference_navigation_test.dart"
           test -s "$APP/assets/images/premium_navigation/crystal_landscape.jpg"
           test -s "$APP/assets/images/premium_navigation/hero_crystals.jpg"
           test -s "$APP/assets/images/premium_navigation/classic.jpg"
