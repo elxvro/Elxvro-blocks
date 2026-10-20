@@ -1,0 +1,145 @@
+--- a/lib/app_state.dart
++++ b/lib/app_state.dart
+@@ -63,6 +63,7 @@
+   static const String _weeklyRewardClaimKey = 'weekly_reward_claim';
+   static const String _adventureUnlockedLevelKey = 'adventure_unlocked_level';
+   static const String _adventureCompletedKey = 'adventure_completed';
++  static const String _crystalAdventureClearsKey = 'crystal_adventure_clears_v0361';
+   static const String _adventureBestScoresKey = 'adventure_best_scores';
+   // New stars are stored separately; older completion data is never overwritten.
+   static const String _adventureStarsV2Key = 'adventure_stars_v2';
+@@ -118,6 +119,7 @@
+   final Set<String> _achievementClaims = <String>{};
+   final Set<String> _unlockedThemes = <String>{'classic'};
+   final Set<int> _adventureCompleted = <int>{};
++  int _crystalAdventureClears = 0;
+   final Map<int, int> _adventureBestScores = <int, int>{};
+   final Map<int, int> _adventureStarsV2 = <int, int>{};
+ 
+@@ -196,6 +198,7 @@
+     'blocks_250', 'score_10000', 'level_5', 'perfect_3', 'level_15',
+     'combo_5', 'combo_8', 'lines_100', 'lines_500', 'blocks_1000',
+     'games_100', 'score_25000', 'perfect_15', 'level_30',
++    'adventure_10',
+   ];
+ 
+   int get unlockedAchievements =>
+@@ -256,7 +259,7 @@
+       case 'level_30':
+         return playerLevel >= 30;
+       case 'adventure_10':
+-        return adventureCompletedCount >= 10;
++        return adventureCompletedCount >= 10 || _crystalAdventureClears >= 10;
+       default:
+         return false;
+     }
+@@ -341,6 +344,7 @@
+       totalScore = prefs.getInt(_totalScoreKey) ?? 0;
+       totalLines = prefs.getInt(_totalLinesKey) ?? 0;
+       totalBlocks = prefs.getInt(_totalBlocksKey) ?? 0;
++      _crystalAdventureClears = prefs.getInt(_crystalAdventureClearsKey) ?? 0;
+       themeId = prefs.getString(_themeKey) ?? 'classic';
+       soundEnabled = prefs.getBool(_soundEnabledKey) ?? true;
+       musicEnabled = prefs.getBool(_musicEnabledKey) ?? true;
+@@ -958,6 +962,30 @@
+     }
+   }
+ 
++  int get crystalAdventureCompletedCount => _crystalAdventureClears;
++
++  /// Mirror the canonical animal/world completed sets for achievements.
++  /// The original five-world storage remains the authoritative source.
++  void syncCrystalAdventureCompletedCount(int total) {
++    if (total <= _crystalAdventureClears) return;
++    _crystalAdventureClears = total.clamp(0, 300).toInt();
++    notifyListeners();
++    unawaited(_saveCrystalAdventureCompletedCount());
++  }
++
++  void registerCrystalAdventureCompletion() {
++    syncCrystalAdventureCompletedCount(_crystalAdventureClears + 1);
++  }
++
++  Future<void> _saveCrystalAdventureCompletedCount() async {
++    try {
++      final prefs = await SharedPreferences.getInstance();
++      await prefs.setInt(_crystalAdventureClearsKey, _crystalAdventureClears);
++    } catch (error) {
++      debugPrint('Crystal adventure achievements save failed: $error');
++    }
++  }
++
+   int get adventureCompletedCount => _adventureCompleted.length;
+ 
+   double get adventureProgress =>
+--- a/lib/screens/animal_adventure_screen.dart
++++ b/lib/screens/animal_adventure_screen.dart
+@@ -84,6 +84,9 @@
+       }
+     }
+     if (!mounted) return;
++    final completedCount = next.values.fold<int>(0,
++        (total, levels) => total + levels.length);
++    widget.appState.syncCrystalAdventureCompletedCount(completedCount);
+     setState(() {
+       _completed..clear()..addAll(next);
+       _reading = false;
+@@ -242,6 +245,8 @@
+       if (_progress.storedCoinBalance != null) {
+         widget.appState.syncAnimalMatchCoins(_progress.storedCoinBalance!);
+       }
++      widget.appState.syncCrystalAdventureCompletedCount(
++          _progress.completed.length);
+       if (mounted) setState(() { _loading = false; _loadFailed = false; });
+     } catch (error, stack) {
+       debugPrint('Animal Adventure progress read failed: $error\n$stack');
+@@ -677,6 +682,9 @@
+       await widget.appState.awardAnimalMatchCoins(receipt.coinsGranted)
+           .timeout(const Duration(seconds: 6));
+     }
++    if (receipt.firstWin) {
++      widget.appState.registerCrystalAdventureCompletion();
++    }
+     return receipt.coinsGranted;
+   }
+ 
+--- a/lib/screens/achievements_screen.dart
++++ b/lib/screens/achievements_screen.dart
+@@ -84,6 +84,11 @@
+                                 style: const TextStyle(color: Colors.white54, fontSize: 12),
+                               ),
+                               const SizedBox(height: 3),
++                              Text(AppStrings.current.f(
++                                'Kristal Macera: ${appState.crystalAdventureCompletedCount}/300',
++                                'Crystal Adventure: ${appState.crystalAdventureCompletedCount}/300'),
++                                style: const TextStyle(color: Color(0xFF8EDFFF), fontSize: 11,
++                                    fontWeight: FontWeight.w700)),
+                               Text('LİG: ${appState.achievementLeague}  •  ${appState.achievementRating} RP',
+                                 style: const TextStyle(color: Color(0xFFFFC977), fontSize: 11, fontWeight: FontWeight.bold)),
+                             ],
+--- a/test/v0361_premium_evolution_test.dart
++++ b/test/v0361_premium_evolution_test.dart
+@@ -51,6 +51,23 @@
+     }
+   });
+ 
++  test('crystal adventure achievement uses persisted 300-stage progress', () async {
++    final app = AppState();
++    await app.load();
++    expect(app.achievementUnlocked('adventure_10'), isFalse);
++    app.syncCrystalAdventureCompletedCount(9);
++    expect(app.achievementUnlocked('adventure_10'), isFalse);
++    app.registerCrystalAdventureCompletion();
++    expect(app.crystalAdventureCompletedCount, 10);
++    expect(app.achievementUnlocked('adventure_10'), isTrue);
++    await Future<void>.delayed(const Duration(milliseconds: 20));
++    final reloaded = AppState();
++    await reloaded.load();
++    expect(reloaded.achievementUnlocked('adventure_10'), isTrue);
++    reloaded.syncCrystalAdventureCompletedCount(3);
++    expect(reloaded.crystalAdventureCompletedCount, 10);
++  });
++
+   test('new cosmetic themes reuse existing sound and material assets', () {
+     const ids = {'electric_neon', 'royal_amethyst', 'emerald_rain'};
+     final actual = gameThemes.where((theme) => ids.contains(theme.id)).toList();
