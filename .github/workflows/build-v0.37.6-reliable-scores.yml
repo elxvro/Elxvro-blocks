@@ -124,7 +124,7 @@ jobs:
           set -euo pipefail
           APP=extracted/elxvro-blocks
           mkdir -p "$APP/.github/workflows"
-          cp .github/workflows/build-v0.37.6-three-mode-leaderboards.yml "$APP/.github/workflows/build-v0.37.6-three-mode-leaderboards.yml"
+          cp .github/workflows/build-v0.37.6-reliable-scores.yml "$APP/.github/workflows/build-v0.37.6-reliable-scores.yml"
           cp -R .github/v0287-code "$APP/.github/"
           cp tools/apply_android_compat.py "$APP/tool/apply_android_compat.py"
           cp tools/apply_play_games_sdk_update.py "$APP/tool/apply_play_games_sdk_update.py"
@@ -147,7 +147,7 @@ jobs:
           unzip -q ELXVRO-Blocks-v0.37.6-FULL-SOURCE.zip -d build_source
           test -f build_source/pubspec.yaml
           test -f build_source/lib/app_state.dart
-          test -f build_source/.github/workflows/build-v0.37.6-three-mode-leaderboards.yml
+          test -f build_source/.github/workflows/build-v0.37.6-reliable-scores.yml
 
       - name: Upload complete source ZIP
         uses: actions/upload-artifact@v4
