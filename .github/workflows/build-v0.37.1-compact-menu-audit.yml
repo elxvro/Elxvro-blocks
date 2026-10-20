@@ -3,7 +3,7 @@ name: ELXVRO Blocks v0.37.1 Compact Menu Audit APK AAB
 on:
   push:
     branches:
-      - feature/v0.37.1-premium-navigation
+      - feature/v0.37.1-compact-menu-audit
     paths:
       - "tools/apply_rising_update.py"
       - "tools/apply_v0311_endless_adventure.py"
