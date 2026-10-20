@@ -96,6 +96,7 @@ jobs:
           unzip -q artifact-v0360/ELXVRO-Blocks-v0.36.0-FULL-SOURCE.zip -d "$APP"
           base64 -d tools/v0361/v0361.patch.gz.b64 | gzip -dc > /tmp/v0361.patch
           patch --batch -p1 -d "$APP" < /tmp/v0361.patch
+          patch --batch -p1 -d "$APP" < tools/v0361/tutorial_preview_hotfix.patch
           grep -Fx 'version: 0.36.1+96' "$APP/pubspec.yaml"
           test -s "$APP/test/v0361_premium_evolution_test.dart"
           test -s "$APP/lib/services/adventure_world_gates.dart"
