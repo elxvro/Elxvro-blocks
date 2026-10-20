@@ -96,6 +96,7 @@ jobs:
           grep -Fx 'version: 0.37.4+102' "$APP/pubspec.yaml"
           base64 -d tools/v0375/v0375.patch.gz.b64 | gzip -dc > /tmp/v0375.patch
           patch --batch -p1 -d "$APP" < /tmp/v0375.patch
+          sed -i 's/item.scoreHolderDisplayName/item.scoreHolder.displayName/g' "$APP/lib/services/play_games_service.dart"
           grep -Fx 'version: 0.37.5+103' "$APP/pubspec.yaml"
           test -s "$APP/lib/widgets/three_game_rankings.dart"
           test -s "$APP/test/v0375_three_mode_leaderboards_test.dart"
