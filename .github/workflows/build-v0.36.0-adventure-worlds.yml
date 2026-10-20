@@ -96,6 +96,7 @@ jobs:
           unzip -q artifact-v0351/ELXVRO-Blocks-v0.35.1-FULL-SOURCE.zip -d "$APP"
           base64 -d tools/v0360/adventure_worlds.patch.gz.b64 | gzip -dc > /tmp/v0360.patch
           patch --batch -p1 -d "$APP" < /tmp/v0360.patch
+          patch --batch -p1 -d "$APP" < tools/v0360/regression_fixes.patch
           grep -Fx 'version: 0.36.0+95' "$APP/pubspec.yaml"
           test -s "$APP/lib/services/world_match_progress.dart"
           test -s "$APP/test/v0360_adventure_worlds_test.dart"
