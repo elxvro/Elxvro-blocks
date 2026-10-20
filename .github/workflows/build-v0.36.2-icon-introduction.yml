@@ -15,7 +15,7 @@ on:
       - "tools/v0362/**"
       - "tools/v0337/**"
       - "tools/v0332/**"
-      - ".github/workflows/build-v0.36.2-premium-evolution.yml"
+      - ".github/workflows/build-v0.36.2-icon-introduction.yml"
       - "tools/apply_v0312_illustrated_worlds.py"
       - "tools/v0312/**"
       - "tools/v0311/**"
@@ -38,7 +38,7 @@ on:
       - "source_snapshot/lib/widgets/weekly_league_card.dart"
       - "source_snapshot/lib/screens/daily_missions_screen.dart"
       - "source_snapshot/lib/models/game_theme.dart"
-      - ".github/workflows/build-v0.36.2-premium-evolution.yml"
+      - ".github/workflows/build-v0.36.2-icon-introduction.yml"
       - ".github/v0287-code/**"
       - ".github/v0285-code/**"
       - ".github/v0284-code/**"
@@ -129,7 +129,7 @@ jobs:
           set -euo pipefail
           APP=extracted/elxvro-blocks
           mkdir -p "$APP/.github/workflows"
-          cp .github/workflows/build-v0.36.2-premium-evolution.yml "$APP/.github/workflows/build-v0.36.2-premium-evolution.yml"
+          cp .github/workflows/build-v0.36.2-icon-introduction.yml "$APP/.github/workflows/build-v0.36.2-icon-introduction.yml"
           cp -R .github/v0287-code "$APP/.github/"
           cp tools/apply_android_compat.py "$APP/tool/apply_android_compat.py"
           cp tools/apply_play_games_sdk_update.py "$APP/tool/apply_play_games_sdk_update.py"
@@ -148,7 +148,7 @@ jobs:
           unzip -q ELXVRO-Blocks-v0.36.2-FULL-SOURCE.zip -d build_source
           test -f build_source/pubspec.yaml
           test -f build_source/lib/app_state.dart
-          test -f build_source/.github/workflows/build-v0.36.2-premium-evolution.yml
+          test -f build_source/.github/workflows/build-v0.36.2-icon-introduction.yml
 
       - name: Upload complete source ZIP
         uses: actions/upload-artifact@v4
