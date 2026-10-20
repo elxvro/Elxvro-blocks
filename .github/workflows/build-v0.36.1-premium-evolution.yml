@@ -268,6 +268,42 @@ jobs:
         working-directory: build_source
         run: flutter pub get
 
+      - name: Ensure a complete Android NDK before Gradle dependency checks
+        working-directory: build_source
+        run: |
+          set -euo pipefail
+          NDK_REQUIRED=28.2.13676358
+          VALID_NDK="$ANDROID_HOME/ndk/$NDK_REQUIRED/source.properties"
+          if [ -f "$VALID_NDK" ]; then
+            echo "Using preinstalled NDK $NDK_REQUIRED"
+          else
+            echo "::warning::Required NDK incomplete; checking installed side-by-side versions"
+            VALID_ALTERNATIVE="$(find "$ANDROID_HOME/ndk" -mindepth 2 -maxdepth 2 -name source.properties -type f 2>/dev/null | sort -V | tail -1 || true)"
+            if [ -n "$VALID_ALTERNATIVE" ]; then
+              ALTERNATIVE_VERSION="$(basename "$(dirname "$VALID_ALTERNATIVE")")"
+              echo "Using installed NDK $ALTERNATIVE_VERSION instead of auto-downloading a broken version"
+              python - "$ALTERNATIVE_VERSION" <<'PY_NDK'
+          from pathlib import Path
+          import sys
+          p=Path('android/app/build.gradle.kts')
+          s=p.read_text()
+          assert 'ndkVersion = flutter.ndkVersion' in s, 'NDK version anchor missing'
+          p.write_text(s.replace('ndkVersion = flutter.ndkVersion',
+                                 'ndkVersion = "' + sys.argv[1] + '"'))
+          PY_NDK
+            else
+              SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | sort -V | tail -1)"
+              test -x "$SDKMANAGER"
+              for attempt in 1 2 3; do
+                echo "NDK install attempt $attempt"
+                yes | timeout 210s "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --install "ndk;$NDK_REQUIRED" || true
+                if [ -f "$VALID_NDK" ]; then break; fi
+                sleep 7
+              done
+              test -f "$VALID_NDK" || { echo "::error::Android NDK could not be installed"; exit 1; }
+            fi
+          fi
+
       - name: Verify resolved Play Services dependency versions
         working-directory: build_source/android
         run: |
