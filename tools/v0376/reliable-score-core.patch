@@ -1,0 +1,483 @@
+--- a/V0376_RELEASE_NOTES.md
++++ b/V0376_RELEASE_NOTES.md
+@@ -0,0 +1,42 @@
++# ELXVRO Blocks v0.37.6 — Reliable Online Scores
++
++Based on the complete v0.37.5 Flutter source, retaining its three independent
++Play Games rankings, compact navigation, assets and five-world Adventure mode.
++
++## Changes
++
++1. **Offline score protection:** before sending a high score to Google Play
++   Games, keep the pending score in local preferences. If authentication or
++   submission fails, the saved score is retried on a later successful sign-in.
++2. **Record coalescing:** pending scores are keyed by the actual Play Games
++   leaderboard ID; only the highest pending score is retained for each table.
++   Async writes and retry flushes are serialized across service instances.
++3. **Safe remote acknowledgments:** a pending result is removed only after the
++   Play Games submission completes; an offline or interrupted submission does
++   not erase it. Local scores are **not** displayed as online player rankings.
++4. **Correct weekly score for Falling Blocks:** upload the actual *current
++   session's* score, not the lifetime-best score. This avoids artificially
++   inserting an old record into the weekly ranking.
++5. **Adventure score bounds:** the five-world campaign completion score sent
++   to its leaderboard is clamped to 0–300 unique completed stages.
++6. Regression tests cover offline preservation, retry after a new service
++   instance, maximum-score coalescing, independent leaderboards and failures.
++
++## Google Play Games configuration
++
++To activate all three remote rankings, supply **real and published** IDs through
++`--dart-define=ELXVRO_PG_CLASSIC_LEADERBOARD_ID=...`,
++`--dart-define=ELXVRO_PG_FALLING_BLOCKS_LEADERBOARD_ID=...` and
++`--dart-define=ELXVRO_PG_WORLD_ADVENTURE_LEADERBOARD_ID=...`.
++
++Remote accounts/signing credentials and Play Games services tester access must
++be verified on real devices before distribution. Pending scores are kept in
++this app installation, not an online account backup. A different Play Games
++account on the same installation can receive pending scores if the account
++changes before synchronization; avoid account switching before sync.
++
++## Validation scope
++
++The archive contains source and Flutter tests. A verified signed APK/AAB is
++not included; building requires Flutter and Android SDK plus the existing
++release-signing configuration.
+--- a/lib/screens/animal_adventure_screen.dart
++++ b/lib/screens/animal_adventure_screen.dart
+@@ -695,7 +695,7 @@
+         rankingScore > 0) {
+       unawaited(PlayGamesService(ids: ids).submitScore(
+         leaderboardId: ids.worldAdventureLeaderboardId,
+-        score: rankingScore,
++        score: rankingScore.clamp(0, 300).toInt(),
+       ));
+     }
+     return receipt.coinsGranted;
+--- a/lib/screens/falling_blocks_screen.dart
++++ b/lib/screens/falling_blocks_screen.dart
+@@ -384,7 +384,7 @@
+     if (ids.fallingBlocksLeaderboardId.trim().isNotEmpty && _score > 0) {
+       unawaited(PlayGamesService(ids: ids).submitScore(
+         leaderboardId: ids.fallingBlocksLeaderboardId,
+-        score: widget.appState.fallingBlocksBestScore,
++        score: _score,
+       ));
+     }
+     if (!mounted) return;
+--- a/lib/services/pending_leaderboard_scores.dart
++++ b/lib/services/pending_leaderboard_scores.dart
+@@ -0,0 +1,99 @@
++import 'dart:async';
++import 'dart:convert';
++
++import 'package:shared_preferences/shared_preferences.dart';
++
++/// A crash-safe retry queue for high-score leaderboards.
++///
++/// Google Play Games keeps the maximum score submitted for each leaderboard.
++/// Accordingly, multiple local submissions are coalesced to the maximum score
++/// for that leaderboard. Failed submissions remain on the device and are
++/// retried on the next successful Play Games sign-in.
++///
++/// This storage is local to the app installation; it is not a user-account
++/// backup or a substitute for published Google Play Games leaderboards.
++class PendingLeaderboardScores {
++  const PendingLeaderboardScores();
++
++  static const String storageKey = 'elxvro_play_games_pending_scores_v1';
++
++  // All service instances share the same preferences key. Serialize the entire
++  // read/write/flush operation to avoid a late save overwriting a newer score.
++  static Future<void> _tail = Future<void>.value();
++
++  Future<T> _exclusive<T>(Future<T> Function() action) async {
++    final previous = _tail;
++    final done = Completer<void>();
++    _tail = done.future;
++    await previous;
++    try {
++      return await action();
++    } finally {
++      done.complete();
++    }
++  }
++
++  Future<Map<String, int>> _read(SharedPreferences prefs) async {
++    final raw = prefs.getString(storageKey);
++    if (raw == null || raw.isEmpty) return <String, int>{};
++    try {
++      final value = jsonDecode(raw);
++      if (value is! Map<String, dynamic>) return <String, int>{};
++      final pending = <String, int>{};
++      for (final entry in value.entries) {
++        if (entry.key.trim().isEmpty || entry.value is! int) continue;
++        final score = entry.value as int;
++        if (score >= 0) pending[entry.key] = score;
++      }
++      return pending;
++    } on FormatException {
++      // A corrupt preference should not crash a game-over screen.
++      return <String, int>{};
++    }
++  }
++
++  Future<void> _write(SharedPreferences prefs, Map<String, int> pending) async {
++    final saved = await prefs.setString(storageKey, jsonEncode(pending));
++    if (!saved) throw StateError('Failed to persist pending Play Games scores');
++  }
++
++  Future<void> enqueue({required String leaderboardId, required int score}) {
++    final id = leaderboardId.trim();
++    if (id.isEmpty) return Future<void>.value();
++    final normalized = score < 0 ? 0 : score;
++    return _exclusive(() async {
++      final prefs = await SharedPreferences.getInstance();
++      final pending = await _read(prefs);
++      if ((pending[id] ?? -1) >= normalized) return;
++      pending[id] = normalized;
++      await _write(prefs, pending);
++    });
++  }
++
++  Future<int?> pendingFor(String leaderboardId) => _exclusive(() async {
++    final prefs = await SharedPreferences.getInstance();
++    return (await _read(prefs))[leaderboardId.trim()];
++  });
++
++  /// A failed item is retained. Successful items are removed *after* the
++  /// platform call completes, so a process crash can only cause an idempotent
++  /// repeat submission, not the loss of a score.
++  Future<int> flush(Future<void> Function(String id, int score) send) {
++    return _exclusive(() async {
++      final prefs = await SharedPreferences.getInstance();
++      final pending = await _read(prefs);
++      var sent = 0;
++      for (final entry in pending.entries.toList(growable: false)) {
++        try {
++          await send(entry.key, entry.value);
++        } catch (_) {
++          continue;
++        }
++        pending.remove(entry.key);
++        await _write(prefs, pending);
++        sent++;
++      }
++      return sent;
++    });
++  }
++}
+--- a/lib/services/play_games_service.dart
++++ b/lib/services/play_games_service.dart
+@@ -4,6 +4,7 @@
+ import '../l10n/app_strings.dart';
+ import 'play_games_ids.dart';
+ import 'mode_leaderboards.dart';
++import 'pending_leaderboard_scores.dart';
+ import 'social_service.dart';
+ 
+ abstract interface class GamesPlatformAdapter {
+@@ -112,8 +113,10 @@
+     required this.ids,
+     GamesPlatformAdapter? adapter,
+     OnlineScoresAdapter? scoresAdapter,
++    PendingLeaderboardScores? pendingScores,
+   }) : _adapter = adapter ?? const GamesServicesPlatformAdapter(),
+-       _scoresAdapter = scoresAdapter ?? const GamesServicesOnlineScoresAdapter();
++       _scoresAdapter = scoresAdapter ?? const GamesServicesOnlineScoresAdapter(),
++       _pendingScores = pendingScores ?? const PendingLeaderboardScores();
+ 
+   factory PlayGamesService.production() => PlayGamesService(
+         ids: const PlayGamesIds.fromEnvironment(),
+@@ -122,6 +125,7 @@
+   final PlayGamesIds ids;
+   final GamesPlatformAdapter _adapter;
+   final OnlineScoresAdapter _scoresAdapter;
++  final PendingLeaderboardScores _pendingScores;
+ 
+   bool _connected = false;
+   bool _signInAttempted = false;
+@@ -166,6 +170,7 @@
+     try {
+       _connected = await _adapter.signIn();
+       _lastError = _connected ? null : 'not_connected';
++      if (_connected) await _flushPendingScores();
+       return _connected;
+     } catch (error, stackTrace) {
+       _connected = false;
+@@ -184,6 +189,18 @@
+     return signIn();
+   }
+ 
++  Future<void> _flushPendingScores() async {
++    try {
++      await _pendingScores.flush((id, score) => _adapter.submitScore(
++        leaderboardId: id,
++        score: score,
++      ));
++    } catch (error, stackTrace) {
++      debugPrint('ELXVRO Play Games pending-score sync failed: $error');
++      debugPrintStack(stackTrace: stackTrace);
++    }
++  }
++
+   @override
+   Future<void> submitScore({
+     required String leaderboardId,
+@@ -191,17 +208,28 @@
+   }) async {
+     final id = leaderboardId.trim();
+     if (id.isEmpty) return;
++    final normalized = score < 0 ? 0 : score;
++    try {
++      // Persist the score before trying the network: an offline round's best
++      // result must survive navigation and process restarts.
++      await _pendingScores.enqueue(leaderboardId: id, score: normalized);
++    } catch (error, stackTrace) {
++      debugPrint('ELXVRO Play Games pending-score save failed: $error');
++      debugPrintStack(stackTrace: stackTrace);
++      // A failed local save must not prevent a live network submission.
++      if (await _ensureConnected()) {
++        try {
++          await _adapter.submitScore(leaderboardId: id, score: normalized);
++        } catch (error) {
++          debugPrint('ELXVRO Play Games score sync failed: $error');
++        }
++      }
++      return;
++    }
+     if (!await _ensureConnected()) return;
+-    try {
+-      await _adapter.submitScore(
+-        leaderboardId: id,
+-        score: score < 0 ? 0 : score,
+-      );
+-    } catch (error, stackTrace) {
+-      _lastError = error.toString();
+-      debugPrint('ELXVRO Play Games score sync failed: $error');
+-      debugPrintStack(stackTrace: stackTrace);
+-    }
++    // signIn() drains the queue on first connection. On an already connected
++    // instance this drains newly enqueued results as well.
++    await _flushPendingScores();
+   }
+ 
+   @override
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -1,7 +1,7 @@
+ name: elxvro_blocks
+ description: Premium block puzzle game for ELXVRO.
+ publish_to: 'none'
+-version: 0.37.5+103
++version: 0.37.6+104
+ 
+ environment:
+   sdk: '>=3.4.0 <4.0.0'
+--- a/test/play_games_sdk_regression_test.dart
++++ b/test/play_games_sdk_regression_test.dart
+@@ -7,7 +7,7 @@
+     final gradle = File('android/app/build.gradle.kts').readAsStringSync();
+     expect(pubspec, contains('games_services: 5.3.0'));
+     expect(pubspec, contains('games_services_platform_interface: 5.3.0'));
+-    expect(pubspec, contains('version: 0.37.5+103'));
++    expect(pubspec, contains('version: 0.37.6+104'));
+     expect(gradle, contains('play-services-games-v2:22.1.0'));
+     expect(gradle, contains('play-services-base:18.11.0'));
+     expect(gradle, contains('play-services-basement:18.12.0'));
+--- a/test/play_games_service_test.dart
++++ b/test/play_games_service_test.dart
+@@ -1,4 +1,5 @@
+ import 'package:flutter_test/flutter_test.dart';
++import 'package:shared_preferences/shared_preferences.dart';
+ import 'package:elxvro_blocks/services/play_games_ids.dart';
+ import 'package:elxvro_blocks/services/play_games_service.dart';
+ 
+@@ -42,6 +43,8 @@
+ }
+ 
+ void main() {
++  TestWidgetsFlutterBinding.ensureInitialized();
++  setUp(() => SharedPreferences.setMockInitialValues(<String, Object>{}));
+   const ids = PlayGamesIds(
+     classicLeaderboardId: 'classic',
+     comboRushLeaderboardId: 'rush',
+--- a/test/real_material_audio_test.dart
++++ b/test/real_material_audio_test.dart
+@@ -7,6 +7,6 @@
+     expect(File('tool/fetch_real_material_audio.sh').existsSync(), isTrue);
+     expect(File('REAL_AUDIO_CREDITS.md').existsSync(), isTrue);
+     final pubspec = File('pubspec.yaml').readAsStringSync();
+-    expect(pubspec, contains('version: 0.37.5+103'));
++    expect(pubspec, contains('version: 0.37.6+104'));
+   });
+ }
+--- a/test/remove_adventure_test.dart
++++ b/test/remove_adventure_test.dart
+@@ -28,7 +28,7 @@
+     expect(Directory('assets/images/adventure_battles').existsSync(), isFalse);
+     expect(Directory('assets/images/adventure_worlds').existsSync(), isFalse);
+     expect(assets, isNot(contains('assets/images/adventure_')));
+-    expect(assets, contains('version: 0.37.5+103'));
++    expect(assets, contains('version: 0.37.6+104'));
+     expect(assets, contains('assets/images/animal_gems/'));
+   });
+ 
+--- a/test/v0240_features_test.dart
++++ b/test/v0240_features_test.dart
+@@ -38,7 +38,7 @@
+         File('lib/screens/daily_missions_screen.dart').readAsStringSync();
+     final game = File('lib/screens/game_screen.dart').readAsStringSync();
+ 
+-    expect(pubspec, contains('version: 0.37.5+103'));
++    expect(pubspec, contains('version: 0.37.6+104'));
+     expect(pubspec, contains('share_plus: 10.1.4'));
+     expect(home, contains('TutorialScreen'));
+     expect(home, contains('ShareService.shareGame'));
+--- a/test/v0287_support_test.dart
++++ b/test/v0287_support_test.dart
+@@ -10,7 +10,7 @@
+   expect(billing,isNot(contains('http')));
+   expect(billing,isNot(contains('buyConsumable(')));
+   final pubspec=File('pubspec.yaml').readAsStringSync();
+-  expect(pubspec,contains('version: 0.37.5+103'));
++  expect(pubspec,contains('version: 0.37.6+104'));
+   expect(pubspec,contains('in_app_purchase:'));
+   expect(pubspec,isNot(contains('google_sign_in:')));
+  });
+--- a/test/v0372_classic_theme_restoration_test.dart
++++ b/test/v0372_classic_theme_restoration_test.dart
+@@ -13,7 +13,7 @@
+     final pubspec = File('${root.path}/pubspec.yaml').readAsStringSync();
+     expect(main, contains('home: MainHubScreen(appState: widget.appState)'));
+     expect(main, isNot(contains('PremiumNavigationShell')));
+-    expect(pubspec, contains('version: 0.37.5+103'));
++    expect(pubspec, contains('version: 0.37.6+104'));
+     expect(File('${root.path}/lib/screens/animal_adventure_screen.dart').existsSync(), isTrue);
+     expect(File('${root.path}/lib/services/world_match_progress.dart').existsSync(), isTrue);
+     expect(File('${root.path}/tool/install_animal_save_channel.py').existsSync(), isTrue);
+--- a/test/v0373_play_console_checks_test.dart
++++ b/test/v0373_play_console_checks_test.dart
+@@ -4,7 +4,7 @@
+ void main() {
+   test('release has a monotonic Play version and keeps the original app id', () {
+     final pubspec = File('pubspec.yaml').readAsStringSync();
+-    expect(pubspec, contains('version: 0.37.5+103'));
++    expect(pubspec, contains('version: 0.37.6+104'));
+     final android = File('tool/apply_android_compat.py').readAsStringSync();
+     expect(android, contains('compileSdk = 36'));
+     expect(android, contains('WindowCompat.setDecorFitsSystemWindows(window, false)')); 
+--- a/test/v0376_score_sync_test.dart
++++ b/test/v0376_score_sync_test.dart
+@@ -0,0 +1,111 @@
++import 'package:flutter_test/flutter_test.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++import 'package:elxvro_blocks/services/pending_leaderboard_scores.dart';
++import 'package:elxvro_blocks/services/play_games_ids.dart';
++import 'package:elxvro_blocks/services/play_games_service.dart';
++
++class RetryGamesAdapter implements GamesPlatformAdapter {
++  bool connected = true;
++  bool failSubmissions = false;
++  final submissions = <(String, int)>[];
++  int signIns = 0;
++
++  @override
++  Future<bool> signIn() async { signIns++; return connected; }
++
++  @override
++  Future<void> submitScore({required String leaderboardId, required int score}) async {
++    if (failSubmissions) throw StateError('Network unavailable');
++    submissions.add((leaderboardId, score));
++  }
++
++  @override
++  Future<void> showLeaderboard({required String leaderboardId}) async {}
++  @override
++  Future<void> showLeaderboards() async {}
++  @override
++  Future<void> showAchievements() async {}
++  @override
++  Future<void> unlockAchievement(String achievementId) async {}
++}
++
++void main() {
++  TestWidgetsFlutterBinding.ensureInitialized();
++  setUp(() => SharedPreferences.setMockInitialValues(<String, Object>{}));
++
++  const ids = PlayGamesIds(
++    classicLeaderboardId: 'classic',
++    comboRushLeaderboardId: 'rush',
++    fallingBlocksLeaderboardId: 'falling',
++    worldAdventureLeaderboardId: 'worlds',
++    achievementIds: <String, String>{},
++  );
++
++  test('offline score remains on disk and is retried by a new service', () async {
++    final offline = RetryGamesAdapter()..connected = false;
++    final oldService = PlayGamesService(ids: ids, adapter: offline);
++    await oldService.submitScore(leaderboardId: 'classic', score: 4321);
++    expect(offline.submissions, isEmpty);
++    expect(await const PendingLeaderboardScores().pendingFor('classic'), 4321);
++
++    final online = RetryGamesAdapter();
++    final newService = PlayGamesService(ids: ids, adapter: online);
++    expect(await newService.signIn(), isTrue);
++    expect(online.submissions, <(String, int)>[('classic', 4321)]);
++    expect(await const PendingLeaderboardScores().pendingFor('classic'), isNull);
++  });
++
++  test('queue retains highest pending score per independent leaderboard', () async {
++    final offline = RetryGamesAdapter()..connected = false;
++    final service = PlayGamesService(ids: ids, adapter: offline);
++    await service.submitScore(leaderboardId: 'classic', score: 100);
++    await service.submitScore(leaderboardId: 'classic', score: 500);
++    await service.submitScore(leaderboardId: 'classic', score: 300);
++    await service.submitScore(leaderboardId: 'falling', score: 280);
++    await service.submitScore(leaderboardId: 'worlds', score: 93);
++
++    final queue = const PendingLeaderboardScores();
++    expect(await queue.pendingFor('classic'), 500);
++    expect(await queue.pendingFor('falling'), 280);
++    expect(await queue.pendingFor('worlds'), 93);
++
++    final online = RetryGamesAdapter();
++    await PlayGamesService(ids: ids, adapter: online).signIn();
++    expect(online.submissions.toSet(), <(String, int)>{
++      ('classic', 500), ('falling', 280), ('worlds', 93),
++    });
++    expect(online.submissions.length, 3);
++    expect(await queue.pendingFor('classic'), isNull);
++    expect(await queue.pendingFor('falling'), isNull);
++    expect(await queue.pendingFor('worlds'), isNull);
++  });
++
++  test('failed remote submission is never deleted before acknowledgment', () async {
++    final adapter = RetryGamesAdapter()..failSubmissions = true;
++    final service = PlayGamesService(ids: ids, adapter: adapter);
++    await service.submitScore(leaderboardId: 'classic', score: 9999);
++    expect(await const PendingLeaderboardScores().pendingFor('classic'), 9999);
++    adapter.failSubmissions = false;
++    await PlayGamesService(ids: ids, adapter: adapter).signIn();
++    expect(adapter.submissions, <(String, int)>[('classic', 9999)]);
++    expect(await const PendingLeaderboardScores().pendingFor('classic'), isNull);
++  });
++
++  test('a score that cannot be persisted does not create fake leaderboard results', () async {
++    final queue = const PendingLeaderboardScores();
++    await queue.enqueue(leaderboardId: '', score: 100);
++    expect(await queue.pendingFor(''), isNull);
++    await queue.enqueue(leaderboardId: 'falling', score: -30);
++    expect(await queue.pendingFor('falling'), 0);
++  });
++
++  test('two simultaneous writers preserve the highest record', () async {
++    final queue = const PendingLeaderboardScores();
++    await Future.wait(<Future<void>>[
++      queue.enqueue(leaderboardId: 'classic', score: 100),
++      queue.enqueue(leaderboardId: 'classic', score: 600),
++      queue.enqueue(leaderboardId: 'classic', score: 300),
++    ]);
++    expect(await queue.pendingFor('classic'), 600);
++  });
++}
