@@ -1,0 +1,16 @@
+--- a/lib/screens/animal_adventure_screen.dart
++++ b/lib/screens/animal_adventure_screen.dart
+@@ -170,10 +170,10 @@
+                   child: Opacity(opacity: unlocked ? 1 : .58,
+                   child: Column(mainAxisAlignment: MainAxisAlignment.center,
+                     children: <Widget>[
+                       Image.asset(world.stageImage(1),
+-                        width: 70, height: 68, fit: BoxFit.contain,
++                        width: 64, height: 58, fit: BoxFit.contain,
+                         errorBuilder: (_, __, ___) => Text(world.emoji,
+                           style: const TextStyle(fontSize: 48))),
+-                      const SizedBox(height: 8),
++                      const SizedBox(height: 6),
+                       Text(tr ? world.labelTr : world.labelEn,
+                         textAlign: TextAlign.center,
+                         style: TextStyle(color: color, fontSize: 14,
