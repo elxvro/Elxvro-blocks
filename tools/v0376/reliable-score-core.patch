@@ -481,3 +481,23 @@
 +    expect(await queue.pendingFor('classic'), 600);
 +  });
 +}
+--- a/test/v0375_three_mode_leaderboards_test.dart
++++ b/test/v0375_three_mode_leaderboards_test.dart
+@@ -138,7 +138,16 @@
+       }
+       expect(tester.takeException(), isNull);
+       await tester.tap(find.byKey(const ValueKey<String>('rank_refresh')));
+-      await tester.pumpAndSettle();
++      // The ranking loader uses a continuous spinner while the remote
++      // request is pending. pumpAndSettle() waits for that animation to stop,
++      // and may time out even when the mocked ranking service responds.
++      // Pump bounded frames and assert the actual result appears instead.
++      for (var attempt = 0;
++          attempt < 40 &&
++          find.text('Gerçek test oyuncusu').evaluate().isEmpty;
++          attempt++) {
++        await tester.pump(const Duration(milliseconds: 50));
++      }
+       expect(find.text('Gerçek test oyuncusu'), findsOneWidget);
+       await tester.pumpWidget(const SizedBox.shrink());
+     });
