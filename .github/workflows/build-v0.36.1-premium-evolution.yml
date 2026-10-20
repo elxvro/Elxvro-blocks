@@ -1,9 +1,9 @@
-name: ELXVRO Blocks v0.36.1 Premium Evolution APK AAB
+name: ELXVRO Blocks v0.36.2 Icon & Introduction APK AAB
 
 on:
   push:
     branches:
-      - feature/v0.36.1-premium-evolution
+      - feature/v0.36.2-icon-introduction
     paths:
       - "tools/apply_rising_update.py"
       - "tools/apply_v0311_endless_adventure.py"
@@ -12,10 +12,10 @@ on:
       - "tools/v0320/**"
       - "tools/v0321/**"
       - "tools/v0330/**"
-      - "tools/v0361/**"
+      - "tools/v0362/**"
       - "tools/v0337/**"
       - "tools/v0332/**"
-      - ".github/workflows/build-v0.36.1-premium-evolution.yml"
+      - ".github/workflows/build-v0.36.2-premium-evolution.yml"
       - "tools/apply_v0312_illustrated_worlds.py"
       - "tools/v0312/**"
       - "tools/v0311/**"
@@ -38,14 +38,14 @@ on:
       - "source_snapshot/lib/widgets/weekly_league_card.dart"
       - "source_snapshot/lib/screens/daily_missions_screen.dart"
       - "source_snapshot/lib/models/game_theme.dart"
-      - ".github/workflows/build-v0.36.1-premium-evolution.yml"
+      - ".github/workflows/build-v0.36.2-premium-evolution.yml"
       - ".github/v0287-code/**"
       - ".github/v0285-code/**"
       - ".github/v0284-code/**"
       - ".github/v0283-code/**"
       - "hosting/**"
   workflow_dispatch:
-# Manual workflow rerun requested 2026-10-14.
+# v0.36.2 launcher focus + user-controlled intro.
 
 permissions:
   contents: write
@@ -79,70 +79,57 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Restore verified v0.36.0 300-level source
+      - name: Restore verified v0.36.1 300-level source
         uses: actions/download-artifact@v4
         with:
-          name: ELXVRO-Blocks-v0.36.0-FULL-SOURCE
-          run-id: 39348771724
+          name: ELXVRO-Blocks-v0.36.1-FULL-SOURCE
+          run-id: 39360652446
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: artifact-v0360
+          path: artifact-v0361
 
-      - name: Apply v0.36.1 progression, balance and theme upgrades
+      - name: Apply v0.36.2 icon and interactive intro changes
         run: |
           set -euo pipefail
           APP=extracted/elxvro-blocks
           mkdir -p "$APP"
-          test -s artifact-v0360/ELXVRO-Blocks-v0.36.0-FULL-SOURCE.zip
-          unzip -q artifact-v0360/ELXVRO-Blocks-v0.36.0-FULL-SOURCE.zip -d "$APP"
-          base64 -d tools/v0361/v0361.patch.gz.b64 | gzip -dc > /tmp/v0361.patch
-          patch --batch -p1 -d "$APP" < /tmp/v0361.patch
-          patch --batch -p1 -d "$APP" < tools/v0361/tutorial_preview_hotfix.patch
-          patch --batch -p1 -d "$APP" < tools/v0361/crystal_achievement_progress.patch
-          patch --batch -p1 -d "$APP" < tools/v0361/regression_ui_tests_hotfix.patch
-          patch --batch -p1 -d "$APP" < tools/v0361/world_hub_overflow_fix.patch
-          grep -Fx 'version: 0.36.1+96' "$APP/pubspec.yaml"
-          test -s "$APP/test/v0361_premium_evolution_test.dart"
-          test -s "$APP/lib/services/adventure_world_gates.dart"
-          test -s "$APP/lib/models/adventure_stage_style.dart"
-          python - <<'PYFIX'
-          from pathlib import Path
-          root=Path('extracted/elxvro-blocks')
-          for p in (root/'test').glob('*.dart'):
-              original=p.read_text()
-              revised=original.replace('version: 0.36.0+95','version: 0.36.1+96')
-              if revised!=original:p.write_text(revised)
-          PYFIX
+          test -s artifact-v0361/ELXVRO-Blocks-v0.36.1-FULL-SOURCE.zip
+          unzip -q artifact-v0361/ELXVRO-Blocks-v0.36.1-FULL-SOURCE.zip -d "$APP"
+          base64 -d tools/v0362/v0362.patch.gz.b64 | gzip -dc > /tmp/v0362.patch
+          patch --batch -p1 -d "$APP" < /tmp/v0362.patch
+          grep -Fx 'version: 0.36.2+97' "$APP/pubspec.yaml"
+          test -s "$APP/test/v0362_intro_icon_test.dart"
+          ! grep -q "Image.asset" "$APP/lib/screens/launch_screen.dart"
 
-      - name: Prepare supplied ELXVRO app icon and splash safe area
+      - name: Enlarge Android launcher icon and remove branded in-app splash
         run: |
           set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y -qq python3-pil
-          base64 -d tools/v0361/logo_reference.jpg.b64 > /tmp/v0361_logo.jpg
-          /usr/bin/python3 - <<'PYLOGO'
-          from PIL import Image, ImageOps, ImageDraw
+          /usr/bin/python3 - <<'PYICON'
+          from PIL import Image, ImageEnhance
           from pathlib import Path
           root=Path('extracted/elxvro-blocks/assets/images')
-          im=Image.open('/tmp/v0361_logo.jpg').convert('RGB')
-          ImageOps.fit(im,(1024,1024),method=Image.Resampling.LANCZOS).save(root/'app_icon.png',optimize=True)
-          foreground=Image.new('RGBA',(1024,1024),(0,0,0,0))
-          artwork=ImageOps.fit(im,(712,712),method=Image.Resampling.LANCZOS).convert('RGBA')
-          mask=Image.new('L',(712,712),0)
-          ImageDraw.Draw(mask).rounded_rectangle((0,0,711,711),radius=110,fill=255)
-          artwork.putalpha(mask)
-          foreground.alpha_composite(artwork,(156,156))
-          foreground.save(root/'splash_logo.png',optimize=True)
-          assert (root/'app_icon.png').stat().st_size>10000
-          assert (root/'splash_logo.png').stat().st_size>10000
-          print('ELXVRO logo fitted to Android launcher and adaptive/splash safe zone')
-          PYLOGO
+          original=Image.open(root/'app_icon.png').convert('RGB')
+          width,height=original.size
+          # User-supplied v0.36.1 artwork: enlarge main 2x2 puzzle motif.
+          # Full-bleed foreground avoids Android adaptive-icon double inset.
+          bounds=(round(width*300/1536),round(height*390/1536),
+                  round(width*1230/1536),round(height*1320/1536))
+          artwork=original.crop(bounds).resize((1024,1024),Image.Resampling.LANCZOS)
+          artwork=ImageEnhance.Contrast(artwork).enhance(1.075)
+          artwork=ImageEnhance.Sharpness(artwork).enhance(1.12)
+          artwork.save(root/'app_icon.png',optimize=True)
+          Image.new('RGBA',(1,1),(0,0,0,0)).save(root/'splash_logo.png')
+          assert (root/'app_icon.png').stat().st_size > 100000
+          print('1024x1024 full-bleed launcher/adaptive icon; no in-app artwork')
+          PYICON
 
-      - name: Create complete v0.36.1 source ZIP
+      - name: Create complete v0.36.2 source ZIP
         run: |
           set -euo pipefail
           APP=extracted/elxvro-blocks
           mkdir -p "$APP/.github/workflows"
-          cp .github/workflows/build-v0.36.1-premium-evolution.yml "$APP/.github/workflows/build-v0.36.1-premium-evolution.yml"
+          cp .github/workflows/build-v0.36.2-premium-evolution.yml "$APP/.github/workflows/build-v0.36.2-premium-evolution.yml"
           cp -R .github/v0287-code "$APP/.github/"
           cp tools/apply_android_compat.py "$APP/tool/apply_android_compat.py"
           cp tools/apply_play_games_sdk_update.py "$APP/tool/apply_play_games_sdk_update.py"
@@ -150,24 +137,24 @@ jobs:
           cp tools/apply_v0301_performance.py "$APP/tool/apply_v0301_performance.py"
           cp tools/v0297/audit_play_services_bitmap.py "$APP/tool/audit_play_services_bitmap.py"
           cp tools/v0296/verify_system_bar_dex.py "$APP/tool/verify_system_bar_dex.py"
-          rm -f ELXVRO-Blocks-v0.36.1-FULL-SOURCE.zip
+          rm -f ELXVRO-Blocks-v0.36.2-FULL-SOURCE.zip
           (
             cd "$APP"
-            zip -qr ../../ELXVRO-Blocks-v0.36.1-FULL-SOURCE.zip .               -x "build/*" ".dart_tool/*" ".git/*"
+            zip -qr ../../ELXVRO-Blocks-v0.36.2-FULL-SOURCE.zip .               -x "build/*" ".dart_tool/*" ".git/*"
           )
-          unzip -t ELXVRO-Blocks-v0.36.1-FULL-SOURCE.zip >/dev/null
+          unzip -t ELXVRO-Blocks-v0.36.2-FULL-SOURCE.zip >/dev/null
           rm -rf build_source
           mkdir build_source
-          unzip -q ELXVRO-Blocks-v0.36.1-FULL-SOURCE.zip -d build_source
+          unzip -q ELXVRO-Blocks-v0.36.2-FULL-SOURCE.zip -d build_source
           test -f build_source/pubspec.yaml
           test -f build_source/lib/app_state.dart
-          test -f build_source/.github/workflows/build-v0.36.1-premium-evolution.yml
+          test -f build_source/.github/workflows/build-v0.36.2-premium-evolution.yml
 
       - name: Upload complete source ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: ELXVRO-Blocks-v0.36.1-FULL-SOURCE
-          path: ELXVRO-Blocks-v0.36.1-FULL-SOURCE.zip
+          name: ELXVRO-Blocks-v0.36.2-FULL-SOURCE
+          path: ELXVRO-Blocks-v0.36.2-FULL-SOURCE.zip
           if-no-files-found: error
           retention-days: 14
 
@@ -645,7 +632,7 @@ jobs:
           s=Path('lib/screens/falling_blocks_screen.dart').read_text()
           assert 'RepaintBoundary(' in s
           assert 'onPanCancel: _onPanCancel' in s
-          assert 'version: 0.36.1+96' in Path('pubspec.yaml').read_text()
+          assert 'version: 0.36.2+97' in Path('pubspec.yaml').read_text()
           assert Path('lib/game/animal_match_engine.dart').is_file()
           assert Path('lib/game/falling_piece_bag.dart').is_file()
           assert Path('lib/services/animal_match_progress.dart').is_file()
@@ -695,21 +682,21 @@ jobs:
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -1)
           "$APKSIGNER" verify --verbose "$APK"
           jarsigner -verify "$AAB"
-          cp "$APK" ELXVRO-Blocks-v0.36.1-SIGNED.apk
-          cp "$AAB" ELXVRO-Blocks-v0.36.1-GOOGLE-PLAY.aab
-          sha256sum ELXVRO-Blocks-v0.36.1-SIGNED.apk > ELXVRO-Blocks-v0.36.1-SIGNED.apk.sha256
-          sha256sum ELXVRO-Blocks-v0.36.1-GOOGLE-PLAY.aab > ELXVRO-Blocks-v0.36.1-GOOGLE-PLAY.aab.sha256
-          mkdir -p ELXVRO-Blocks-v0.36.1-APK-AAB
-          cp ELXVRO-Blocks-v0.36.1-SIGNED.apk* ELXVRO-Blocks-v0.36.1-APK-AAB/
-          cp ELXVRO-Blocks-v0.36.1-GOOGLE-PLAY.aab* ELXVRO-Blocks-v0.36.1-APK-AAB/
-          cp ELXVRO-Blocks-v0.36.1-FULL-SOURCE.zip ELXVRO-Blocks-v0.36.1-APK-AAB/
-          ls -lh ELXVRO-Blocks-v0.36.1-APK-AAB/
+          cp "$APK" ELXVRO-Blocks-v0.36.2-SIGNED.apk
+          cp "$AAB" ELXVRO-Blocks-v0.36.2-GOOGLE-PLAY.aab
+          sha256sum ELXVRO-Blocks-v0.36.2-SIGNED.apk > ELXVRO-Blocks-v0.36.2-SIGNED.apk.sha256
+          sha256sum ELXVRO-Blocks-v0.36.2-GOOGLE-PLAY.aab > ELXVRO-Blocks-v0.36.2-GOOGLE-PLAY.aab.sha256
+          mkdir -p ELXVRO-Blocks-v0.36.2-APK-AAB
+          cp ELXVRO-Blocks-v0.36.2-SIGNED.apk* ELXVRO-Blocks-v0.36.2-APK-AAB/
+          cp ELXVRO-Blocks-v0.36.2-GOOGLE-PLAY.aab* ELXVRO-Blocks-v0.36.2-APK-AAB/
+          cp ELXVRO-Blocks-v0.36.2-FULL-SOURCE.zip ELXVRO-Blocks-v0.36.2-APK-AAB/
+          ls -lh ELXVRO-Blocks-v0.36.2-APK-AAB/
 
       - name: Upload APK and AAB
         uses: actions/upload-artifact@v4
         with:
-          name: ELXVRO-Blocks-v0.36.1-APK-AAB
-          path: ELXVRO-Blocks-v0.36.1-APK-AAB/
+          name: ELXVRO-Blocks-v0.36.2-APK-AAB
+          path: ELXVRO-Blocks-v0.36.2-APK-AAB/
           if-no-files-found: error
           retention-days: 14
 # ELXVRO Crystal Animal Match-3 300 stage release
