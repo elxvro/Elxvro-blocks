@@ -97,6 +97,8 @@ jobs:
           grep -Fx 'version: 0.37.3+101' "$APP/pubspec.yaml"
           base64 -d tools/v0374/v0374_nav.patch.gz.b64 | gzip -dc > /tmp/v0374_nav.patch
           patch --batch -p1 -d "$APP" < /tmp/v0374_nav.patch
+          base64 -d tools/v0374/compact_layout_hotfix.patch.gz.b64 | gzip -dc > /tmp/v0374_layout.patch
+          patch --batch -p1 -d "$APP" < /tmp/v0374_layout.patch
           grep -Fx 'version: 0.37.4+102' "$APP/pubspec.yaml"
           grep -F 'home: MainHubScreen(appState: widget.appState)' "$APP/lib/main.dart"
           test -s "$APP/lib/screens/main_hub_screen.dart"
