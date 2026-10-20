@@ -95,6 +95,7 @@ jobs:
           test -s artifact-v0362/ELXVRO-Blocks-v0.36.2-FULL-SOURCE.zip
           unzip -q artifact-v0362/ELXVRO-Blocks-v0.36.2-FULL-SOURCE.zip -d "$APP"
           cat tools/v0370/overlay_*.part | base64 -d | tar -xz -C "$APP"
+          python tools/v0370/apply_v0370_hotfix.py "$APP"
           grep -Fx 'version: 0.37.0+98' "$APP/pubspec.yaml"
           test -s "$APP/lib/screens/premium_navigation_shell.dart"
           test -s "$APP/test/v0370_reference_navigation_test.dart"
