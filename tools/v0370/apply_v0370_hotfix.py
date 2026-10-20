@@ -49,6 +49,6 @@ void main() {
 nav_test=root/'test/v0370_reference_navigation_test.dart'
 nt=nav_test.read_text()
 nt=nt.replace("    expect(find.text('HESAP'), findsOneWidget);",
-              "    await tester.scrollUntilVisible(find.text('HESAP'), 180.0);\\n    expect(find.text('HESAP'), findsOneWidget);")
+              "    await tester.scrollUntilVisible(find.text('HESAP'), 180.0);\n    expect(find.text('HESAP'), findsOneWidget);")
 nav_test.write_text(nt)
 print('v0370 hotfix applied',root)
