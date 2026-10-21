@@ -98,6 +98,7 @@ jobs:
           grep -Fx 'version: 0.37.6+104' "$APP/pubspec.yaml"
           base64 -d tools/v0377/engagement-upgrade.patch.gz.b64 | gzip -dc > /tmp/v0377.patch
           patch --batch -p1 -d "$APP" < /tmp/v0377.patch
+          patch --batch -p1 -d "$APP" < tools/v0377/fix-analyzer.patch
           grep -Fx 'version: 0.37.7+105' "$APP/pubspec.yaml"
           test -s "$APP/lib/services/engagement_center.dart"
           test -s "$APP/lib/screens/engagement_hub_screen.dart"
