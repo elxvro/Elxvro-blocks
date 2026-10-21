@@ -369,7 +369,7 @@ jobs:
           test -f lib/services/developer_support_service.dart
           test -f lib/widgets/developer_support_card.dart
           ! grep -q 'google_sign_in:' pubspec.yaml
-          ! grep -q 'in_app_purchase_android:' pubspec.yaml
+          grep -F 'in_app_purchase_android:' pubspec.yaml
 
       - name: Build signed release APK
         working-directory: build_source
