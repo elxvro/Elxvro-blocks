@@ -103,6 +103,7 @@ jobs:
           base64 -d tools/v0381/prepaid-l10n-support.patch.gz.b64 | gzip -dc > /tmp/v0381.patch
           patch --batch --fuzz=0 -p1 -d "$APP" < /tmp/v0381.patch
           patch --batch --fuzz=0 -p1 -d "$APP" < tools/v0381/analyzer-unused-tr-hotfix.patch
+          patch --batch --fuzz=0 -p1 -d "$APP" < tools/v0381/version-tests-hotfix.patch
           grep -Fx 'version: 0.38.1+109' "$APP/pubspec.yaml"
           test -s "$APP/lib/l10n/extended_ui_translations.dart"
           test -s "$APP/test/v0381_locale_billing_ui_test.dart"
