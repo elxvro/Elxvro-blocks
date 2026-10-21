@@ -1,0 +1,24 @@
+--- v0380patchtest/lib/screens/game_screen.dart	2026-10-21 03:49:14.127182505 +0000
++++ v0380/lib/screens/game_screen.dart	2026-10-21 03:56:33.369728730 +0000
+@@ -1179,7 +1179,6 @@
+               ),
+             ],
+           ),
+-          ),
+           actionsAlignment: MainAxisAlignment.center,
+           actions: <Widget>[
+             FilledButton.icon(
+--- v0380patchtest/lib/services/coin_boost_subscription.dart	2026-10-21 03:49:14.127906567 +0000
++++ v0380/lib/services/coin_boost_subscription.dart	2026-10-21 03:56:33.370049033 +0000
+@@ -177,4 +177,11 @@
+       client.close(force: true);
+     }
+   }
++  @override
++  void dispose() {
++    final stream = _purchaseStream;
++    if (stream != null) unawaited(stream.cancel());
++    super.dispose();
++  }
++
+ }
