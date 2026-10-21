@@ -1,0 +1,82 @@
+--- a/test/v0240_features_test.dart
++++ b/test/v0240_features_test.dart
+@@ -38,7 +38,7 @@
+         File('lib/screens/daily_missions_screen.dart').readAsStringSync();
+     final game = File('lib/screens/game_screen.dart').readAsStringSync();
+ 
+-    expect(pubspec, contains('version: 0.38.0+108'));
++    expect(pubspec, contains('version: 0.38.1+109'));
+     expect(pubspec, contains('share_plus: 10.1.4'));
+     expect(home, contains('TutorialScreen'));
+     expect(home, contains('ShareService.shareGame'));
+--- a/test/v0287_support_test.dart
++++ b/test/v0287_support_test.dart
+@@ -10,7 +10,7 @@
+   expect(billing,isNot(contains('http')));
+   expect(billing,isNot(contains('buyConsumable(')));
+   final pubspec=File('pubspec.yaml').readAsStringSync();
+-  expect(pubspec,contains('version: 0.38.0+108'));
++  expect(pubspec,contains('version: 0.38.1+109'));
+   expect(pubspec,contains('in_app_purchase:'));
+   expect(pubspec,isNot(contains('google_sign_in:')));
+  });
+@@ -21,7 +21,7 @@
+   expect(settings, contains('SupportScreen(appState: appState)'));
+   expect(support, contains('info@elxvro.com'));
+   expect(support, contains('initialGame'));
+-  expect(support, contains('Version: 0.38.0 (108)'));
++  expect(support, contains('Version: 0.38.1 (109)'));
+   expect(File('lib/app_state.dart').readAsStringSync(),contains('Future<bool> buyUndoPack()'));
+  });
+--- a/test/play_games_sdk_regression_test.dart
++++ b/test/play_games_sdk_regression_test.dart
+@@ -7,7 +7,7 @@
+     final pubspec = File('pubspec.yaml').readAsStringSync();
+     final manifest = File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
+ 
+-    expect(pubspec, contains('version: 0.38.0+108'));
++    expect(pubspec, contains('version: 0.38.1+109'));
+     expect(pubspec, contains('games_services: ^4.1.1'));
+     expect(manifest, contains('com.google.android.gms.games.APP_ID'));
+     expect(manifest, contains('com.google.android.gms.games.APP_ID'));
+--- a/test/v0372_classic_theme_restoration_test.dart
++++ b/test/v0372_classic_theme_restoration_test.dart
+@@ -13,7 +13,7 @@
+     final pubspec = File('pubspec.yaml').readAsStringSync();
+     final theme = File('lib/models/game_theme.dart').readAsStringSync();
+ 
+-    expect(pubspec, contains('version: 0.38.0+108'));
++    expect(pubspec, contains('version: 0.38.1+109'));
+     expect(theme, contains('classicMetal'));
+     expect(theme, contains('classicMetal'));
+     expect(File('lib/screens/game_screen.dart').existsSync(), isTrue);
+--- a/test/v0373_play_console_checks_test.dart
++++ b/test/v0373_play_console_checks_test.dart
+@@ -4,7 +4,7 @@
+ void main() {
+   test('Play Console build config is ready for 3 independent rankings', () {
+     final pubspec = File('pubspec.yaml').readAsStringSync();
+-    expect(pubspec, contains('version: 0.38.0+108'));
++    expect(pubspec, contains('version: 0.38.1+109'));
+     expect(pubspec, contains('flutter_local_notifications:'));
+     expect(pubspec, contains('games_services: ^4.1.1'));
+     expect(pubspec, contains('in_app_purchase:'));
+--- a/test/real_material_audio_test.dart
++++ b/test/real_material_audio_test.dart
+@@ -7,7 +7,7 @@
+   test('real material audio build pipeline is included', () {
+     final pubspec = File('pubspec.yaml').readAsStringSync();
+     final realAudioScript = File('tool/fetch_real_material_audio.sh').readAsStringSync();
+-    expect(pubspec, contains('version: 0.38.0+108'));
++    expect(pubspec, contains('version: 0.38.1+109'));
+     expect(realAudioScript, contains('Wikimedia'));
+     expect(realAudioScript, contains('OpenGameArt'));
+--- a/test/remove_adventure_test.dart
++++ b/test/remove_adventure_test.dart
+@@ -29,7 +29,7 @@
+     expect(File('lib/screens/adventure_screen.dart').existsSync(), isFalse);
+     final assets = File('pubspec.yaml').readAsStringSync();
+-    expect(assets, contains('version: 0.38.0+108'));
++    expect(assets, contains('version: 0.38.1+109'));
+     expect(assets, contains('assets/images/animal_gems/'));
+     expect(assets, contains('assets/images/worlds/'));
