@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - build/v0.38.8-release
+      - build/v0.38.8-gameover-hotfix
     paths:
       - 'tools/v0388/**'
-      - '.github/workflows/build-v0.38.8-release.yml'
+      - '.github/workflows/build-v0.38.8-gameover.yml'
 
 permissions:
   contents: read
