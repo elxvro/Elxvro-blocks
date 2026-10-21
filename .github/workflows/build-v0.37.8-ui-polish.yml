@@ -3,7 +3,7 @@ name: ELXVRO Blocks v0.37.8 UI Polish Signed APK and AAB
 on:
   push:
     branches:
-      - feature/v0.37.8-engagement
+      - feature/v0.37.8-ui-polish
     paths:
       - "tools/apply_rising_update.py"
       - "tools/apply_v0311_endless_adventure.py"
