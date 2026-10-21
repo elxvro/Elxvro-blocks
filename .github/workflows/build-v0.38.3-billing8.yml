@@ -110,12 +110,12 @@ jobs:
               assert marker in s, f'Expected source marker missing: {marker}'
           s = s.replace('version: 0.38.2+110', 'version: 0.38.3+111', 1)
           s = s.replace('  in_app_purchase: ^3.2.3', '  in_app_purchase: ^3.3.1', 1)
-          s = s.replace('  in_app_purchase_android: ^0.4.0', '  in_app_purchase_android: ^0.5.4', 1)
+          s = s.replace('  in_app_purchase_android: ^0.4.0', '  in_app_purchase_android: 0.5.4', 1)
           p.write_text(s)
           PY_BILLING_8
           grep -Fx 'version: 0.38.3+111' "$APP/pubspec.yaml"
           grep -Fx '  in_app_purchase: ^3.3.1' "$APP/pubspec.yaml"
-          grep -Fx '  in_app_purchase_android: ^0.5.4' "$APP/pubspec.yaml"
+          grep -Fx '  in_app_purchase_android: 0.5.4' "$APP/pubspec.yaml"
           grep -F "productId = 'coin_plus'" "$APP/lib/services/coin_boost_subscription.dart"
           grep -F "basePlanId = 'monthly-prepaid'" "$APP/lib/services/coin_boost_subscription.dart"
           if grep -q "_verificationUrl" "$APP/lib/services/coin_boost_subscription.dart"; then exit 1; fi
@@ -268,9 +268,9 @@ jobs:
         working-directory: build_source
         run: |
           set -euo pipefail
-          flutter pub deps --style=compact | grep -F 'in_app_purchase_android 0.5.'
+          flutter pub deps --style=compact | grep -F 'in_app_purchase_android 0.5.4'
           grep -Fx '  in_app_purchase: ^3.3.1' pubspec.yaml
-          grep -Fx '  in_app_purchase_android: ^0.5.4' pubspec.yaml
+          grep -Fx '  in_app_purchase_android: 0.5.4' pubspec.yaml
 
       - name: Ensure a complete Android NDK before Gradle dependency checks
         working-directory: build_source
