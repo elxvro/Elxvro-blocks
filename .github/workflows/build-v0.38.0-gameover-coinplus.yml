@@ -101,6 +101,7 @@ jobs:
           grep -Fx 'version: 0.37.9+107' "$APP/pubspec.yaml"
           base64 -d tools/v0380/gameover-coinplus.patch.gz.b64 | gzip -dc > /tmp/v0380.patch
           patch --batch --fuzz=0 -p1 -d "$APP" < /tmp/v0380.patch
+          patch --batch --fuzz=0 -p1 -d "$APP" < tools/v0380/analyzer-hotfix.patch
           grep -Fx 'version: 0.38.0+108' "$APP/pubspec.yaml"
           test -s "$APP/lib/services/coin_boost_subscription.dart"
           test -s "$APP/lib/widgets/coin_subscription_card.dart"
