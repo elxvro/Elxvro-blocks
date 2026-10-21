@@ -314,6 +314,35 @@ jobs:
             fi
           fi
 
+      - name: Align JNI Flutter plugin with installed Android NDK
+        working-directory: build_source
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+          app = Path('android/app/build.gradle.kts').read_text()
+          match = re.search(r'ndkVersion\\s*=\\s*"([0-9.]+)"', app)
+          if not match:
+              print('App uses Flutter default NDK; no plugin override required')
+              raise SystemExit(0)
+          ndk = match.group(1)
+          cache = Path(os.environ.get('PUB_CACHE') or (Path.home() / '.pub-cache'))
+          updated = []
+          for pattern in ('jni-*/android/build.gradle', 'jni_flutter-*/android/build.gradle'):
+              for path in (cache / 'hosted/pub.dev').glob(pattern):
+                  content = path.read_text()
+                  replacement = content.replace('ndkVersion flutter.ndkVersion',
+                                                f'ndkVersion "{ndk}"')
+                  replacement = replacement.replace('ndkVersion = flutter.ndkVersion',
+                                                    f'ndkVersion = "{ndk}"')
+                  if replacement != content:
+                      path.write_text(replacement)
+                      updated.append(str(path))
+          print(f'Android NDK {ndk} synchronized with JNI plugin: {updated}')
+          PY
+
       - name: Verify resolved Play Services dependency versions
         working-directory: build_source/android
         run: |
