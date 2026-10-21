@@ -133,7 +133,7 @@ jobs:
           cp tools/apply_v0301_performance.py "$APP/tool/apply_v0301_performance.py"
           cp tools/v0297/audit_play_services_bitmap.py "$APP/tool/audit_play_services_bitmap.py"
           cp tools/v0296/verify_system_bar_dex.py "$APP/tool/verify_system_bar_dex.py"
-          grep -Fx 'version: 0.38.2+110' "$APP/pubspec.yaml"
+          grep -Fx 'version: 0.38.3+111' "$APP/pubspec.yaml"
           grep -F 'WindowCompat.setDecorFitsSystemWindows(window, false)' "$APP/tool/apply_android_compat.py"
           test -s "$APP/test/v0375_three_mode_leaderboards_test.dart"
           test -s "$APP/V0375_RELEASE_NOTES.md"
