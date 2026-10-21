@@ -1,0 +1,529 @@
+name: ELXVRO Blocks v0.38.1 Prepaid Support Localization Signed APK AAB
+
+on:
+  push:
+    branches:
+      - feature/v0.38.1-prepaid-l10n-support
+    paths:
+      - "tools/apply_rising_update.py"
+      - "tools/apply_v0311_endless_adventure.py"
+      - "tools/v0313/**"
+      - "tools/v0314/**"
+      - "tools/v0320/**"
+      - "tools/v0321/**"
+      - "tools/v0330/**"
+      - "tools/v0375/**"
+      - "tools/v0376/**"
+      - "tools/v0377/**"
+      - "tools/v0378/**"
+      - "tools/v0379/**"
+      - "tools/v0380/**"
+      - "tools/v0381/**"
+      - "tools/v0337/**"
+      - "tools/v0332/**"
+      - ".github/workflows/build-v0.38.1-prepaid-l10n-support.yml"
+      - "tools/apply_v0312_illustrated_worlds.py"
+      - "tools/v0312/**"
+      - "tools/v0311/**"
+      - "tools/apply_v0301_performance.py"
+      - "tools/v0301/**"
+      - "tools/adventure2/**"
+      - "tools/apply_adventure_gravity_fix.py"
+      - "tools/apply_classic_save_integrity.py"
+      - "tools/v0300/**"
+      - "tools/v0299/**"
+      - "tools/apply_adventure_stability.py"
+      - "tools/apply_play_games_sdk_update.py"
+      - "tools/v0297/**"
+      - "tools/apply_android_compat.py"
+      - "tools/v0296/**"
+      - "tools/v0295/**"
+      - "tools/apply_android_compat.py"
+      - "source_snapshot/lib/screens/falling_blocks_screen.dart"
+      - "source_snapshot/lib/app_state.dart"
+      - "source_snapshot/lib/widgets/weekly_league_card.dart"
+      - "source_snapshot/lib/screens/daily_missions_screen.dart"
+      - "source_snapshot/lib/models/game_theme.dart"
+      - ".github/workflows/build-v0.38.1-prepaid-l10n-support.yml"
+      - ".github/v0287-code/**"
+      - ".github/v0285-code/**"
+      - ".github/v0284-code/**"
+      - ".github/v0283-code/**"
+      - "hosting/**"
+  workflow_dispatch:
+# v0.37.5: three independent real Google Play Games rankings with safe offline behavior.
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: elxvro-blocks-v0381-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter 3.47.4
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.4'
+          channel: stable
+          cache: true
+
+      - name: Restore verified v0.38.1 source
+        uses: actions/download-artifact@v4
+        with:
+          name: ELXVRO-Blocks-v0.38.0-FULL-SOURCE
+          run-id: 39542905363
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: artifact-v0380
+
+      - name: Restore support card, locale and prepaid Coin Plus v0.38.1
+        run: |
+          set -euo pipefail
+          APP=extracted/elxvro-blocks
+          mkdir -p "$APP"
+          unzip -q artifact-v0380/ELXVRO-Blocks-v0.38.0-FULL-SOURCE.zip -d "$APP"
+          grep -Fx 'version: 0.38.0+108' "$APP/pubspec.yaml"
+          base64 -d tools/v0381/prepaid-l10n-support.patch.gz.b64 | gzip -dc > /tmp/v0381.patch
+          patch --batch --fuzz=0 -p1 -d "$APP" < /tmp/v0381.patch
+          grep -Fx 'version: 0.38.1+109' "$APP/pubspec.yaml"
+          test -s "$APP/lib/l10n/extended_ui_translations.dart"
+          test -s "$APP/test/v0381_locale_billing_ui_test.dart"
+          test -s "$APP/lib/widgets/developer_support_card.dart"
+
+      - name: Create complete v0.38.1 source ZIP
+        run: |
+          set -euo pipefail
+          APP=extracted/elxvro-blocks
+          mkdir -p "$APP/.github/workflows"
+          cp .github/workflows/build-v0.38.1-prepaid-l10n-support.yml "$APP/.github/workflows/build-v0.38.1-prepaid-l10n-support.yml"
+          cp -R .github/v0287-code "$APP/.github/"
+          cp tools/apply_android_compat.py "$APP/tool/apply_android_compat.py"
+          cp tools/apply_play_games_sdk_update.py "$APP/tool/apply_play_games_sdk_update.py"
+          cp tools/apply_classic_save_integrity.py "$APP/tool/apply_classic_save_integrity.py"
+          cp tools/apply_v0301_performance.py "$APP/tool/apply_v0301_performance.py"
+          cp tools/v0297/audit_play_services_bitmap.py "$APP/tool/audit_play_services_bitmap.py"
+          cp tools/v0296/verify_system_bar_dex.py "$APP/tool/verify_system_bar_dex.py"
+          grep -Fx 'version: 0.38.1+109' "$APP/pubspec.yaml"
+          grep -F 'WindowCompat.setDecorFitsSystemWindows(window, false)' "$APP/tool/apply_android_compat.py"
+          test -s "$APP/test/v0375_three_mode_leaderboards_test.dart"
+          test -s "$APP/V0375_RELEASE_NOTES.md"
+          rm -f ELXVRO-Blocks-v0.38.1-FULL-SOURCE.zip
+          (
+            cd "$APP"
+            zip -qr ../../ELXVRO-Blocks-v0.38.1-FULL-SOURCE.zip .               -x "build/*" ".dart_tool/*" ".git/*"
+          )
+          unzip -t ELXVRO-Blocks-v0.38.1-FULL-SOURCE.zip >/dev/null
+          rm -rf build_source
+          mkdir build_source
+          unzip -q ELXVRO-Blocks-v0.38.1-FULL-SOURCE.zip -d build_source
+          test -f build_source/pubspec.yaml
+          test -f build_source/lib/app_state.dart
+          test -f build_source/.github/workflows/build-v0.38.1-prepaid-l10n-support.yml
+
+      - name: Upload complete source ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: ELXVRO-Blocks-v0.38.1-FULL-SOURCE
+          path: ELXVRO-Blocks-v0.38.1-FULL-SOURCE.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Generate Android platform
+        working-directory: build_source
+        run: |
+          flutter create \
+            --platforms=android \
+            --org com.elxvro \
+            --project-name elxvro_blocks \
+            .
+
+      - name: Apply Android branding
+        working-directory: build_source
+        run: python tool/apply_android_branding.py
+
+      - name: Configure explicit Android 15/16 edge-to-edge
+        working-directory: build_source
+        run: |
+          python tool/apply_android_compat.py --android .
+          grep -F 'WindowCompat.setDecorFitsSystemWindows(window, false)' android/app/src/main/kotlin/com/elxvro/elxvro_blocks/MainActivity.kt
+          grep -F 'androidx.core:core-ktx:1.17.0' android/app/build.gradle.kts
+          grep -F 'play-services-games-v2:22.1.0' android/app/build.gradle.kts
+          grep -F 'play-services-base:18.11.0' android/app/build.gradle.kts
+          grep -F 'play-services-basement:18.12.0' android/app/build.gradle.kts
+
+      - name: Install native atomic adventure save channel
+        working-directory: build_source
+        run: |
+          python tool/install_animal_save_channel.py .
+          grep -F 'com.elxvro.blocks/animal_save' android/app/src/main/kotlin/com/elxvro/elxvro_blocks/MainActivity.kt
+
+      - name: Install isolated worlds native coin and progress channel
+        working-directory: build_source
+        run: |
+          python tool/install_world_save_channel.py .
+          grep -F '"saveWorldWin" ->' android/app/src/main/kotlin/com/elxvro/elxvro_blocks/MainActivity.kt
+
+      - name: Configure live Play Games app id
+        working-directory: build_source
+        env:
+          PG_APP_ID: '227765065065'
+        run: |
+          set -euo pipefail
+          mkdir -p android/app/src/main/res/values
+          cat > android/app/src/main/res/values/elxvro_play_games.xml <<EOF
+          <resources>
+              <string name="elxvro_play_games_app_id" translatable="false">${PG_APP_ID}</string>
+          </resources>
+          EOF
+          python - <<'PY'
+          from pathlib import Path
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          text = manifest.read_text()
+          needle = '</application>'
+          meta = '        <meta-data android:name="com.google.android.gms.games.APP_ID" android:value="@string/elxvro_play_games_app_id" />\n'
+          if text.count(needle) != 1:
+              raise SystemExit('AndroidManifest application anchor mismatch')
+          if 'com.google.android.gms.games.APP_ID' not in text:
+              text = text.replace(needle, meta + '    ' + needle, 1)
+          manifest.write_text(text)
+          PY
+          grep -F '227765065065' android/app/src/main/res/values/elxvro_play_games.xml
+          grep -F 'com.google.android.gms.games.APP_ID' android/app/src/main/AndroidManifest.xml
+
+      - name: Configure Android engagement notifications
+        working-directory: build_source
+        run: |
+          python tool/configure_engagement_notifications.py
+          grep -F 'isCoreLibraryDesugaringEnabled = true' android/app/build.gradle.kts
+          grep -F 'ScheduledNotificationReceiver' android/app/src/main/AndroidManifest.xml
+
+      - name: Configure mandatory release signing
+        working-directory: build_source
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ELXVRO_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ELXVRO_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ELXVRO_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ELXVRO_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "::error::Release signing secrets are missing."
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > android/app/elxvro-release.jks
+          keytool -list \
+            -keystore android/app/elxvro-release.jks \
+            -alias "$KEY_ALIAS" \
+            -storepass "$KEYSTORE_PASSWORD" \
+            >/dev/null
+          keytool -list -v \
+            -keystore android/app/elxvro-release.jks \
+            -alias "$KEY_ALIAS" \
+            -storepass "$KEYSTORE_PASSWORD" \
+            | grep -E 'SHA1:|SHA-1:' || true
+          {
+            printf 'storePassword=%s\n' "$KEYSTORE_PASSWORD"
+            printf 'keyPassword=%s\n' "$KEY_PASSWORD"
+            printf 'keyAlias=%s\n' "$KEY_ALIAS"
+            printf 'storeFile=elxvro-release.jks\n'
+          } > android/key.properties
+          python tool/configure_release_signing.py
+          echo 'RELEASE_SIGNING_CONFIGURED=true' >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        working-directory: build_source
+        run: flutter pub get
+
+      - name: Ensure a complete Android NDK before Gradle dependency checks
+        working-directory: build_source
+        run: |
+          set -euo pipefail
+          NDK_REQUIRED=28.2.13676358
+          VALID_NDK="$ANDROID_HOME/ndk/$NDK_REQUIRED/source.properties"
+          if [ -f "$VALID_NDK" ]; then
+            echo "Using preinstalled NDK $NDK_REQUIRED"
+          else
+            echo "::warning::Required NDK incomplete; checking installed side-by-side versions"
+            VALID_ALTERNATIVE="$(find "$ANDROID_HOME/ndk" -mindepth 2 -maxdepth 2 -name source.properties -type f 2>/dev/null | sort -V | tail -1 || true)"
+            if [ -n "$VALID_ALTERNATIVE" ]; then
+              ALTERNATIVE_VERSION="$(basename "$(dirname "$VALID_ALTERNATIVE")")"
+              echo "Using installed NDK $ALTERNATIVE_VERSION instead of auto-downloading a broken version"
+              python - "$ALTERNATIVE_VERSION" <<'PY_NDK'
+          from pathlib import Path
+          import sys
+          p=Path('android/app/build.gradle.kts')
+          s=p.read_text()
+          assert 'ndkVersion = flutter.ndkVersion' in s, 'NDK version anchor missing'
+          p.write_text(s.replace('ndkVersion = flutter.ndkVersion',
+                                 'ndkVersion = "' + sys.argv[1] + '"'))
+          PY_NDK
+            else
+              SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | sort -V | tail -1)"
+              test -x "$SDKMANAGER"
+              for attempt in 1 2 3; do
+                echo "NDK install attempt $attempt"
+                yes | timeout 210s "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --install "ndk;$NDK_REQUIRED" || true
+                if [ -f "$VALID_NDK" ]; then break; fi
+                sleep 7
+              done
+              test -f "$VALID_NDK" || { echo "::error::Android NDK could not be installed"; exit 1; }
+            fi
+          fi
+
+      - name: Verify resolved Play Services dependency versions
+        working-directory: build_source/android
+        run: |
+          set -euo pipefail
+          ./gradlew :app:dependencies --configuration releaseRuntimeClasspath > /tmp/elxvro-gradle-dependencies.txt
+          grep -F 'play-services-games-v2:22.1.0' /tmp/elxvro-gradle-dependencies.txt
+          grep -F 'play-services-base:18.11.0' /tmp/elxvro-gradle-dependencies.txt
+          grep -F 'play-services-basement:18.12.0' /tmp/elxvro-gradle-dependencies.txt
+
+      - name: Download audio from verified v0.37.9 signed build
+        uses: actions/download-artifact@v4
+        with:
+          name: ELXVRO-Blocks-v0.37.9-APK-AAB
+          run-id: 39537429906
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: verified-audio-build
+
+      - name: Reuse verified CC0 material sound and music assets
+        run: |
+          set -euo pipefail
+          test -s verified-audio-build/ELXVRO-Blocks-v0.37.9-SIGNED.apk
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          apk = Path('verified-audio-build/ELXVRO-Blocks-v0.37.9-SIGNED.apk')
+          dest = Path('build_source/assets/audio')
+          dest.mkdir(parents=True, exist_ok=True)
+          prefix = 'assets/flutter_assets/assets/audio/'
+          with ZipFile(apk) as z:
+              items = [n for n in z.namelist() if n.startswith(prefix) and not n.endswith('/')]
+              assert len(items) >= 65, f'Expected original game audio, found {len(items)}'
+              for item in items:
+                  basename = item[len(prefix):]
+                  assert '/' not in basename and basename not in ('.','..')
+                  (dest / basename).write_bytes(z.read(item))
+          required = [
+            'glass_place_v1.wav', 'stone_clear_v1.wav',
+            'cc0_glass_break.wav', 'cc0_wood_break.wav', 'cc0_stone_break.wav',
+            'pro_glass_break.wav', 'menu_fun_v1.wav', 'firework_combo_v1.wav',
+            'bgm_magic_puzzle.ogg', 'bgm_cozy_title.ogg',
+            'cozy_puzzle_music.ogg', 'AUDIO_LICENSES_v0230.txt',
+          ]
+          assert all((dest / name).stat().st_size > 0 for name in required)
+          print(f'Restored {len(items)} verified signed release audio files')
+          PY
+          test -s build_source/assets/audio/REAL_AUDIO_BUILD.txt
+
+      - name: Generate launcher icon and splash
+        working-directory: build_source
+        run: |
+          dart run flutter_launcher_icons
+          dart run flutter_native_splash:create
+
+      - name: Analyze
+        working-directory: build_source
+        run: flutter analyze
+
+      - name: Test
+        working-directory: build_source
+        run: |
+          set -euo pipefail
+          timeout 180s flutter test --reporter expanded --concurrency=1
+
+      - name: Second independent Flutter analysis
+        working-directory: build_source
+        run: flutter analyze
+
+      - name: Second complete regression test pass
+        working-directory: build_source
+        run: timeout 180s flutter test --reporter expanded --concurrency=1
+
+      - name: Verify one-time developer support
+        working-directory: build_source
+        run: |
+          set -euo pipefail
+          grep -F 'in_app_purchase:' pubspec.yaml
+          test -f lib/services/developer_support_service.dart
+          test -f lib/widgets/developer_support_card.dart
+          ! grep -q 'google_sign_in:' pubspec.yaml
+          ! grep -q 'in_app_purchase_android:' pubspec.yaml
+
+      - name: Build signed release APK
+        working-directory: build_source
+        env:
+          PG_CLASSIC: 'CgkI6arsvtAGEAIQAw'
+          PG_RUSH: ''
+          PG_ADVENTURE: ''
+          PG_FALLING: 'CgkI6arsvtAGEAIQAg'
+          PG_WORLD: 'CgkI6arsvtAGEAIQBA'
+          ACH_FIRST: ${{ secrets.ELXVRO_PG_ACH_FIRST_GAME }}
+          ACH_SCORE_1000: ${{ secrets.ELXVRO_PG_ACH_SCORE_1000 }}
+          ACH_COMBO_3: ${{ secrets.ELXVRO_PG_ACH_COMBO_3 }}
+          ACH_LINES_25: ${{ secrets.ELXVRO_PG_ACH_LINES_25 }}
+          ACH_GAMES_10: ${{ secrets.ELXVRO_PG_ACH_GAMES_10 }}
+          ACH_BLOCKS_250: ${{ secrets.ELXVRO_PG_ACH_BLOCKS_250 }}
+          ACH_SCORE_10000: ${{ secrets.ELXVRO_PG_ACH_SCORE_10000 }}
+          ACH_LEVEL_5: ${{ secrets.ELXVRO_PG_ACH_LEVEL_5 }}
+          ACH_PERFECT_3: ${{ secrets.ELXVRO_PG_ACH_PERFECT_3 }}
+          ACH_LEVEL_15: ${{ secrets.ELXVRO_PG_ACH_LEVEL_15 }}
+          ELXVRO_SUBSCRIPTION_VERIFY_URL: ${{ vars.ELXVRO_SUBSCRIPTION_VERIFY_URL }}
+          ELXVRO_PREPAID_PLAN_APPROVED: ${{ vars.ELXVRO_PREPAID_PLAN_APPROVED }}
+        run: |
+          test "$RELEASE_SIGNING_CONFIGURED" = "true"
+          flutter build apk --release --obfuscate --split-debug-info=build/symbols/apk \
+            --dart-define="ELXVRO_SUBSCRIPTION_VERIFY_URL=${ELXVRO_SUBSCRIPTION_VERIFY_URL:-}" \
+            --dart-define="ELXVRO_PREPAID_PLAN_APPROVED=${ELXVRO_PREPAID_PLAN_APPROVED:-false}" \
+            --dart-define="ELXVRO_PG_CLASSIC_LEADERBOARD_ID=${PG_CLASSIC}" \
+            --dart-define="ELXVRO_PG_COMBO_RUSH_LEADERBOARD_ID=${PG_RUSH}" \
+            --dart-define="ELXVRO_PG_ADVENTURE_LEADERBOARD_ID=${PG_ADVENTURE:-}" \
+            --dart-define="ELXVRO_PG_FALLING_BLOCKS_LEADERBOARD_ID=${PG_FALLING:-}" \
+            --dart-define="ELXVRO_PG_WORLD_ADVENTURE_LEADERBOARD_ID=${PG_WORLD:-}" \
+            --dart-define="ELXVRO_PG_ACH_FIRST_GAME=${ACH_FIRST:-}" \
+            --dart-define="ELXVRO_PG_ACH_SCORE_1000=${ACH_SCORE_1000:-}" \
+            --dart-define="ELXVRO_PG_ACH_COMBO_3=${ACH_COMBO_3:-}" \
+            --dart-define="ELXVRO_PG_ACH_LINES_25=${ACH_LINES_25:-}" \
+            --dart-define="ELXVRO_PG_ACH_GAMES_10=${ACH_GAMES_10:-}" \
+            --dart-define="ELXVRO_PG_ACH_BLOCKS_250=${ACH_BLOCKS_250:-}" \
+            --dart-define="ELXVRO_PG_ACH_SCORE_10000=${ACH_SCORE_10000:-}" \
+            --dart-define="ELXVRO_PG_ACH_LEVEL_5=${ACH_LEVEL_5:-}" \
+            --dart-define="ELXVRO_PG_ACH_PERFECT_3=${ACH_PERFECT_3:-}" \
+            --dart-define="ELXVRO_PG_ACH_LEVEL_15=${ACH_LEVEL_15:-}"
+
+      - name: Inspect actual Android APK for bundled material graphics
+        run: |
+          set -euo pipefail
+          APK=build_source/build/app/outputs/flutter-apk/app-release.apk
+          unzip -Z1 "$APK" > /tmp/packed-apk-entries.txt
+          for name in glass crystal marble stone wood leaf; do
+            grep -Fx "assets/flutter_assets/assets/images/material_tiles/palette_${name}.webp" /tmp/packed-apk-entries.txt
+            for i in 0 1 2 3 4; do
+              grep -Fx "assets/flutter_assets/assets/images/material_shards/${name}_${i}.webp" /tmp/packed-apk-entries.txt
+            done
+          done
+          echo "Verified six face bitmaps and thirty material fragment assets inside signed APK"
+          # Crystal animal sprites must ship in the signed install.
+          for animal in fox rabbit frog owl panda wolf; do
+            grep -Fx "assets/flutter_assets/assets/images/animal_gems/${animal}.png" /tmp/packed-apk-entries.txt
+          done
+          # Removed Adventure world and battle images must be absent.
+          ! grep -F 'assets/images/adventure_worlds/' /tmp/packed-apk-entries.txt
+          ! grep -F 'assets/images/adventure_battles/' /tmp/packed-apk-entries.txt
+
+      - name: Verify compiled MainActivity avoids deprecated bar colors
+        working-directory: build_source
+        run: |
+          python tool/verify_system_bar_dex.py build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Audit Play Services BitmapFactory loader in compiled APK
+        working-directory: build_source
+        run: python tool/audit_play_services_bitmap.py build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Independent second-pass source and regression verification
+        working-directory: build_source
+        run: |
+          set -euo pipefail
+          flutter analyze --no-pub
+          flutter test --no-pub --concurrency=1
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('lib/screens/falling_blocks_screen.dart').read_text()
+          assert 'RepaintBoundary(' in s
+          assert 'onPanCancel: _onPanCancel' in s
+          assert 'version: 0.38.1+109' in Path('pubspec.yaml').read_text()
+          assert Path('lib/game/animal_match_engine.dart').is_file()
+          assert Path('lib/game/falling_piece_bag.dart').is_file()
+          assert Path('lib/services/animal_match_progress.dart').is_file()
+          assert len(list(Path('assets/images/animal_gems').glob('*.png'))) == 6
+          PY
+
+      - name: Build signed Google Play AAB
+        working-directory: build_source
+        env:
+          PG_CLASSIC: 'CgkI6arsvtAGEAIQAw'
+          PG_RUSH: ''
+          PG_ADVENTURE: ''
+          PG_FALLING: 'CgkI6arsvtAGEAIQAg'
+          PG_WORLD: 'CgkI6arsvtAGEAIQBA'
+          ACH_FIRST: ${{ secrets.ELXVRO_PG_ACH_FIRST_GAME }}
+          ACH_SCORE_1000: ${{ secrets.ELXVRO_PG_ACH_SCORE_1000 }}
+          ACH_COMBO_3: ${{ secrets.ELXVRO_PG_ACH_COMBO_3 }}
+          ACH_LINES_25: ${{ secrets.ELXVRO_PG_ACH_LINES_25 }}
+          ACH_GAMES_10: ${{ secrets.ELXVRO_PG_ACH_GAMES_10 }}
+          ACH_BLOCKS_250: ${{ secrets.ELXVRO_PG_ACH_BLOCKS_250 }}
+          ACH_SCORE_10000: ${{ secrets.ELXVRO_PG_ACH_SCORE_10000 }}
+          ACH_LEVEL_5: ${{ secrets.ELXVRO_PG_ACH_LEVEL_5 }}
+          ACH_PERFECT_3: ${{ secrets.ELXVRO_PG_ACH_PERFECT_3 }}
+          ACH_LEVEL_15: ${{ secrets.ELXVRO_PG_ACH_LEVEL_15 }}
+          ELXVRO_SUBSCRIPTION_VERIFY_URL: ${{ vars.ELXVRO_SUBSCRIPTION_VERIFY_URL }}
+          ELXVRO_PREPAID_PLAN_APPROVED: ${{ vars.ELXVRO_PREPAID_PLAN_APPROVED }}
+        run: |
+          test "$RELEASE_SIGNING_CONFIGURED" = "true"
+          flutter build appbundle --release --obfuscate --split-debug-info=build/symbols/aab \
+            --dart-define="ELXVRO_SUBSCRIPTION_VERIFY_URL=${ELXVRO_SUBSCRIPTION_VERIFY_URL:-}" \
+            --dart-define="ELXVRO_PREPAID_PLAN_APPROVED=${ELXVRO_PREPAID_PLAN_APPROVED:-false}" \
+            --dart-define="ELXVRO_PG_CLASSIC_LEADERBOARD_ID=${PG_CLASSIC}" \
+            --dart-define="ELXVRO_PG_COMBO_RUSH_LEADERBOARD_ID=${PG_RUSH}" \
+            --dart-define="ELXVRO_PG_ADVENTURE_LEADERBOARD_ID=${PG_ADVENTURE:-}" \
+            --dart-define="ELXVRO_PG_FALLING_BLOCKS_LEADERBOARD_ID=${PG_FALLING:-}" \
+            --dart-define="ELXVRO_PG_WORLD_ADVENTURE_LEADERBOARD_ID=${PG_WORLD:-}" \
+            --dart-define="ELXVRO_PG_ACH_FIRST_GAME=${ACH_FIRST:-}" \
+            --dart-define="ELXVRO_PG_ACH_SCORE_1000=${ACH_SCORE_1000:-}" \
+            --dart-define="ELXVRO_PG_ACH_COMBO_3=${ACH_COMBO_3:-}" \
+            --dart-define="ELXVRO_PG_ACH_LINES_25=${ACH_LINES_25:-}" \
+            --dart-define="ELXVRO_PG_ACH_GAMES_10=${ACH_GAMES_10:-}" \
+            --dart-define="ELXVRO_PG_ACH_BLOCKS_250=${ACH_BLOCKS_250:-}" \
+            --dart-define="ELXVRO_PG_ACH_SCORE_10000=${ACH_SCORE_10000:-}" \
+            --dart-define="ELXVRO_PG_ACH_LEVEL_5=${ACH_LEVEL_5:-}" \
+            --dart-define="ELXVRO_PG_ACH_PERFECT_3=${ACH_PERFECT_3:-}" \
+            --dart-define="ELXVRO_PG_ACH_LEVEL_15=${ACH_LEVEL_15:-}"
+
+      - name: Prepare APK and AAB package
+        run: |
+          set -euo pipefail
+          APK="build_source/build/app/outputs/flutter-apk/app-release.apk"
+          AAB="build_source/build/app/outputs/bundle/release/app-release.aab"
+          test -s "$APK"
+          test -s "$AAB"
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --verbose "$APK"
+          jarsigner -verify "$AAB"
+          cp "$APK" ELXVRO-Blocks-v0.38.1-SIGNED.apk
+          cp "$AAB" ELXVRO-Blocks-v0.38.1-GOOGLE-PLAY.aab
+          sha256sum ELXVRO-Blocks-v0.38.1-SIGNED.apk > ELXVRO-Blocks-v0.38.1-SIGNED.apk.sha256
+          sha256sum ELXVRO-Blocks-v0.38.1-GOOGLE-PLAY.aab > ELXVRO-Blocks-v0.38.1-GOOGLE-PLAY.aab.sha256
+          mkdir -p ELXVRO-Blocks-v0.38.1-APK-AAB
+          cp ELXVRO-Blocks-v0.38.1-SIGNED.apk* ELXVRO-Blocks-v0.38.1-APK-AAB/
+          cp ELXVRO-Blocks-v0.38.1-GOOGLE-PLAY.aab* ELXVRO-Blocks-v0.38.1-APK-AAB/
+          cp ELXVRO-Blocks-v0.38.1-FULL-SOURCE.zip ELXVRO-Blocks-v0.38.1-APK-AAB/
+          ls -lh ELXVRO-Blocks-v0.38.1-APK-AAB/
+
+      - name: Upload APK and AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: ELXVRO-Blocks-v0.38.1-APK-AAB
+          path: ELXVRO-Blocks-v0.38.1-APK-AAB/
+          if-no-files-found: error
+          retention-days: 14
+# ELXVRO Crystal Animal Match-3 300 stage release
+
+# Adventure 2.0 preserves themes and player data; two analysis/test passes before Google Play bundle.
