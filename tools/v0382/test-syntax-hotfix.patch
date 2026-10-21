@@ -1,0 +1,11 @@
+--- a/test/v0382_coin_plus_billing_test.dart
++++ b/test/v0382_coin_plus_billing_test.dart
+@@ -16,7 +16,7 @@
+     expect(code, contains('Timer.periodic(const Duration(minutes: 2)'));
+     expect(code, contains('isAutoRenewing'));
+     expect(code, contains('pendingCompletePurchase'));
+-    expect(code, isNot(contains('DateTime.now().add(const Duration(days: 30))'));
++    expect(code, isNot(contains('DateTime.now().add(const Duration(days: 30))')));
+     expect(code, isNot(contains('SharedPreferences')));
+     expect(code, isNot(contains('HttpClient')));
+   });
