@@ -112,6 +112,13 @@ jobs:
           s = s.replace('  in_app_purchase: ^3.2.3', '  in_app_purchase: ^3.3.1', 1)
           s = s.replace('  in_app_purchase_android: ^0.4.0', '  in_app_purchase_android: 0.5.4', 1)
           p.write_text(s)
+          # Keep explicit version assertions in historical regression tests
+          # consistent with the new, higher Play Console versionCode.
+          for test_file in Path('extracted/elxvro-blocks/test').rglob('*.dart'):
+              test_text = test_file.read_text()
+              if 'version: 0.38.2+110' in test_text:
+                  test_file.write_text(test_text.replace(
+                      'version: 0.38.2+110', 'version: 0.38.3+111'))
           PY_BILLING_8
           grep -Fx 'version: 0.38.3+111' "$APP/pubspec.yaml"
           grep -Fx '  in_app_purchase: ^3.3.1' "$APP/pubspec.yaml"
