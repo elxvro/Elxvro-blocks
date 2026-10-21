@@ -99,6 +99,16 @@ jobs:
           base64 -d tools/v0377/engagement-upgrade.patch.gz.b64 | gzip -dc > /tmp/v0377.patch
           patch --batch -p1 -d "$APP" < /tmp/v0377.patch
           patch --batch -p1 -d "$APP" < tools/v0377/fix-analyzer.patch
+          # Old regression tests must validate the upgraded version and score API.
+          python - <<'PYTESTS'
+          from pathlib import Path
+          for test in Path('extracted/elxvro-blocks/test').rglob('*.dart'):
+              old = test.read_text()
+              new = old.replace('version: 0.37.6+104', 'version: 0.37.7+105')
+              new = new.replace('recordFallingBlocksScore(_score)', 'recordFallingBlocksScore(_score, clearedLines: _lines)')
+              if old != new:
+                  test.write_text(new)
+          PYTESTS
           grep -Fx 'version: 0.37.7+105' "$APP/pubspec.yaml"
           test -s "$APP/lib/services/engagement_center.dart"
           test -s "$APP/lib/screens/engagement_hub_screen.dart"
