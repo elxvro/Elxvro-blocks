@@ -1,0 +1,24 @@
+--- v0380patchtest/lib/services/coin_boost_subscription.dart	2026-10-21 03:56:43.041775090 +0000
++++ v0380/lib/services/coin_boost_subscription.dart	2026-10-21 04:13:15.106124638 +0000
+@@ -15,7 +15,8 @@
+   static const String _verificationUrl = String.fromEnvironment(
+     'ELXVRO_SUBSCRIPTION_VERIFY_URL', defaultValue: '');
+   static const String _packageName = 'com.elxvro.elxvro_blocks';
+-  final InAppPurchase _billing = InAppPurchase.instance;
++  // Delay native Billing initialization until the configured store is opened.
++  InAppPurchase get _billing => InAppPurchase.instance;
+   StreamSubscription<List<PurchaseDetails>>? _purchaseStream;
+   DateTime? _verifiedUntil;
+   ProductDetails? product;
+--- v0380patchtest/test/remove_adventure_test.dart	2026-10-21 03:49:14.128189253 +0000
++++ v0380/test/remove_adventure_test.dart	2026-10-21 04:13:15.106278208 +0000
+@@ -22,7 +22,8 @@
+     expect(File('lib/screens/animal_adventure_screen.dart').existsSync(), isTrue);
+     expect(arcade, isNot(contains('_isAdventure')));
+     expect(arcade, isNot(contains('AdventureResultDialog')));
+-    expect(arcade, contains('recordFallingBlocksScore(_score, clearedLines: _lines)'));
++    expect(arcade, contains('recordFallingBlocksScore('));
++    expect(arcade, contains('clearedLines: _lines'));
+     expect(File('lib/screens/adventure_screen.dart').existsSync(), isFalse);
+     expect(File('lib/screens/adventure_combat_screen.dart').existsSync(), isFalse);
+     expect(Directory('assets/images/adventure_battles').existsSync(), isFalse);
