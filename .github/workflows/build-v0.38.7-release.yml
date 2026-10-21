@@ -64,6 +64,20 @@ jobs:
           test -s build_source/tool/apply_native_play_games.py
           test -s build_source/test/v0387_release_regression_test.dart
           ! grep -Fq 'if (GamesServices.isSignedIn)' build_source/lib/services/play_games_service.dart
+          # Update seven historical version-only assertions; preserve all gameplay checks.
+          python - <<'PY_VERSION_TESTS'
+          from pathlib import Path
+          expected = "version: 0.38.4+112"
+          current = "version: 0.38.7+115"
+          changed = []
+          for f in sorted(Path('build_source/test').glob('*.dart')):
+              data = f.read_text()
+              if expected in data:
+                  f.write_text(data.replace(expected, current))
+                  changed.append(f.name)
+          assert len(changed) == 7, f'Expected 7 version fixtures, got {changed}'
+          print('Updated version assertions in:', ', '.join(changed))
+          PY_VERSION_TESTS
 
       - name: Retrieve most recent verified signed audio assets
         uses: actions/download-artifact@v4
