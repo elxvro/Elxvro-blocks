@@ -25,6 +25,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Confirm SHA-1 certificate parser on Android V2 signer format
+        run: |
+          set -euo pipefail
+          TEST_SHA1="$(printf '%s\\n' 'V2 Signer: certificate SHA-1 digest: da2459cf2dd472aa6df81a59b3c7a45683b6fb36' | awk -F ': ' '/certificate SHA-1 digest:/ { print tolower($NF) }' | head -1 | tr -cd '[:xdigit:]' | tr '[:upper:]' '[:lower:]')"
+          test "$TEST_SHA1" = 'da2459cf2dd472aa6df81a59b3c7a45683b6fb36'
+
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
@@ -483,7 +489,7 @@ jobs:
           # Android build-tools may include ':' separators in SHA-1 output.
           # Normalize hex formatting, but never bypass a certificate mismatch.
           "$APKSIGNER" verify --print-certs "$APK"
-          ACTUAL_SHA1=$("$APKSIGNER" verify --print-certs "$APK" | awk -F ': ' '/certificate SHA-1 digest:/ { print tolower($2) }' | head -1 | tr -cd '[:xdigit:]' | tr '[:upper:]' '[:lower:]')
+          ACTUAL_SHA1=$("$APKSIGNER" verify --print-certs "$APK" | awk -F ': ' '/certificate SHA-1 digest:/ { print tolower($NF) }' | head -1 | tr -cd '[:xdigit:]' | tr '[:upper:]' '[:lower:]')
           echo "Expected signing certificate SHA-1: $EXPECTED_SHA1"
           echo "Actual signing certificate SHA-1:   $ACTUAL_SHA1"
           test ${#ACTUAL_SHA1} -eq 40 || { echo "::error::APK SHA-1 certificate extraction failed"; exit 1; }
