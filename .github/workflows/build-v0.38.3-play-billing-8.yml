@@ -3,7 +3,7 @@ name: ELXVRO Blocks v0.38.3 Play Billing 8 Signed APK AAB
 on:
   push:
     branches:
-      - feature/v0.38.3-serverless-coin-plus
+      - feature/v0.38.3-play-billing-8
     paths:
       - "tools/apply_rising_update.py"
       - "tools/apply_v0311_endless_adventure.py"
@@ -23,7 +23,7 @@ on:
       - "tools/v0383/**"
       - "tools/v0337/**"
       - "tools/v0332/**"
-      - ".github/workflows/build-v0.38.3-serverless-coin-plus.yml"
+      - ".github/workflows/build-v0.38.3-play-billing-8.yml"
       - "tools/apply_v0312_illustrated_worlds.py"
       - "tools/v0312/**"
       - "tools/v0311/**"
@@ -46,7 +46,7 @@ on:
       - "source_snapshot/lib/widgets/weekly_league_card.dart"
       - "source_snapshot/lib/screens/daily_missions_screen.dart"
       - "source_snapshot/lib/models/game_theme.dart"
-      - ".github/workflows/build-v0.38.3-serverless-coin-plus.yml"
+      - ".github/workflows/build-v0.38.3-play-billing-8.yml"
       - ".github/v0287-code/**"
       - ".github/v0285-code/**"
       - ".github/v0284-code/**"
@@ -136,7 +136,7 @@ jobs:
           set -euo pipefail
           APP=extracted/elxvro-blocks
           mkdir -p "$APP/.github/workflows"
-          cp .github/workflows/build-v0.38.3-serverless-coin-plus.yml "$APP/.github/workflows/build-v0.38.3-serverless-coin-plus.yml"
+          cp .github/workflows/build-v0.38.3-play-billing-8.yml "$APP/.github/workflows/build-v0.38.3-play-billing-8.yml"
           cp -R .github/v0287-code "$APP/.github/"
           cp tools/apply_android_compat.py "$APP/tool/apply_android_compat.py"
           cp tools/apply_play_games_sdk_update.py "$APP/tool/apply_play_games_sdk_update.py"
@@ -159,7 +159,7 @@ jobs:
           unzip -q ELXVRO-Blocks-v0.38.3-FULL-SOURCE.zip -d build_source
           test -f build_source/pubspec.yaml
           test -f build_source/lib/app_state.dart
-          test -f build_source/.github/workflows/build-v0.38.3-serverless-coin-plus.yml
+          test -f build_source/.github/workflows/build-v0.38.3-play-billing-8.yml
 
       - name: Upload complete source ZIP
         uses: actions/upload-artifact@v4
@@ -324,8 +324,8 @@ jobs:
           grep -F 'play-services-base:18.11.0' /tmp/elxvro-gradle-dependencies.txt
           grep -F 'play-services-basement:18.12.0' /tmp/elxvro-gradle-dependencies.txt
           echo 'Verifying resolved Google Play Billing Library is 8.0.0'
-          grep -E 'com\\.android\\.billingclient:billing:8\\.0\\.0' /tmp/elxvro-gradle-dependencies.txt
-          if grep -E 'com\\.android\\.billingclient:billing:7\\.' /tmp/elxvro-gradle-dependencies.txt; then
+          grep -F 'com.android.billingclient:billing:8.0.0' /tmp/elxvro-gradle-dependencies.txt
+          if grep -F 'com.android.billingclient:billing:7.' /tmp/elxvro-gradle-dependencies.txt; then
             echo "::error::Old Play Billing 7.x is still resolved"
             exit 1
           fi
