@@ -1,0 +1,38 @@
+--- a/lib/widgets/premium_background.dart
++++ b/lib/widgets/premium_background.dart
+@@ -38,6 +38,17 @@
+   }
+ 
+   @override
++  void didChangeDependencies() {
++    super.didChangeDependencies();
++    // Pause only the decorative painter; never silence the game's tickers.
++    if (MediaQuery.of(context).disableAnimations) {
++      _rainController.stop();
++    } else if (!_rainController.isAnimating) {
++      _rainController.repeat();
++    }
++  }
++
++  @override
+   void dispose() {
+     _rainController.dispose();
+     super.dispose();
+@@ -53,7 +64,7 @@
+           colors: <Color>[widget.top, widget.bottom],
+         ),
+       ),
+-      child: TickerMode(enabled: !MediaQuery.of(context).disableAnimations, child: Stack(
++      child: Stack(
+         fit: StackFit.expand,
+         children: <Widget>[
+           if (!MediaQuery.of(context).disableAnimations) IgnorePointer(
+@@ -73,7 +84,7 @@
+           if (!MediaQuery.of(context).disableAnimations) IgnorePointer(child: _AmbientGlow(accent: widget.accent)),
+           widget.child,
+         ],
+-      )),
++      ),
+     );
+   }
+ }
