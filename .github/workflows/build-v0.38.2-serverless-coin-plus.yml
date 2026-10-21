@@ -103,6 +103,7 @@ jobs:
           grep -Fx 'version: 0.38.1+109' "$APP/pubspec.yaml"
           base64 -d tools/v0382/serverless-prepaid.patch.gz.b64 | gzip -dc > /tmp/v0382.patch
           patch --batch --fuzz=0 -p1 -d "$APP" < /tmp/v0382.patch
+          patch --batch --fuzz=0 -p1 -d "$APP" < tools/v0382/test-syntax-hotfix.patch
           grep -Fx 'version: 0.38.2+110' "$APP/pubspec.yaml"
           test -s "$APP/test/v0382_coin_plus_billing_test.dart"
           grep -F "productId = 'coin_plus'" "$APP/lib/services/coin_boost_subscription.dart"
