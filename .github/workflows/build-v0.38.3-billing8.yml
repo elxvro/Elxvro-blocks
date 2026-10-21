@@ -316,7 +316,7 @@ jobs:
           grep -F 'play-services-games-v2:22.1.0' /tmp/elxvro-gradle-dependencies.txt
           grep -F 'play-services-base:18.11.0' /tmp/elxvro-gradle-dependencies.txt
           grep -F 'play-services-basement:18.12.0' /tmp/elxvro-gradle-dependencies.txt
-          grep -E 'com\\.android\\.billingclient:billing:8\\.[0-9.]+' /tmp/elxvro-gradle-dependencies.txt
+          grep -F 'com.android.billingclient:billing:8.' /tmp/elxvro-gradle-dependencies.txt
 
       - name: Download audio from verified v0.37.9 signed build
         uses: actions/download-artifact@v4
