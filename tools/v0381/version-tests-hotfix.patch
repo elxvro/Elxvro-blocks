@@ -28,55 +28,58 @@
 +  expect(support, contains('Version: 0.38.1 (109)'));
    expect(File('lib/app_state.dart').readAsStringSync(),contains('Future<bool> buyUndoPack()'));
   });
+ }
 --- a/test/play_games_sdk_regression_test.dart
 +++ b/test/play_games_sdk_regression_test.dart
 @@ -7,7 +7,7 @@
-     final pubspec = File('pubspec.yaml').readAsStringSync();
-     final manifest = File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
- 
+     final gradle = File('android/app/build.gradle.kts').readAsStringSync();
+     expect(pubspec, contains('games_services: 5.3.0'));
+     expect(pubspec, contains('games_services_platform_interface: 5.3.0'));
 -    expect(pubspec, contains('version: 0.38.0+108'));
 +    expect(pubspec, contains('version: 0.38.1+109'));
-     expect(pubspec, contains('games_services: ^4.1.1'));
-     expect(manifest, contains('com.google.android.gms.games.APP_ID'));
-     expect(manifest, contains('com.google.android.gms.games.APP_ID'));
+     expect(gradle, contains('play-services-games-v2:22.1.0'));
+     expect(gradle, contains('play-services-base:18.11.0'));
+     expect(gradle, contains('play-services-basement:18.12.0'));
 --- a/test/v0372_classic_theme_restoration_test.dart
 +++ b/test/v0372_classic_theme_restoration_test.dart
 @@ -13,7 +13,7 @@
-     final pubspec = File('pubspec.yaml').readAsStringSync();
-     final theme = File('lib/models/game_theme.dart').readAsStringSync();
- 
+     final pubspec = File('${root.path}/pubspec.yaml').readAsStringSync();
+     expect(main, contains('home: MainHubScreen(appState: widget.appState)'));
+     expect(main, isNot(contains('PremiumNavigationShell')));
 -    expect(pubspec, contains('version: 0.38.0+108'));
 +    expect(pubspec, contains('version: 0.38.1+109'));
-     expect(theme, contains('classicMetal'));
-     expect(theme, contains('classicMetal'));
-     expect(File('lib/screens/game_screen.dart').existsSync(), isTrue);
+     expect(File('${root.path}/lib/screens/animal_adventure_screen.dart').existsSync(), isTrue);
+     expect(File('${root.path}/lib/services/world_match_progress.dart').existsSync(), isTrue);
+     expect(File('${root.path}/tool/install_animal_save_channel.py').existsSync(), isTrue);
 --- a/test/v0373_play_console_checks_test.dart
 +++ b/test/v0373_play_console_checks_test.dart
 @@ -4,7 +4,7 @@
  void main() {
-   test('Play Console build config is ready for 3 independent rankings', () {
+   test('release has a monotonic Play version and keeps the original app id', () {
      final pubspec = File('pubspec.yaml').readAsStringSync();
 -    expect(pubspec, contains('version: 0.38.0+108'));
 +    expect(pubspec, contains('version: 0.38.1+109'));
-     expect(pubspec, contains('flutter_local_notifications:'));
-     expect(pubspec, contains('games_services: ^4.1.1'));
-     expect(pubspec, contains('in_app_purchase:'));
+     final android = File('tool/apply_android_compat.py').readAsStringSync();
+     expect(android, contains('compileSdk = 36'));
+     expect(android, contains('WindowCompat.setDecorFitsSystemWindows(window, false)')); 
 --- a/test/real_material_audio_test.dart
 +++ b/test/real_material_audio_test.dart
-@@ -7,7 +7,7 @@
-   test('real material audio build pipeline is included', () {
+@@ -7,6 +7,6 @@
+     expect(File('tool/fetch_real_material_audio.sh').existsSync(), isTrue);
+     expect(File('REAL_AUDIO_CREDITS.md').existsSync(), isTrue);
      final pubspec = File('pubspec.yaml').readAsStringSync();
-     final realAudioScript = File('tool/fetch_real_material_audio.sh').readAsStringSync();
 -    expect(pubspec, contains('version: 0.38.0+108'));
 +    expect(pubspec, contains('version: 0.38.1+109'));
-     expect(realAudioScript, contains('Wikimedia'));
-     expect(realAudioScript, contains('OpenGameArt'));
+   });
+ }
 --- a/test/remove_adventure_test.dart
 +++ b/test/remove_adventure_test.dart
 @@ -29,7 +29,7 @@
-     expect(File('lib/screens/adventure_screen.dart').existsSync(), isFalse);
-     final assets = File('pubspec.yaml').readAsStringSync();
+     expect(Directory('assets/images/adventure_battles').existsSync(), isFalse);
+     expect(Directory('assets/images/adventure_worlds').existsSync(), isFalse);
+     expect(assets, isNot(contains('assets/images/adventure_')));
 -    expect(assets, contains('version: 0.38.0+108'));
 +    expect(assets, contains('version: 0.38.1+109'));
      expect(assets, contains('assets/images/animal_gems/'));
-     expect(assets, contains('assets/images/worlds/'));
+   });
+ 
