@@ -301,231 +301,43 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg curl
 
-      - name: Fetch game material audio
-        working-directory: build_source
-        run: |
-          bash tool/fetch_real_material_audio.sh
-          bash tool/fetch_real_puzzle_music.sh
+      - name: Download audio from verified v0.37.9 signed build
+        uses: actions/download-artifact@v4
+        with:
+          name: ELXVRO-Blocks-v0.37.9-APK-AAB
+          run-id: 39537429906
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: verified-audio-build
 
-      - name: Build Audio 4.0 real breaks fireworks and menu chimes
-        working-directory: build_source
+      - name: Reuse verified CC0 material sound and music assets
         run: |
           set -euo pipefail
-          mkdir -p /tmp/elxvro-cc0-breaks assets/audio
-
-          curl -fL --retry 4 --retry-all-errors -A "ELXVRO-Blocks-GitHub-Build/0.22.1" \
-            "https://opengameart.org/sites/default/files/sfx_breaking_and_falling.zip" \
-            -o /tmp/elxvro-cc0-breaks/breaks.zip
-
+          test -s verified-audio-build/ELXVRO-Blocks-v0.37.9-SIGNED.apk
           python - <<'PY'
           from pathlib import Path
-          import zipfile
-          root = Path('/tmp/elxvro-cc0-breaks')
-          with zipfile.ZipFile(root / 'breaks.zip') as z:
-              z.extractall(root / 'raw')
+          from zipfile import ZipFile
+          apk = Path('verified-audio-build/ELXVRO-Blocks-v0.37.9-SIGNED.apk')
+          dest = Path('build_source/assets/audio')
+          dest.mkdir(parents=True, exist_ok=True)
+          prefix = 'assets/flutter_assets/assets/audio/'
+          with ZipFile(apk) as z:
+              items = [n for n in z.namelist() if n.startswith(prefix) and not n.endswith('/')]
+              assert len(items) >= 65, f'Expected original game audio, found {len(items)}'
+              for item in items:
+                  basename = item[len(prefix):]
+                  assert '/' not in basename and basename not in ('.','..')
+                  (dest / basename).write_bytes(z.read(item))
+          required = [
+            'glass_place_v1.wav', 'stone_clear_v1.wav',
+            'cc0_glass_break.wav', 'cc0_wood_break.wav', 'cc0_stone_break.wav',
+            'pro_glass_break.wav', 'menu_fun_v1.wav', 'firework_combo_v1.wav',
+            'bgm_magic_puzzle.ogg', 'bgm_cozy_title.ogg',
+            'cozy_puzzle_music.ogg', 'AUDIO_LICENSES_v0230.txt',
+          ]
+          assert all((dest / name).stat().st_size > 0 for name in required)
+          print(f'Restored {len(items)} verified signed release audio files')
           PY
-
-          pick_audio() {
-            pattern="$1"
-            found="$(find /tmp/elxvro-cc0-breaks/raw -type f | grep -Ei '\.(wav|ogg|mp3|flac)$' | grep -Ei "$pattern" | sort | head -n 1 || true)"
-            if [ -z "$found" ]; then
-              found="$(find /tmp/elxvro-cc0-breaks/raw -type f | grep -Ei '\.(wav|ogg|mp3|flac)$' | sort | head -n 1)"
-            fi
-            test -n "$found"
-            printf '%s' "$found"
-          }
-
-          GLASS_SRC="$(pick_audio 'glass|bottle|crystal')"
-          WOOD_SRC="$(pick_audio 'wood|branch|stick|plank')"
-          STONE_SRC="$(pick_audio 'stone|rock|brick|concrete')"
-
-          normalize_break() {
-            ffmpeg -y -loglevel error -i "$1" \
-              -af "highpass=f=55,loudnorm=I=-12:TP=-1.2:LRA=8,alimiter=limit=0.97" \
-              -ar 44100 -ac 2 "$2"
-          }
-
-          normalize_break "$GLASS_SRC" assets/audio/cc0_glass_break.wav
-          normalize_break "$WOOD_SRC" assets/audio/cc0_wood_break.wav
-          normalize_break "$STONE_SRC" assets/audio/cc0_stone_break.wav
-
-          # Three short, playful menu chimes.
-          make_chime() {
-            f1="$1"; f2="$2"; out="$3"
-            ffmpeg -y -loglevel error \
-              -f lavfi -i "sine=frequency=$f1:duration=0.24:sample_rate=44100" \
-              -f lavfi -i "sine=frequency=$f2:duration=0.20:sample_rate=44100" \
-              -filter_complex "[0:a]volume=0.34,afade=t=out:st=0.08:d=0.16[a0];[1:a]adelay=42|42,volume=0.23,afade=t=out:st=0.07:d=0.13[a1];[a0][a1]amix=inputs=2:normalize=0,alimiter=limit=0.88" \
-              -ar 44100 -ac 2 "$out"
-          }
-          make_chime 660 990 assets/audio/menu_fun_v1.wav
-          make_chime 740 1110 assets/audio/menu_fun_v2.wav
-          make_chime 820 1230 assets/audio/menu_fun_v3.wav
-
-          # Firework/explosion variants: low boom + bright crackle + real impact layer.
-          make_firework() {
-            freq="$1"; delay="$2"; impact="$3"; out="$4"
-            ffmpeg -y -loglevel error \
-              -f lavfi -i "anoisesrc=color=pink:amplitude=0.82:d=1.35:r=44100" \
-              -f lavfi -i "anoisesrc=color=white:amplitude=0.58:d=0.82:r=44100" \
-              -i "$impact" \
-              -filter_complex "[0:a]lowpass=f=$freq,afade=t=out:st=0.08:d=1.20,volume=1.18[boom];[1:a]highpass=f=2100,adelay=$delay|$delay,afade=t=out:st=0.04:d=0.72,volume=0.62[crackle];[2:a]adelay=28|28,volume=0.48[hit];[boom][crackle][hit]amix=inputs=3:normalize=0,alimiter=limit=0.96" \
-              -ar 44100 -ac 2 "$out"
-          }
-          make_firework 390 70 assets/audio/cc0_stone_break.wav assets/audio/firework_combo_v1.wav
-          make_firework 470 92 assets/audio/cc0_glass_break.wav assets/audio/firework_combo_v2.wav
-          make_firework 330 58 assets/audio/cc0_wood_break.wav assets/audio/firework_combo_v3.wav
-
-          for f in \
-            assets/audio/cc0_glass_break.wav \
-            assets/audio/cc0_wood_break.wav \
-            assets/audio/cc0_stone_break.wav \
-            assets/audio/menu_fun_v1.wav \
-            assets/audio/menu_fun_v2.wav \
-            assets/audio/menu_fun_v3.wav \
-            assets/audio/firework_combo_v1.wav \
-            assets/audio/firework_combo_v2.wav \
-            assets/audio/firework_combo_v3.wav; do
-            test -s "$f"
-          done
-
-      - name: Build Audio 5.0 material impact layers
-        working-directory: build_source
-        run: |
-          set -euo pipefail
-
-          for source in \
-            assets/audio/cc0_glass_break.wav \
-            assets/audio/cc0_wood_break.wav \
-            assets/audio/cc0_stone_break.wav \
-            assets/audio/glass_clear_v2.wav \
-            assets/audio/crystal_clear_v2.wav \
-            assets/audio/wood_clear_v2.wav \
-            assets/audio/leaf_clear_v2.wav \
-            assets/audio/stone_clear_v2.wav \
-            assets/audio/marble_clear_v2.wav; do
-            test -s "$source"
-          done
-
-          mix_break() {
-            real="$1"
-            detail="$2"
-            real_gain="$3"
-            detail_gain="$4"
-            delay_ms="$5"
-            output="$6"
-
-            ffmpeg -y -loglevel error \
-              -i "$real" \
-              -i "$detail" \
-              -filter_complex "[0:a]volume=$real_gain,highpass=f=45[a0];[1:a]adelay=$delay_ms|$delay_ms,volume=$detail_gain[a1];[a0][a1]amix=inputs=2:normalize=0,acompressor=threshold=-10dB:ratio=2.2:attack=4:release=95,alimiter=limit=0.97" \
-              -ar 44100 -ac 2 "$output"
-          }
-
-          mix_break assets/audio/cc0_glass_break.wav assets/audio/glass_clear_v2.wav 0.94 0.82 12 assets/audio/pro_glass_break.wav
-          mix_break assets/audio/cc0_glass_break.wav assets/audio/crystal_clear_v2.wav 0.82 0.94 8 assets/audio/pro_crystal_break.wav
-          mix_break assets/audio/cc0_wood_break.wav assets/audio/wood_clear_v2.wav 0.96 0.76 22 assets/audio/pro_wood_break.wav
-          mix_break assets/audio/cc0_wood_break.wav assets/audio/leaf_clear_v2.wav 0.58 0.90 18 assets/audio/pro_leaf_break.wav
-          mix_break assets/audio/cc0_stone_break.wav assets/audio/stone_clear_v2.wav 1.00 0.82 30 assets/audio/pro_stone_break.wav
-          mix_break assets/audio/cc0_stone_break.wav assets/audio/marble_clear_v2.wav 0.84 0.96 24 assets/audio/pro_marble_break.wav
-
-          for output in \
-            assets/audio/pro_glass_break.wav \
-            assets/audio/pro_crystal_break.wav \
-            assets/audio/pro_wood_break.wav \
-            assets/audio/pro_leaf_break.wav \
-            assets/audio/pro_stone_break.wav \
-            assets/audio/pro_marble_break.wav; do
-            test -s "$output"
-            ffprobe -v error -show_entries format=duration \
-              -of default=noprint_wrappers=1:nokey=1 "$output"
-          done
-
-      - name: Fetch upbeat CC0 background playlist
-        working-directory: build_source
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/elxvro-music assets/audio
-          UA="ELXVRO-Blocks-GitHub-Build/0.22.1"
-
-          curl -fL --retry 4 --retry-all-errors -A "$UA" \
-            "https://opengameart.org/sites/default/files/magic_puzzle_in-game_1_bpm110_0.ogg" \
-            -o /tmp/elxvro-music/magic.ogg
-          curl -fL --retry 4 --retry-all-errors -A "$UA" \
-            "https://opengameart.org/sites/default/files/cozy_puzzle_in-game_1_bpm118_0.ogg" \
-            -o /tmp/elxvro-music/cozy1.ogg
-          curl -fL --retry 4 --retry-all-errors -A "$UA" \
-            "https://opengameart.org/sites/default/files/cozy_puzzle_in-game_3_bpm108_0.ogg" \
-            -o /tmp/elxvro-music/cozy3.ogg
-          curl -fL --retry 4 --retry-all-errors -A "$UA" \
-            "https://opengameart.org/sites/default/files/platformer_alt.ogg" \
-            -o /tmp/elxvro-music/platformer.ogg
-          curl -fL --retry 4 --retry-all-errors -A "$UA" \
-            "https://opengameart.org/sites/default/files/othercenter.ogg" \
-            -o /tmp/elxvro-music/othercenter.ogg
-          curl -fL --retry 4 --retry-all-errors -A "$UA" \
-            "https://opengameart.org/sites/default/files/cozy_puzzle_title_bpm95_0.ogg" \
-            -o /tmp/elxvro-music/title.ogg
-
-          normalize() {
-            ffmpeg -y -loglevel error -i "$1" \
-              -af "loudnorm=I=-19:TP=-1.8:LRA=10" -c:a libvorbis -q:a 4 "$2"
-          }
-          normalize /tmp/elxvro-music/magic.ogg assets/audio/bgm_magic_puzzle.ogg
-          normalize /tmp/elxvro-music/cozy1.ogg assets/audio/bgm_cozy_puzzle_1.ogg
-          normalize /tmp/elxvro-music/cozy3.ogg assets/audio/bgm_cozy_puzzle_3.ogg
-          normalize /tmp/elxvro-music/platformer.ogg assets/audio/bgm_platformer_alt.ogg
-          normalize /tmp/elxvro-music/othercenter.ogg assets/audio/bgm_othercenter.ogg
-          normalize /tmp/elxvro-music/title.ogg assets/audio/bgm_cozy_title.ogg
-
-          cat > assets/audio/AUDIO_LICENSES_v0230.txt <<'EOF'
-          ELXVRO Blocks v0.28.7 audio sources
-          Music — CC0 / public-domain dedication via OpenGameArt:
-          - Magic Puzzle In-Game 1 — MintoDog
-          - Cozy Puzzle In-Game 1 — MintoDog
-          - Cozy Puzzle In-Game 3 — MintoDog
-          - Overworld Theme / platformer_alt — Louswan
-          - Other Center — zesona / Chris Murphy
-          - Cozy Puzzle Title — MintoDog
-          Sound effects — CC0 via OpenGameArt:
-          - 75 CC0 breaking / falling / hit sfx — rubberduck
-          Menu chimes and firework layering are generated/processed during the ELXVRO build.
-          EOF
-
-      - name: Verify Audio 4.0 assets
-        working-directory: build_source
-        run: |
-          set -euo pipefail
-          for track in \
-            assets/audio/bgm_magic_puzzle.ogg \
-            assets/audio/bgm_cozy_puzzle_1.ogg \
-            assets/audio/bgm_cozy_puzzle_3.ogg \
-            assets/audio/bgm_platformer_alt.ogg \
-            assets/audio/bgm_othercenter.ogg \
-            assets/audio/bgm_cozy_title.ogg; do
-            test -s "$track"
-            ffprobe -v error -show_entries format=duration \
-              -of default=noprint_wrappers=1:nokey=1 "$track"
-          done
-          for sfx in \
-            assets/audio/cc0_glass_break.wav \
-            assets/audio/cc0_wood_break.wav \
-            assets/audio/cc0_stone_break.wav \
-            assets/audio/menu_fun_v1.wav \
-            assets/audio/menu_fun_v2.wav \
-            assets/audio/menu_fun_v3.wav \
-            assets/audio/firework_combo_v1.wav \
-            assets/audio/firework_combo_v2.wav \
-            assets/audio/firework_combo_v3.wav \
-            assets/audio/pro_glass_break.wav \
-            assets/audio/pro_crystal_break.wav \
-            assets/audio/pro_wood_break.wav \
-            assets/audio/pro_leaf_break.wav \
-            assets/audio/pro_stone_break.wav \
-            assets/audio/pro_marble_break.wav; do
-            test -s "$sfx"
-          done
-          test -s assets/audio/AUDIO_LICENSES_v0230.txt
+          test -s build_source/assets/audio/REAL_AUDIO_BUILD.txt
 
       - name: Generate launcher icon and splash
         working-directory: build_source
