@@ -1,0 +1,138 @@
+--- a/lib/screens/settings_screen.dart
++++ b/lib/screens/settings_screen.dart
+@@ -198,7 +198,6 @@
+                           },
+                         ),
+                         const SizedBox(height: 12),
+-                        const SizedBox(height: 12),
+                         _ActionCard(
+                           icon: Icons.support_agent_rounded,
+                           title: AppStrings.current.f('YARDIM VE DESTEK', 'HELP & SUPPORT'),
+@@ -519,74 +518,6 @@
+       ),
+     );
+   }
+-}
+-
+-class _StatusCard extends StatelessWidget {
+-  _StatusCard({
+-    required this.icon,
+-    required this.title,
+-    required this.subtitle,
+-    required this.status,
+-  });
+-
+-  final IconData icon;
+-  final String title;
+-  final String subtitle;
+-  final String status;
+-
+-  @override
+-  Widget build(BuildContext context) {
+-    return Container(
+-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+-      decoration: BoxDecoration(
+-        color: Colors.white.withValues(alpha: 0.04),
+-        borderRadius: BorderRadius.circular(22),
+-        border: Border.all(color: Colors.white.withValues(alpha: 0.055)),
+-      ),
+-      child: Row(
+-        children: <Widget>[
+-          Icon(icon, color: const Color(0xFFFFCF7A)),
+-          const SizedBox(width: 14),
+-          Expanded(
+-            child: Column(
+-              crossAxisAlignment: CrossAxisAlignment.start,
+-              children: <Widget>[
+-                Text(
+-                  title,
+-                  style: const TextStyle(
+-                    color: Colors.white,
+-                    fontSize: 13,
+-                    fontWeight: FontWeight.w800,
+-                    letterSpacing: 0.7,
+-                  ),
+-                ),
+-                const SizedBox(height: 3),
+-                Text(
+-                  subtitle,
+-                  style: const TextStyle(color: Colors.white38, fontSize: 11),
+-                ),
+-              ],
+-            ),
+-          ),
+-          Container(
+-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+-            decoration: BoxDecoration(
+-              color: const Color(0xFFFFC86E).withValues(alpha: 0.08),
+-              borderRadius: BorderRadius.circular(999),
+-            ),
+-            child: Text(
+-              status,
+-              style: const TextStyle(
+-                color: Color(0xFFFFD98B),
+-                fontSize: 8,
+-                fontWeight: FontWeight.w900,
+-              ),
+-            ),
+-          ),
+-        ],
+-      ),
+-    );
+-  }
+ }
+ 
+ class _SettingCard extends StatelessWidget {
+--- a/lib/screens/support_screen.dart
++++ b/lib/screens/support_screen.dart
+@@ -9,7 +9,7 @@
+ /// Email support with contextual game and app version in the draft subject.
+ /// No in-app server is implied; the player approves sending in their mail app.
+ class SupportScreen extends StatefulWidget {
+-  const SupportScreen({super.key, required this.appState, this.initialGame = 'classic'});
++  const SupportScreen({super.key, required this.appState, this.initialGame = 'general'});
+   final AppState appState;
+   final String initialGame;
+ 
+--- a/test/v0378_navigation_localization_test.dart
++++ b/test/v0378_navigation_localization_test.dart
+@@ -1,9 +1,6 @@
++import 'dart:io';
+ import 'package:flutter_test/flutter_test.dart';
+ import 'package:elxvro_blocks/l10n/app_strings.dart';
+-import 'package:elxvro_blocks/screens/achievements_screen.dart';
+-import 'package:elxvro_blocks/screens/share_hub_screen.dart';
+-import 'package:elxvro_blocks/screens/support_screen.dart';
+-import 'package:elxvro_blocks/screens/engagement_hub_screen.dart';
+ 
+ void main() {
+   test('new interface translations are real text, not placeholder prefixes', () {
+@@ -21,11 +18,24 @@
+   test('achievement medals share one persistent claim state', () {
+     // Medal claiming uses the existing unique achievement ID with zero coin
+     // reward; no new currency or duplicated claim ledger is introduced.
+-    expect(AchievementsScreen, isNotNull);
++    final code = File('lib/screens/achievements_screen.dart').readAsStringSync();
++    expect(code, contains('reward: 0'));
++    expect(code, contains('MADALYA KOLEKSİYONU'));
++    expect(code, isNot(contains('monetization_on_rounded')));
+   });
+   test('share and support are direct routes, not extra bottom navigation tabs', () {
+-    expect(ShareHubScreen, isNotNull);
+-    expect(SupportScreen, isNotNull);
+-    expect(EngagementHubScreen, isNotNull);
++    final home = File('lib/screens/main_hub_screen.dart').readAsStringSync();
++    expect('home_engagement_hub'.allMatches(home).length, 1);
++    expect('game_shop'.allMatches(home).length, 1);
++    expect(home, isNot(contains('home_missions')));
++    expect(home, isNot(contains('home_store')));
++    final support=File('lib/screens/support_screen.dart').readAsStringSync();
++    expect(support, contains('info@elxvro.com'));
++    expect(support, contains('Game ID:'));
++    expect(support, contains('Version:'));
++    final sharing=File('lib/screens/share_hub_screen.dart').readAsStringSync();
++    expect(sharing, contains('XFile.fromData'));
++    expect(sharing, contains('share_text'));
++    expect(sharing, contains('share_link'));
+   });
+ }
