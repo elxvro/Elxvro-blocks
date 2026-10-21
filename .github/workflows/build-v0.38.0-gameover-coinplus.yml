@@ -102,6 +102,7 @@ jobs:
           base64 -d tools/v0380/gameover-coinplus.patch.gz.b64 | gzip -dc > /tmp/v0380.patch
           patch --batch --fuzz=0 -p1 -d "$APP" < /tmp/v0380.patch
           patch --batch --fuzz=0 -p1 -d "$APP" < tools/v0380/analyzer-hotfix.patch
+          patch --batch --fuzz=0 -p1 -d "$APP" < tools/v0380/test-hotfix.patch
           grep -Fx 'version: 0.38.0+108' "$APP/pubspec.yaml"
           test -s "$APP/lib/services/coin_boost_subscription.dart"
           test -s "$APP/lib/widgets/coin_subscription_card.dart"
@@ -295,11 +296,6 @@ jobs:
           grep -F 'play-services-games-v2:22.1.0' /tmp/elxvro-gradle-dependencies.txt
           grep -F 'play-services-base:18.11.0' /tmp/elxvro-gradle-dependencies.txt
           grep -F 'play-services-basement:18.12.0' /tmp/elxvro-gradle-dependencies.txt
-
-      - name: Install audio tooling
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg curl
 
       - name: Download audio from verified v0.37.9 signed build
         uses: actions/download-artifact@v4
