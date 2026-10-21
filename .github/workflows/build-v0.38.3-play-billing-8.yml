@@ -113,6 +113,14 @@ jobs:
               assert s.count(old) == 1, f'Expected exactly one {old}'
               s = s.replace(old, new)
           p.write_text(s)
+          count = 0
+          for test_file in sorted(Path('extracted/elxvro-blocks/test').glob('*.dart')):
+              source = test_file.read_text()
+              if 'version: 0.38.2+110' in source:
+                  count += source.count('version: 0.38.2+110')
+                  test_file.write_text(source.replace('version: 0.38.2+110',
+                                                      'version: 0.38.3+111'))
+          assert count == 7, f'Expected 7 historical version assertions, got {count}'
           notes = Path('extracted/elxvro-blocks/V0383_RELEASE_NOTES.md')
           notes.write_text(
               '# ELXVRO Blocks v0.38.3 (build 111) — Google Play Billing 8.0.0\n\n'
