@@ -268,7 +268,7 @@ jobs:
         working-directory: build_source
         run: |
           set -euo pipefail
-          flutter pub deps --style=compact | grep -E 'in_app_purchase_android 0\\.5\\.'
+          flutter pub deps --style=compact | grep -F 'in_app_purchase_android 0.5.'
           grep -Fx '  in_app_purchase: ^3.3.1' pubspec.yaml
           grep -Fx '  in_app_purchase_android: ^0.5.4' pubspec.yaml
 
