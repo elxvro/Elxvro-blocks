@@ -1,0 +1,42 @@
+--- a/lib/screens/engagement_hub_screen.dart
++++ b/lib/screens/engagement_hub_screen.dart
+@@ -1,10 +1,7 @@
+-import 'dart:async';
+-
+ import 'package:flutter/material.dart';
+ 
+ import '../app_state.dart';
+ import '../models/engagement_catalog.dart';
+-import '../services/engagement_notifications.dart';
+ import '../widgets/premium_background.dart';
+ import 'notifications_center_screen.dart';
+ import 'store_screen.dart';
+--- a/lib/screens/main_hub_screen.dart
++++ b/lib/screens/main_hub_screen.dart
+@@ -11,7 +11,6 @@
+ import '../widgets/coin_badge.dart';
+ import '../widgets/premium_background.dart';
+ import 'animal_adventure_screen.dart';
+-import 'daily_missions_screen.dart';
+ import 'engagement_hub_screen.dart';
+ import 'notifications_center_screen.dart';
+ import 'duel_screen.dart';
+--- a/lib/services/engagement_notifications.dart
++++ b/lib/services/engagement_notifications.dart
+@@ -1,5 +1,3 @@
+-import 'dart:async';
+-
+ import 'package:flutter/foundation.dart';
+ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+ import 'package:flutter_timezone/flutter_timezone.dart';
+--- a/lib/services/engagement_center.dart
++++ b/lib/services/engagement_center.dart
+@@ -94,7 +94,7 @@
+     (g) => g.mode == mode && value(mode,g.metric) >= g.target && !_claimed.contains(g.id)).length;
+   int availableAchievements(String mode) => engagementAchievements.where(
+     (g) => g.mode == mode && value(mode,g.metric,daily:false) >= g.target && !_achievementsClaimed.contains(g.id)).length;
+-  int unread => _inbox.where((n) => !n.read).length;
++  int get unread => _inbox.where((n) => !n.read).length;
+   List<EngagementNotice> get inbox => List.unmodifiable(_inbox);
+   int boosts(String mode) => _boosts[mode] ?? 0;
+   bool claimedMission(String id) => _claimed.contains(id);
