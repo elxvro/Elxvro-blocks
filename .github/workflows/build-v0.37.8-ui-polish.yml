@@ -101,6 +101,7 @@ jobs:
           patch --batch -p1 -d "$APP" < /tmp/v0378.patch
           patch --batch -p1 -d "$APP" < tools/v0378/analyzer-hotfix.patch
           patch --batch -p1 -d "$APP" < tools/v0378/performance-hotfix.patch
+          patch --batch -p1 -d "$APP" < tools/v0378/ci-tests-hotfix.patch
           grep -Fx 'version: 0.37.8+106' "$APP/pubspec.yaml"
           test -s "$APP/lib/screens/share_hub_screen.dart"
           test -s "$APP/lib/screens/support_screen.dart"
