@@ -1,0 +1,54 @@
+--- a/lib/screens/animal_adventure_screen.dart
++++ b/lib/screens/animal_adventure_screen.dart
+@@ -105,7 +105,6 @@
+   @override
+   Widget build(BuildContext context) {
+     final theme = _currentTheme(widget.appState);
+-    final tr = widget.appState.languageCode == 'tr';
+     return Scaffold(body: PremiumBackground(
+       top: theme.backgroundTop, bottom: theme.backgroundBottom,
+       material: theme.material, accent: theme.blockAccent,
+@@ -268,7 +267,6 @@
+   @override
+   Widget build(BuildContext context) {
+     final theme = _currentTheme(widget.appState);
+-    final tr = widget.appState.languageCode == 'tr';
+     return Scaffold(
+       body: PremiumBackground(
+         top: theme.backgroundTop, bottom: theme.backgroundBottom,
+@@ -805,7 +803,6 @@
+ 
+   Future<bool> _buyBooster(int price, String label) async {
+     if (_busy || _finishing || _purchasing || _engine.ended) return false;
+-    final tr = widget.appState.languageCode == 'tr';
+     setState(() => _purchasing = true);
+     try {
+       final confirm = await showDialog<bool>(context: context,
+@@ -940,7 +937,6 @@
+     final targetColor = _gemColors[_level.featuredGem];
+     final progressFraction = (_engine.targetProgress / _level.target)
+       .clamp(0.0, 1.0).toDouble();
+-    final tr = widget.appState.languageCode == 'tr';
+     return Scaffold(body:PremiumBackground(
+       top:chapter.top,bottom:chapter.bottom,
+       material:theme.material,accent:accent,
+--- a/lib/screens/animal_match_result_screen.dart
++++ b/lib/screens/animal_match_result_screen.dart
+@@ -63,7 +63,6 @@
+     const gold = Color(0xFFFFD67A);
+     const dark = Color(0xFF070E22);
+     final accent = widget.won ? gold : sapphire;
+-    final tr = widget.tr;
+     return Material(
+       color: dark,
+       child: Stack(children: <Widget>[
+--- a/lib/screens/launch_screen.dart
++++ b/lib/screens/launch_screen.dart
+@@ -31,7 +31,6 @@
+ 
+   @override
+   Widget build(BuildContext context) {
+-    final tr = appState.languageCode == 'tr';
+     const gold = Color(0xFFFFCE75);
+     const pale = Color(0xFFDAE7FC);
+     final worlds = AdventureWorld.values;
