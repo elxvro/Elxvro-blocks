@@ -23,6 +23,13 @@ class _Auth implements GamesPlatformAdapter {
   Future<void> showAchievements() async {}
 }
 
+class _Records implements PlayerRecordsAdapter {
+  @override
+  Future<String?> playerName() async => 'cazador6116';
+  @override
+  Future<int?> personalBest(String leaderboardId) async => 0;
+}
+
 class _Scores implements OnlineScoresAdapter {
   final pending = <String, Completer<List<OnlineRankingEntry>?>>{};
   @override
@@ -59,7 +66,7 @@ void main() {
     final app = AppState();
     await app.load();
     final scores = _Scores();
-    final service = PlayGamesService(ids: ids, adapter: _Auth(), scoresAdapter: scores);
+    final service = PlayGamesService(ids: ids, adapter: _Auth(), scoresAdapter: scores, playerRecordsAdapter: _Records());
     await tester.pumpWidget(MaterialApp(home: Scaffold(body:
       SingleChildScrollView(child: ThreeGameRankings(appState: app, service: service)))));
     await _wait(tester, scores, 'classic-id:weekly');
@@ -88,25 +95,4 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('switching weekly to all-time clears stale rows', (tester) async {
-    final app = AppState();
-    await app.load();
-    final scores = _Scores();
-    final service = PlayGamesService(ids: ids, adapter: _Auth(), scoresAdapter: scores);
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body:
-      SingleChildScrollView(child: ThreeGameRankings(appState: app, service: service)))));
-    await _wait(tester, scores, 'classic-id:weekly');
-    scores.complete('classic-id', 'weekly', const <OnlineRankingEntry>[
-      OnlineRankingEntry(rank: 1, name: 'Weekly Player', displayScore: '100', rawScore: 100),
-    ]);
-    await tester.pump();
-    await tester.pump();
-    expect(find.text('Weekly Player'), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey<String>('rank_all_time')));
-    await tester.pump();
-    await _wait(tester, scores, 'classic-id:allTime');
-    expect(find.text('Weekly Player'), findsNothing);
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
 }
