@@ -64,6 +64,7 @@ jobs:
           grep -Fx 'version: 0.38.9+117' build_source/pubspec.yaml
           test -s build_source/test/v0389_score_queue_nonblocking_test.dart
           test -s build_source/test/v0389_game_over_stalled_save_test.dart
+          test -s build_source/test/v0389_game_over_mode_stalled_save_test.dart
           test -s build_source/test/v0389_audio_settings_reopen_test.dart
           grep -F 'await send(entry.key, entry.value)' build_source/lib/services/pending_leaderboard_scores.dart
           grep -F 'A failed first Play connection' build_source/lib/services/coin_boost_subscription.dart
@@ -272,7 +273,8 @@ jobs:
           set -euo pipefail
           flutter test test/v0389_score_queue_nonblocking_test.dart --reporter expanded --concurrency=1
           flutter test test/v0389_audio_settings_reopen_test.dart --reporter expanded --concurrency=1
-          flutter test test/v0389_game_over_stalled_save_test.dart --reporter expanded --concurrency=1
+          timeout 120s flutter test test/v0389_game_over_stalled_save_test.dart --reporter expanded --concurrency=1
+          timeout 120s flutter test test/v0389_game_over_mode_stalled_save_test.dart --reporter expanded --concurrency=1
 
       - name: Classic Game Over UI recovery regression tests
         working-directory: build_source
