@@ -29,3 +29,8 @@ pub = root / 'pubspec.yaml'
 p = pub.read_text()
 assert 'version: 0.38.18+126' in p
 pub.write_text(p.replace('version: 0.38.18+126', 'version: 0.38.19+127'))
+
+settings = root / 'lib/screens/settings_screen.dart'
+label = settings.read_text()
+assert 'v0.38.18  •' in label
+settings.write_text(label.replace('v0.38.18  •', 'v0.38.19  •'))
