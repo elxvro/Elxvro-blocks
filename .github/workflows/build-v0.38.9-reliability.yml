@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - build/v0.38.9-gameover-hotfix
+      - build/v0.38.9-reliability-fixes
     paths:
       - 'tools/v0389/**'
-      - '.github/workflows/build-v0.38.9-gameover.yml'
+      - '.github/workflows/build-v0.38.9-reliability.yml'
 
 permissions:
   contents: read
