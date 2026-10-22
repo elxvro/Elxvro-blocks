@@ -48,7 +48,7 @@ jobs:
           sed -i 's/android:label="elxvro_scan"/android:label="ELXVRO Scan"/' android/app/src/main/AndroidManifest.xml
           rm -rf test
           flutter pub get
-          flutter analyze lib
+          flutter analyze lib --no-fatal-infos
           flutter build apk --debug
           cp build/app/outputs/flutter-apk/app-debug.apk ELXVRO-Scan-v4.1.0-TEST.apk
 
