@@ -49,7 +49,7 @@ jobs:
         with:
           name: ELXVRO-Blocks-v0.38.12-FULL-SOURCE
           run-id: 39725239447
-          github-token: \${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           path: previous-v03812
 
       - name: Five pre-build source and compatibility audits
