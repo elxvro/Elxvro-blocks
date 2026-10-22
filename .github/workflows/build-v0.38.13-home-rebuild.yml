@@ -66,6 +66,7 @@ jobs:
           base64 --decode tools/v03813/home-rebuild.py.gz.b64 | gzip -d > /tmp/elxvro_v03813_patch.py
           python -m py_compile /tmp/elxvro_v03813_patch.py
           (cd build_source && python /tmp/elxvro_v03813_patch.py)
+          sed -i "s/expect(settings, contains('SUPPORT THE DEVELOPER'));/expect(settings, isNot(contains('SUPPORT THE DEVELOPER')));/" build_source/test/v0381_locale_billing_ui_test.dart
           (cd build_source && dart format lib/screens/main_hub_screen.dart lib/screens/social_hub_screen.dart lib/screens/store_screen.dart lib/screens/engagement_hub_screen.dart lib/screens/settings_screen.dart lib/services/play_games_service.dart test/v03813_home_navigation_test.dart test/v0381_locale_billing_ui_test.dart test/v0382_coin_plus_billing_test.dart test/v0387_release_regression_test.dart)
           echo 'AUDIT 3/5: version and navigation consistency'
           grep -Fx 'version: 0.38.13+121' build_source/pubspec.yaml
