@@ -34,3 +34,13 @@ settings = root / 'lib/screens/settings_screen.dart'
 label = settings.read_text()
 assert 'v0.38.18  •' in label
 settings.write_text(label.replace('v0.38.18  •', 'v0.38.19  •'))
+
+# Historical release assertions should follow the current published version.
+assertion_count = 0
+for test_file in (root / 'test').glob('*.dart'):
+    text = test_file.read_text()
+    if 'version: 0.38.18+126' in text:
+        assertion_count += text.count('version: 0.38.18+126')
+        test_file.write_text(text.replace('version: 0.38.18+126',
+                                          'version: 0.38.19+127'))
+assert assertion_count >= 7, assertion_count
