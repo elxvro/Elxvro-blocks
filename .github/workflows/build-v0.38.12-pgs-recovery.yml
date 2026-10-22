@@ -285,7 +285,7 @@ jobs:
 
       - name: Daily missions and coins credit immediately, never twice
         working-directory: build_source
-        run: flutter test test/v03812_instant_daily_claim_test.dart --reporter expanded --concurrency=1
+        run: flutter test test/v03811_instant_daily_claim_test.dart --reporter expanded --concurrency=1
 
       - name: Test Play Games no-popup session probing
         working-directory: build_source
