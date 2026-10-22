@@ -66,7 +66,8 @@ jobs:
           base64 --decode tools/v03817/overlay.tar.gz.b64 | tar -xz -C build_source
           grep -Fx 'version: 0.38.17+125' build_source/pubspec.yaml
           echo 'AUDIT 3/5: public leaderboard reader and privacy'
-          grep -Fq 'ignoreImages: true' build_source/lib/services/play_games_service.dart
+          ! grep -Fq '      ignoreImages: true,' build_source/lib/services/play_games_service.dart
+          grep -Fq 'games_services: 5.3.0' build_source/pubspec.yaml
           grep -Fq 'playerCentered: centered' build_source/lib/services/play_games_service.dart
           grep -Fq 'PlayerScope.global' build_source/lib/services/play_games_service.dart
           grep -Fq 'OYUNCUNUN ÇEVRESİNDEKİ SIRALAMA' build_source/lib/widgets/three_game_rankings.dart
