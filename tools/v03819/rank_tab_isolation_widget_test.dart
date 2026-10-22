@@ -71,6 +71,7 @@ void main() {
     expect(find.text('Old Classic User'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey<String>('rank_tab_fallingBlocks')));
+    await tester.pump();
     await _wait(tester, scores, 'falling-id:weekly');
     expect(find.text('Old Classic User'), findsNothing);
     scores.complete('falling-id', 'weekly', const <OnlineRankingEntry>[
@@ -81,6 +82,7 @@ void main() {
     expect(find.text('Falling User'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey<String>('rank_tab_worldAdventure')));
+    await tester.pump();
     await _wait(tester, scores, 'adventure-id:weekly');
     expect(find.text('Falling User'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -102,6 +104,7 @@ void main() {
     expect(find.text('Weekly Player'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey<String>('rank_all_time')));
+    await tester.pump();
     await _wait(tester, scores, 'classic-id:allTime');
     expect(find.text('Weekly Player'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
