@@ -278,7 +278,7 @@ jobs:
 
       - name: Classic Game Over UI recovery regression tests
         working-directory: build_source
-        run: flutter test test/v0389_game_over_recovery_test.dart --reporter expanded --concurrency=1
+        run: flutter test test/v0388_game_over_recovery_test.dart --reporter expanded --concurrency=1
 
       - name: Arabic phone navigation regression widget tests
         working-directory: build_source
