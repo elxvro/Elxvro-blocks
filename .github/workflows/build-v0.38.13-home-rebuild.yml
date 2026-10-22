@@ -67,6 +67,14 @@ jobs:
           python -m py_compile /tmp/elxvro_v03813_patch.py
           (cd build_source && python /tmp/elxvro_v03813_patch.py)
           sed -i "s/expect(settings, contains('SUPPORT THE DEVELOPER'));/expect(settings, isNot(contains('SUPPORT THE DEVELOPER')));/" build_source/test/v0381_locale_billing_ui_test.dart
+          python - <<'PY_LOCALE_REGRESSION'
+          from pathlib import Path
+          file = Path('build_source/test/v0381_locale_billing_ui_test.dart')
+          content = file.read_text()
+          old = "AppStrings.current.f('ELXVRO BLOCKS DÜNYASINA HOŞ GELDİN', 'WELCOME TO ELXVRO BLOCKS')"
+          assert content.count(old) == 1, 'Only the legacy one-line source assertion may be changed'
+          file.write_text(content.replace(old, 'ELXVRO BLOCKS DÜNYASINA HOŞ GELDİN'))
+          PY_LOCALE_REGRESSION
           python - <<'PY_V03813'
           from pathlib import Path
           for file in Path('build_source/test').glob('*.dart'):
