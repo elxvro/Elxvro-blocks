@@ -1,0 +1,60 @@
+name: ELXVRO Scan v4.1 Test APK
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - "scan_test/**"
+      - ".github/workflows/elxvro-scan-test.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create isolated Android project
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/elxvro_scan_build
+          flutter create --platforms=android --org com.elxvro --project-name elxvro_scan /tmp/elxvro_scan_build
+          cp scan_test/pubspec.yaml /tmp/elxvro_scan_build/pubspec.yaml
+          cp scan_test/lib/main.dart /tmp/elxvro_scan_build/lib/main.dart
+          mkdir -p /tmp/elxvro_scan_build/assets/backgrounds
+
+          curl -L --fail --retry 3 "https://images.unsplash.com/photo-1781455793310-8427c96454c7?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=72&w=1400" -o /tmp/elxvro_scan_build/assets/backgrounds/barber.jpg
+          curl -L --fail --retry 3 "https://images.unsplash.com/photo-1770062824236-2055ac54f662?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=72&w=1400" -o /tmp/elxvro_scan_build/assets/backgrounds/cafe.jpg
+          curl -L --fail --retry 3 "https://images.unsplash.com/photo-1502491759181-ffa0aead0076?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=72&w=1400" -o /tmp/elxvro_scan_build/assets/backgrounds/restaurant.jpg
+          curl -L --fail --retry 3 "https://images.unsplash.com/photo-1776267074159-6245a4ec670c?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=72&w=1400" -o /tmp/elxvro_scan_build/assets/backgrounds/bakery.jpg
+          curl -L --fail --retry 3 "https://images.unsplash.com/photo-1773924093206-9a433a14bb44?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=72&w=1400" -o /tmp/elxvro_scan_build/assets/backgrounds/spa.jpg
+          curl -L --fail --retry 3 "https://images.unsplash.com/photo-1769107805511-0bb7075fca27?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=72&w=1400" -o /tmp/elxvro_scan_build/assets/backgrounds/boutique.jpg
+          curl -L --fail --retry 3 "https://images.unsplash.com/photo-1761971974992-6df33df97c3a?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=72&w=1400" -o /tmp/elxvro_scan_build/assets/backgrounds/gym.jpg
+          curl -L --fail --retry 3 "https://images.unsplash.com/photo-1778151270886-f227700b0eba?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=72&w=1400" -o /tmp/elxvro_scan_build/assets/backgrounds/clinic.jpg
+          curl -L --fail --retry 3 "https://images.unsplash.com/photo-1766603636774-5f328e0da870?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=72&w=1400" -o /tmp/elxvro_scan_build/assets/backgrounds/realestate.jpg
+          curl -L --fail --retry 3 "https://images.unsplash.com/photo-1717063543845-f72f5bddc6ab?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=72&w=1400" -o /tmp/elxvro_scan_build/assets/backgrounds/automotive.jpg
+
+          cd /tmp/elxvro_scan_build
+          sed -i 's/android:label="elxvro_scan"/android:label="ELXVRO Scan"/' android/app/src/main/AndroidManifest.xml
+          flutter pub get
+          flutter analyze
+          flutter build apk --debug
+          cp build/app/outputs/flutter-apk/app-debug.apk ELXVRO-Scan-v4.1.0-TEST.apk
+
+      - name: Upload test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ELXVRO-Scan-v4.1.0-TEST
+          path: /tmp/elxvro_scan_build/ELXVRO-Scan-v4.1.0-TEST.apk
+          if-no-files-found: error
+          retention-days: 7
