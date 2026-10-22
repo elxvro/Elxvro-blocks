@@ -61,6 +61,20 @@ jobs:
           unzip -q previous-v0389/ELXVRO-Blocks-v0.38.9-FULL-SOURCE.zip -d build_source
           grep -Fx 'version: 0.38.9+117' build_source/pubspec.yaml
           base64 -d tools/v03810/play-games-silent-fix.tar.gz.b64 | tar -xz -C build_source
+          # Keep every old regression test but update its strict version-only fixture.
+          python - <<'PY_TEST_VERSION'
+          from pathlib import Path
+          previous='version: 0.38.9+117'
+          current='version: 0.38.10+118'
+          changed=[]
+          for file in Path('build_source/test').glob('*.dart'):
+              before=file.read_text()
+              if previous in before:
+                  file.write_text(before.replace(previous,current))
+                  changed.append(file.name)
+          assert len(changed)==6, f'Expected exactly 6 legacy version-only tests: {changed}'
+          print('Updated legacy version fixtures:', ', '.join(sorted(changed)))
+          PY_TEST_VERSION
           grep -Fx 'version: 0.38.10+118' build_source/pubspec.yaml
           test -s build_source/test/v03810_silent_play_games_test.dart
           grep -F 'GamesServices.isSignedIn' build_source/lib/services/play_games_service.dart
