@@ -97,10 +97,10 @@ jobs:
           grep -Fq 'PlayerRecordsAdapter' build_source/lib/services/play_games_service.dart
           grep -Fq 'Google Play Games · $googleName' build_source/lib/widgets/play_games_name_label.dart
           grep -Fq 'syncExistingScores(' build_source/lib/main.dart
-          grep -Fq 'loadPlayerSummary()' build_source/lib/services/play_games_service.dart
+          grep -Fq 'loadPlayerSummary({' build_source/lib/services/play_games_service.dart
           ! grep -Fq 'Google Play Games’TE AÇ' build_source/lib/widgets/three_game_rankings.dart
           echo 'ALL FIVE AUDITS PASSED'
-          (cd build_source && dart format lib/main.dart lib/services/play_games_service.dart lib/screens/main_hub_screen.dart lib/screens/social_hub_screen.dart lib/widgets/three_game_rankings.dart test/v03814_play_games_score_restoration_test.dart test/v03814_home_navigation_test.dart)
+          (cd build_source && dart format lib/main.dart lib/services/play_games_service.dart lib/screens/main_hub_screen.dart lib/screens/social_hub_screen.dart lib/screens/profile_screen.dart lib/screens/settings_screen.dart lib/widgets/three_game_rankings.dart lib/widgets/play_games_name_label.dart test/v03814_play_games_score_restoration_test.dart test/v03813_home_navigation_test.dart test/v03815_online_personal_best_test.dart)
 
       - name: Create and validate v0.38.15 complete source ZIP
         run: |
@@ -326,7 +326,7 @@ jobs:
         working-directory: build_source
         run: |
           set -euo pipefail
-          flutter test test/v0387_auto_play_games_test.dart test/v0387_release_regression_test.dart test/v03814_home_navigation_test.dart --reporter expanded --concurrency=1
+          flutter test test/v0387_auto_play_games_test.dart test/v0387_release_regression_test.dart test/v03813_home_navigation_test.dart --reporter expanded --concurrency=1
           ! grep -Fq "Text(_tr ? 'YÜKLE'" lib/widgets/three_game_rankings.dart
           ! grep -Fq "Restore purchases" lib/widgets/coin_subscription_card.dart
           ! grep -Fq "Restore purchase" lib/widgets/developer_support_card.dart
@@ -334,7 +334,7 @@ jobs:
 
       - name: Score and ranking integration regression
         working-directory: build_source
-        run: flutter test test/v03814_play_games_score_restoration_test.dart test/v03814_home_navigation_test.dart test/v0375_three_mode_leaderboards_test.dart --reporter expanded --concurrency=1
+        run: flutter test test/v03814_play_games_score_restoration_test.dart test/v03813_home_navigation_test.dart test/v0375_three_mode_leaderboards_test.dart --reporter expanded --concurrency=1
 
       - name: v0.38.15 cloud record and identity regressions
         working-directory: build_source
