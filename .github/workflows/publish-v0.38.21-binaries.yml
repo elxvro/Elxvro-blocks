@@ -1,0 +1,70 @@
+name: Publish ELXVRO Blocks v0.38.21 APK and AAB
+
+on:
+  push:
+    branches:
+      - build/v0.38.21-games-cloud-rankings
+    paths:
+      - '.github/workflows/publish-v0.38.21-binaries.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Retrieve successful signed APK and AAB
+        uses: actions/download-artifact@v4
+        with:
+          name: ELXVRO-Blocks-v0.38.21-APK-AAB
+          run-id: 39914215791
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: release
+
+      - name: Validate binary files and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="release/ELXVRO-Blocks-v0.38.21-SIGNED.apk"
+          AAB="release/ELXVRO-Blocks-v0.38.21-GOOGLE-PLAY.aab"
+          test -s "$APK"
+          test -s "$AAB"
+          (cd release && sha256sum -c ELXVRO-Blocks-v0.38.21-SIGNED.apk.sha256)
+          (cd release && sha256sum -c ELXVRO-Blocks-v0.38.21-GOOGLE-PLAY.aab.sha256)
+          file "$APK" "$AAB"
+          test "$(stat -c%s "$APK")" -gt 1000000
+          test "$(stat -c%s "$AAB")" -gt 1000000
+
+      - name: Publish direct download links
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view v0.38.21 > /dev/null 2>&1; then
+            echo "::error::Release v0.38.21 already exists; refusing to overwrite binaries."
+            exit 1
+          fi
+          gh release create v0.38.21 \
+            release/ELXVRO-Blocks-v0.38.21-SIGNED.apk \
+            release/ELXVRO-Blocks-v0.38.21-GOOGLE-PLAY.aab \
+            release/ELXVRO-Blocks-v0.38.21-SIGNED.apk.sha256 \
+            release/ELXVRO-Blocks-v0.38.21-GOOGLE-PLAY.aab.sha256 \
+            --target "${GITHUB_SHA}" \
+            --title "ELXVRO Blocks v0.38.21" \
+            --notes "Signed Android APK and Google Play AAB from successful tested GitHub Actions run 39914215791. Version 0.38.21+129."
+
+      - name: Verify published downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh release view v0.38.21 --json assets -q '.assets[].name' > /tmp/release_files.txt
+          grep -Fx 'ELXVRO-Blocks-v0.38.21-SIGNED.apk' /tmp/release_files.txt
+          grep -Fx 'ELXVRO-Blocks-v0.38.21-GOOGLE-PLAY.aab' /tmp/release_files.txt
