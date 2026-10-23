@@ -213,8 +213,8 @@ jobs:
 
           """
           source = source.replace(class_anchor, fake + class_anchor, 1)
-          start = source.index("testWidgets('first 100 players")
-          finish = source.index("test('native paging requests", start)
+          start = source.index('first 100 players scroll independently')
+          finish = source.index('native paging requests 4x25', start)
           segment = source[start:finish]
           pattern = r'final service\s*=\s*PlayGamesService\([\s\S]*?\);'
           segment, n = re.subn(pattern, 'final service = _UiReadyService(ids);', segment, count=1)
