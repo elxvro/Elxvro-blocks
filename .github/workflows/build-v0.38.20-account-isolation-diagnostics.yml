@@ -134,6 +134,17 @@ jobs:
               '      return const OnlineRankingResult(OnlineRankingStatus.unavailable);\n'
               '    }\n') + screen[end:]
           ranking.write_text(screen)
+          # Complete the synthetic Adventure response before ending the tab
+          # isolation widget test. It deliberately uses a Completer rather
+          # than a live Play Games request.
+          test = Path('build_source/test/v03819_rank_tab_isolation_widget_test.dart')
+          t = test.read_text()
+          needle = '    await tester.pumpWidget(const SizedBox.shrink());'
+          assert t.count(needle) == 1
+          t = t.replace(needle,
+              "    scores.complete('adventure-id', 'weekly', const <OnlineRankingEntry>[]);\n"
+              '    await tester.pump();\n    await tester.pump();\n' + needle)
+          test.write_text(t)
           PY_TIMERS
           sed -i "s/account switch never flushes the previous player's score/account switch never flushes previous account scores/" build_source/test/v03820_account_isolation_diagnostics_test.dart
           test -s build_source/test/v03820_account_isolation_diagnostics_test.dart
