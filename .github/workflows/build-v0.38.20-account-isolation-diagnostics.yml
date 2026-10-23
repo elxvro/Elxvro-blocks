@@ -82,6 +82,15 @@ jobs:
                   '      await tester.pump(const Duration(seconds: 36));\n'
                   '      await tester.pump();')
               p.write_text(t)
+          # The Classic replay regression also launches Google Play Games in a
+          # widget test with no platform channel response. Let the bounded
+          # authentication attempt settle after disposing the screen.
+          p = Path('build_source/test/v0388_game_over_recovery_test.dart')
+          t = p.read_text()
+          needle = '    await tester.pumpWidget(const SizedBox.shrink());'
+          assert t.count(needle) == 2
+          t = t.replace(needle, needle + '\n    await tester.pump(const Duration(seconds: 36));\n    await tester.pump();')
+          p.write_text(t)
           PY_TIMERS
           sed -i "s/account switch never flushes the previous player's score/account switch never flushes previous account scores/" build_source/test/v03820_account_isolation_diagnostics_test.dart
           test -s build_source/test/v03820_account_isolation_diagnostics_test.dart
