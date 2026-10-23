@@ -231,30 +231,27 @@ jobs:
         run: |
           python - <<'PYSDK'
           from pathlib import Path
-          p=Path('build_source/tool/install_top100_leaderboards.py')
-          s=p.read_text()
-          changes=[
+          p = Path('build_source/tool/install_top100_leaderboards.py')
+          s = p.read_text()
+          changes = [
             ('import com.google.android.gms.games.leaderboard.PageDirection',
              'import com.google.android.gms.games.PageDirection'),
-            ('''                    if (next.isSuccessful && next.result?.get() != null) {
-                        consume(next.result.get(), pageNo + 1)''',
-             '''                    val nextPage = if (next.isSuccessful) next.result?.get() else null
-                    if (nextPage != null) {
-                        consume(nextPage, pageNo + 1)'''),
-            ('''            if (first.isSuccessful && first.result?.get() != null) {
-                consume(first.result.get(), 1)''',
-             '''            val firstPage = if (first.isSuccessful) first.result?.get() else null
-            if (firstPage != null) {
-                consume(firstPage, 1)'''),
+            ('if (next.isSuccessful && next.result?.get() != null) {',
+             'val nextPage = if (next.isSuccessful) next.result?.get() else null\\n                    if (nextPage != null) {'),
+            ('consume(next.result.get(), pageNo + 1)',
+             'consume(nextPage, pageNo + 1)'),
+            ('if (first.isSuccessful && first.result?.get() != null) {',
+             'val firstPage = if (first.isSuccessful) first.result?.get() else null\\n            if (firstPage != null) {'),
+            ('consume(first.result.get(), 1)', 'consume(firstPage, 1)'),
           ]
-          for old,new in changes:
-            assert s.count(old)==1, 'SDK contract changed: '+old.splitlines()[0]
-            s=s.replace(old,new,1)
+          for old, new in changes:
+            assert s.count(old) == 1, 'Missing SDK API anchor: ' + old
+            s = s.replace(old, new, 1)
           assert 'loadMoreScores(buffer, 25, PageDirection.NEXT)' in s
           assert 'val nextPage = if (next.isSuccessful)' in s
           assert 'val firstPage = if (first.isSuccessful)' in s
           p.write_text(s)
-          print('Play Games SDK Top 100 Kotlin import and nullable types fixed')
+          print('Top 100 Kotlin SDK 22.1.0 compatibility fixed')
           PYSDK
           python -m py_compile build_source/tool/install_top100_leaderboards.py
 
