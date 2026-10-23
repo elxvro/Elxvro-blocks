@@ -157,7 +157,7 @@ jobs:
           needle = '      await tester.pumpWidget(const SizedBox.shrink());'
           assert t.count(needle) == 1
           t = t.replace(needle, needle + '\n      await tester.pump(const Duration(seconds: 36));\n      await tester.pump();')
-          needle = '    await tester.pumpWidget(const SizedBox.shrink());'
+          needle = '\n    await tester.pumpWidget(const SizedBox.shrink());'
           assert t.count(needle) == 2
           t = t.replace(needle, needle + '\n    await tester.pump(const Duration(seconds: 36));\n    await tester.pump();')
           nav.write_text(t)
