@@ -64,6 +64,7 @@ jobs:
           echo 'AUDIT 2/5: apply verified targeted overlay'
           test -s tools/v03820/verified-overlay.tar.gz.b64
           base64 -d tools/v03820/verified-overlay.tar.gz.b64 | tar -xz -C build_source
+          sed -i "s/account switch never flushes the previous player's score/account switch never flushes previous account scores/" build_source/test/v03820_account_isolation_diagnostics_test.dart
           test -s build_source/test/v03820_account_isolation_diagnostics_test.dart
           test -s build_source/lib/services/play_games_account_identity.dart
           test -s build_source/lib/services/play_games_diagnostics.dart
