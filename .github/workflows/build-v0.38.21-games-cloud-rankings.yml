@@ -62,8 +62,20 @@ jobs:
           grep -Fx 'version: 0.38.20+128' build_source/pubspec.yaml
           test -s tools/v03821/upgrade.patch.gz.b64
           base64 --decode tools/v03821/upgrade.patch.gz.b64 | gzip -d > /tmp/elxvro-v03821.patch
-          (cd build_source && git apply --check /tmp/elxvro-v03821.patch)
-          (cd build_source && git apply /tmp/elxvro-v03821.patch)
+          python - <<'PYFILTER'
+          from pathlib import Path
+          import re
+          src = Path('/tmp/elxvro-v03821.patch').read_text()
+          blocks = re.split(r'(?=^--- (?:a/|/dev/null))', src, flags=re.M)
+          excluded = ('lib/services/play_games_service.dart',
+                      'lib/widgets/three_game_rankings.dart')
+          target = ''.join(block for block in blocks if block.strip() and
+                           not any(name in block.splitlines()[0] for name in excluded))
+          Path('/tmp/elxvro-v03821-filtered.patch').write_text(target)
+          PYFILTER
+          (cd build_source && git apply --check /tmp/elxvro-v03821-filtered.patch)
+          (cd build_source && git apply /tmp/elxvro-v03821-filtered.patch)
+          python tools/v03821/compat_v03821.py build_source
           grep -Fx 'version: 0.38.21+129' build_source/pubspec.yaml
           test -s build_source/lib/services/play_games_cloud_progress.dart
           test -s build_source/tool/install_cloud_restore_channel.py
