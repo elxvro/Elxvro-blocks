@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - build/v0.38.22-games-cloud-rankings
+      - build/v0.38.22-stable-games-top100
     paths:
       - 'tools/v03822/**'
-      - '.github/workflows/build-v0.38.22-games-cloud-rankings.yml'
+      - '.github/workflows/build-v0.38.22-stable-games-top100.yml'
 
 permissions:
   contents: write
@@ -92,7 +92,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build_source/.github/workflows
-          cp .github/workflows/build-v0.38.22-games-cloud-rankings.yml build_source/.github/workflows/
+          cp .github/workflows/build-v0.38.22-stable-games-top100.yml build_source/.github/workflows/
           (cd build_source && zip -qr ../ELXVRO-Blocks-v0.38.22-FULL-SOURCE.zip . -x 'build/*' '.dart_tool/*' '.git/*')
           unzip -t ELXVRO-Blocks-v0.38.22-FULL-SOURCE.zip >/dev/null
 
