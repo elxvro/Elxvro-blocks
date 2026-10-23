@@ -6,6 +6,7 @@ on:
     branches:
       - build/v0.38.22-stable-games-top100
       - build/v0.38.22-top100-recovery
+      - build/v0.38.22-native-final
     paths:
       - 'tools/v03822/**'
       - '.github/workflows/build-v0.38.22-stable-games-top100.yml'
