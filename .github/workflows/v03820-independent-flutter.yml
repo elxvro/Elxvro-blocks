@@ -51,6 +51,18 @@ jobs:
       - name: Ranking isolation widget regressions
         working-directory: project
         run: flutter test --no-pub test/v03819_rank_tab_isolation_widget_test.dart --reporter expanded --concurrency=1
-      - name: All regression tests
+      - name: All cross-platform Flutter regression tests
         working-directory: project
-        run: timeout 900s flutter test --no-pub --reporter compact --concurrency=1
+        run: |
+          set -euo pipefail
+          # Native Android tree is generated only in the full release workflow.
+          # Its two platform-file checks execute there after Android setup.
+          tests=()
+          for file in test/*_test.dart; do
+            case "$file" in
+              test/android15_system_bars_test.dart|test/play_games_sdk_regression_test.dart) ;;
+              *) tests+=("$file");;
+            esac
+          done
+          test "${#tests[@]}" -gt 20
+          timeout 900s flutter test --no-pub --reporter compact --concurrency=1 "${tests[@]}"
