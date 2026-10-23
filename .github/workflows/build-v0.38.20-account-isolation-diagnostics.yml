@@ -68,6 +68,7 @@ jobs:
           test -s build_source/test/v03820_account_isolation_diagnostics_test.dart
           test -s build_source/lib/services/play_games_account_identity.dart
           test -s build_source/lib/services/play_games_diagnostics.dart
+          python tools/v03820/patch_stalled_gameover_test.py
           grep -Fx 'version: 0.38.20+128' build_source/pubspec.yaml
           echo 'AUDIT 3/5: public leaderboard reader and privacy'
           ! grep -Fq '      ignoreImages: true,' build_source/lib/services/play_games_service.dart
