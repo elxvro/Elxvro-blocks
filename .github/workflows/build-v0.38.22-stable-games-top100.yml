@@ -194,7 +194,7 @@ jobs:
               expect(initialRanking?.entries.length, 100);
           """
           p.write_text(src.replace(anchor, prefetch + anchor, 1))
-          assert p.read_text().count('initialRanking.entries.length, 100') == 1
+          assert p.read_text().count('initialRanking?.entries.length, 100') == 1
           print('Widget fixture: real 100-player response prepared before rendering')
           PYTOP
           (cd build_source && dart format test/v03822_stable_play_games_rankings_test.dart)
