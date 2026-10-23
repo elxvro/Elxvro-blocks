@@ -116,6 +116,24 @@ jobs:
           needle = '      await tester.pumpWidget(const SizedBox.shrink());'
           assert source.count(needle) == 1
           widget.write_text(source.replace(needle, needle + '\n      await tester.pump(const Duration(seconds: 36));\n      await tester.pump();'))
+          # Analyzer: drop unused exception bindings, keep bounded timeout.
+          code = service.read_text()
+          assert code.count('on TimeoutException catch (error) {') == 2
+          code = code.replace('on TimeoutException catch (error) {', 'on TimeoutException {')
+          service.write_text(code)
+          # Never surface a stale mode/period request after a new selection.
+          ranking = Path('build_source/lib/widgets/three_game_rankings.dart')
+          screen = ranking.read_text()
+          assert screen.count('  bool _needsRetry = false;') == 1
+          screen = screen.replace('  bool _needsRetry = false;\n', '')
+          start = screen.index('    if (mounted &&\n        serial == _rankingRequestSerial')
+          end = screen.index('    return result;\n', start)
+          screen = screen[:start] + (
+              '    if (!mounted || serial != _rankingRequestSerial ||\n'
+              '        game != _game || period != _period) {\n'
+              '      return const OnlineRankingResult(OnlineRankingStatus.unavailable);\n'
+              '    }\n') + screen[end:]
+          ranking.write_text(screen)
           PY_TIMERS
           sed -i "s/account switch never flushes the previous player's score/account switch never flushes previous account scores/" build_source/test/v03820_account_isolation_diagnostics_test.dart
           test -s build_source/test/v03820_account_isolation_diagnostics_test.dart
