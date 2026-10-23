@@ -64,6 +64,25 @@ jobs:
           echo 'AUDIT 2/5: apply verified targeted overlay'
           test -s tools/v03820/verified-overlay.tar.gz.b64
           base64 -d tools/v03820/verified-overlay.tar.gz.b64 | tar -xz -C build_source
+          # The game-over widget regressions deliberately leave a native
+          # Play Games request unresolved. Drain bounded SDK timeout timers
+          # after widget disposal; otherwise fake_async reports pending timers
+          # even though game-over UI was successfully rendered.
+          python - <<'PY_TIMERS'
+          from pathlib import Path
+          for fname in ('v0389_game_over_stalled_save_test.dart',
+                        'v0389_game_over_mode_stalled_save_test.dart'):
+              p = Path('build_source/test') / fname
+              t = p.read_text()
+              needle = '      await tester.pumpWidget(const SizedBox.shrink());\n      state.dispose();'
+              assert t.count(needle) == 1, fname
+              t = t.replace(needle,
+                  '      await tester.pumpWidget(const SizedBox.shrink());\n'
+                  '      state.dispose();\n'
+                  '      await tester.pump(const Duration(seconds: 36));\n'
+                  '      await tester.pump();')
+              p.write_text(t)
+          PY_TIMERS
           sed -i "s/account switch never flushes the previous player's score/account switch never flushes previous account scores/" build_source/test/v03820_account_isolation_diagnostics_test.dart
           test -s build_source/test/v03820_account_isolation_diagnostics_test.dart
           test -s build_source/lib/services/play_games_account_identity.dart
