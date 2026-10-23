@@ -186,10 +186,11 @@ jobs:
           assert 'final initialRanking' not in src, 'Already patched test'
           prefetch = """    // Resolve the real 100-row response outside widget frame pumping.
               // Do not replace leaderboard data with fake visible placeholders.
-              final initialRanking = await service.loadModeRanking(
-                mode: RankedGame.classic, period: RankingPeriod.weekly);
-              expect(initialRanking.status, OnlineRankingStatus.ready);
-              expect(initialRanking.entries.length, 100);
+              final initialRanking = await tester.runAsync(() =>
+                service.loadModeRanking(
+                  mode: RankedGame.classic, period: RankingPeriod.weekly));
+              expect(initialRanking?.status, OnlineRankingStatus.ready);
+              expect(initialRanking?.entries.length, 100);
           """
           p.write_text(src.replace(anchor, prefetch + anchor, 1))
           assert p.read_text().count('initialRanking.entries.length, 100') == 1
