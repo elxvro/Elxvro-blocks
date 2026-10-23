@@ -10,7 +10,7 @@ on:
       - '.github/workflows/build-v0.38.21-games-cloud-rankings.yml'
 
 permissions:
-  contents: read
+  contents: write
   actions: read
 
 concurrency:
@@ -473,6 +473,27 @@ jobs:
           cp ELXVRO-Blocks-v0.38.21-GOOGLE-PLAY.aab* ELXVRO-Blocks-v0.38.21-APK-AAB/
           cp ELXVRO-Blocks-v0.38.21-FULL-SOURCE.zip ELXVRO-Blocks-v0.38.21-APK-AAB/
           ls -lh ELXVRO-Blocks-v0.38.21-APK-AAB/
+
+      - name: Publish signed APK and AAB directly from this build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          (cd ELXVRO-Blocks-v0.38.21-APK-AAB && sha256sum -c ELXVRO-Blocks-v0.38.21-SIGNED.apk.sha256)
+          (cd ELXVRO-Blocks-v0.38.21-APK-AAB && sha256sum -c ELXVRO-Blocks-v0.38.21-GOOGLE-PLAY.aab.sha256)
+          if gh release view v0.38.21 >/dev/null 2>&1; then
+            echo "::error::Release tag exists; refusing to replace previously published binaries."
+            exit 1
+          fi
+          gh release create v0.38.21 \
+            ELXVRO-Blocks-v0.38.21-APK-AAB/ELXVRO-Blocks-v0.38.21-SIGNED.apk \
+            ELXVRO-Blocks-v0.38.21-APK-AAB/ELXVRO-Blocks-v0.38.21-GOOGLE-PLAY.aab \
+            ELXVRO-Blocks-v0.38.21-APK-AAB/ELXVRO-Blocks-v0.38.21-SIGNED.apk.sha256 \
+            ELXVRO-Blocks-v0.38.21-APK-AAB/ELXVRO-Blocks-v0.38.21-GOOGLE-PLAY.aab.sha256 \
+            --target "${GITHUB_SHA}" \
+            --title "ELXVRO Blocks v0.38.21" \
+            --notes "Android signed APK and Google Play AAB. Version 0.38.21+129. Passed full regression test suite."
 
       - name: Upload APK and AAB
         uses: actions/upload-artifact@v4
