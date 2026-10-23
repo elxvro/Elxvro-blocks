@@ -237,11 +237,11 @@ jobs:
             ('import com.google.android.gms.games.leaderboard.PageDirection',
              'import com.google.android.gms.games.PageDirection'),
             ('if (next.isSuccessful && next.result?.get() != null) {',
-             'val nextPage = if (next.isSuccessful) next.result?.get() else null\\n                    if (nextPage != null) {'),
+             'val nextPage = if (next.isSuccessful) next.result?.get() else null\n                    if (nextPage != null) {'),
             ('consume(next.result.get(), pageNo + 1)',
              'consume(nextPage, pageNo + 1)'),
             ('if (first.isSuccessful && first.result?.get() != null) {',
-             'val firstPage = if (first.isSuccessful) first.result?.get() else null\\n            if (firstPage != null) {'),
+             'val firstPage = if (first.isSuccessful) first.result?.get() else null\n            if (firstPage != null) {'),
             ('consume(first.result.get(), 1)', 'consume(firstPage, 1)'),
           ]
           for old, new in changes:
