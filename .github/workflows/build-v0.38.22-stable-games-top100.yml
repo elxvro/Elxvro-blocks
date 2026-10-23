@@ -181,7 +181,7 @@ jobs:
           from pathlib import Path
           p = Path('build_source/test/v03822_stable_play_games_rankings_test.dart')
           src = p.read_text()
-          anchor = '    await tester.pumpWidget(MaterialApp(home: Scaffold(body:'
+          anchor = 'await tester.pumpWidget('
           assert src.count(anchor) == 1, 'Widget test insertion point changed'
           assert 'final initialRanking' not in src, 'Already patched test'
           prefetch = """    // Resolve the real 100-row response outside widget frame pumping.
