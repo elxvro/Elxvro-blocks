@@ -182,7 +182,7 @@ jobs:
           p = Path('build_source/test/v03822_stable_play_games_rankings_test.dart')
           src = p.read_text()
           anchor = 'await tester.pumpWidget('
-          assert src.count(anchor) == 1, 'Widget test insertion point changed'
+          assert src.count(anchor) == 2, 'Expected initial and disposal pumpWidget calls'
           assert 'final initialRanking' not in src, 'Already patched test'
           prefetch = """    // Resolve the real 100-row response outside widget frame pumping.
               // Do not replace leaderboard data with fake visible placeholders.
@@ -191,7 +191,7 @@ jobs:
               expect(initialRanking.status, OnlineRankingStatus.ready);
               expect(initialRanking.entries.length, 100);
           """
-          p.write_text(src.replace(anchor, prefetch + anchor))
+          p.write_text(src.replace(anchor, prefetch + anchor, 1))
           assert p.read_text().count('initialRanking.entries.length, 100') == 1
           print('Widget fixture: real 100-player response prepared before rendering')
           PYTOP
