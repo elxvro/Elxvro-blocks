@@ -106,7 +106,7 @@ jobs:
                 }
               }""")
           old="""    // Profile changed in system settings? Verify identity BEFORE any cache hit.
-              if (!await signIn(force: true)) return null;"""
+              if (!await signIn()) return null;"""
           assert source.count(old)==1
           source=source.replace(old, """    // Compare active player without reauthorizing an established session.
               if (_adapter is GamesServicesPlatformAdapter) {
