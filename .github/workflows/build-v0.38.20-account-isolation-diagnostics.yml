@@ -154,12 +154,19 @@ jobs:
           # Compact navigation widget tests inspect layout, not live SDK auth.
           nav = Path('build_source/test/v0374_compact_navigation_test.dart')
           t = nav.read_text()
-          needle = '      await tester.pumpWidget(const SizedBox.shrink());'
-          assert t.count(needle) == 1
-          t = t.replace(needle, needle + '\n      await tester.pump(const Duration(seconds: 36));\n      await tester.pump();')
-          needle = '\n    await tester.pumpWidget(const SizedBox.shrink());'
-          assert t.count(needle) == 2
-          t = t.replace(needle, needle + '\n    await tester.pump(const Duration(seconds: 36));\n    await tester.pump();')
+          original_lines = t.splitlines()
+          revised_lines = []
+          patched = 0
+          for line in original_lines:
+              revised_lines.append(line)
+              if line.strip() == 'await tester.pumpWidget(const SizedBox.shrink());':
+                  indent = line[:len(line) - len(line.lstrip())]
+                  revised_lines.append(indent + 'await tester.pump(const Duration(seconds: 36));')
+                  revised_lines.append(indent + 'await tester.pump();')
+                  patched += 1
+          assert patched >= 3, patched
+          t = '\n'.join(revised_lines) + '\n'
+
           nav.write_text(t)
           PY_TIMERS
           sed -i "s/account switch never flushes the previous player's score/account switch never flushes previous account scores/" build_source/test/v03820_account_isolation_diagnostics_test.dart
