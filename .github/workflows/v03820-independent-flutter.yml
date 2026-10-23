@@ -29,7 +29,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ELXVRO-Blocks-v0.38.20-FULL-SOURCE
-          run-id: 39902052272
+          run-id: 39902464250
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: source-artifact
       - name: Extract candidate
